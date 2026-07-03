@@ -27,6 +27,19 @@ CREATE TABLE IF NOT EXISTS sanctions (
 );
 CREATE INDEX IF NOT EXISTS idx_sanctions_guild_user ON sanctions (guild_id, user_id);
 CREATE INDEX IF NOT EXISTS idx_sanctions_expiry ON sanctions (active, expires_at);
+
+CREATE TABLE IF NOT EXISTS tickets (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  guild_id TEXT NOT NULL,
+  channel_id TEXT NOT NULL UNIQUE,
+  user_id TEXT NOT NULL,
+  number INTEGER NOT NULL,
+  type_id TEXT,
+  status TEXT NOT NULL DEFAULT 'open',   -- open | closed
+  claimed_by TEXT,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_tickets_guild_user ON tickets (guild_id, user_id, status);
 `);
 
 module.exports = db;

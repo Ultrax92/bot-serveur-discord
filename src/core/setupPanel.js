@@ -7,6 +7,7 @@ const {
 const { MODULES, getSettings, updateSettings } = require('./settings');
 const { LOG_TYPES, autoConfigureLogs, createLogChannel } = require('./logs');
 const { buildVerifyPanel } = require('./verification');
+const { buildTicketPanel } = require('./tickets');
 const { parseDuration, formatDuration } = require('./utils');
 
 function panelEmbed(guild, title, description) {
@@ -77,6 +78,7 @@ function hubView(guild) {
     `📜 **Salons de logs** — ${logsCount}/${Object.keys(LOG_TYPES).length} configurés`,
     `✅ **Vérification** — salon ${settings.verifConfig.channel ? '🟢' : '🔴'} | rôle ${settings.verifConfig.role ? '🟢' : '🔴'}`,
     `🤖 **Auto-modération** — ${['antispam', 'antilink', 'antimention', 'badwords'].filter((k) => settings.automodConfig[k].enabled).length}/4 protections actives`,
+    `🎫 **Tickets** — salon ${settings.ticketsConfig.panelChannel ? '🟢' : '🔴'} | ${settings.ticketsConfig.types.length} type(s)`,
     '',
     'Choisis une section dans le menu pour voir et modifier ses réglages.',
   ].join('\n'));
@@ -99,6 +101,8 @@ function hubView(guild) {
         .setDescription('Bouton de vérification qui donne un rôle'),
       new StringSelectMenuOptionBuilder().setValue('automod').setLabel('Auto-modération').setEmoji('🤖')
         .setDescription('Antispam, antilink, antimention, mots interdits'),
+      new StringSelectMenuOptionBuilder().setValue('tickets').setLabel('Tickets').setEmoji('🎫')
+        .setDescription('Panneau à sélecteur, types de tickets, transcript'),
     );
 
   const buttons = new ActionRowBuilder().addComponents(
@@ -367,6 +371,7 @@ function automodView(guild) {
       ),
       new ActionRowBuilder().addComponents(
         toggleButton('badwords', '🤬', 'Mots interdits', am.badwords.enabled),
+        new ButtonBuilder().setCustomId('setup:am:wordsview').setLabel('👀 Voir la liste').setStyle(ButtonStyle.Secondary),
         new ButtonBuilder().setCustomId('setup:am:wordscfg').setLabel('📝 Gérer la liste').setStyle(ButtonStyle.Primary),
         new ButtonBuilder().setCustomId('setup:am:wordsdefault').setLabel('📥 Liste par défaut').setStyle(ButtonStyle.Primary),
       ),
@@ -382,6 +387,150 @@ function automodView(guild) {
   };
 }
 
+// ── Pages tickets ─────────────────────────────────────────────────────────────
+
+function ticketsView(guild) {
+  const settings = getSettings(guild.id);
+  const tc = settings.ticketsConfig;
+  const channel = tc.panelChannel && guild.channels.cache.get(tc.panelChannel);
+  const role = tc.requiredRole && guild.roles.cache.get(tc.requiredRole);
+  const typesList = tc.types.length
+    ? tc.types.map((t) => `• ${t.emoji ? `${t.emoji} ` : ''}**${t.label}** → ${t.categoryId ? `<#${t.categoryId}>` : '🔴 pas de catégorie'}`).join('\n')
+    : '*Aucun type — crée ton premier type dans le menu ci-dessous.*';
+
+  const embed = panelEmbed(guild, '🎫 Tickets', [
+    `${settings.modules.tickets ? '🟢 Module activé' : '🔴 Module désactivé — active-le dans 🧩 Modules'}`,
+    '',
+    `📢 **Salon du panneau** — ${channel ? `${channel}` : '🔴 non configuré'}`,
+    `🎭 **Rôle requis pour ouvrir** — ${role ? `${role}` : 'aucun (tout le monde)'}`,
+    `⚙️ **Réglages** — max ${tc.maxPerUser}/personne | fermeture au départ ${tc.closeOnLeave ? '🟢' : '🔴'} | transcript MP ${tc.transcriptDM ? '🟢' : '🔴'}`,
+    '',
+    `**Types de tickets (${tc.types.length}) :**`,
+    typesList,
+    '',
+    'Configure tes types puis clique sur **📤 Publier le panneau**.',
+  ].join('\n'));
+
+  const channelSelect = new ChannelSelectMenuBuilder()
+    .setCustomId('setup:tk:panelchannel')
+    .setPlaceholder('📢 Salon où publier le panneau de tickets…')
+    .setChannelTypes(ChannelType.GuildText);
+
+  const roleSelect = new RoleSelectMenuBuilder()
+    .setCustomId('setup:tk:reqrole')
+    .setPlaceholder('🎭 Rôle requis pour ouvrir un ticket (vide = tout le monde)…')
+    .setMinValues(0)
+    .setMaxValues(1);
+  if (role) roleSelect.setDefaultRoles([role.id]);
+
+  const typeSelect = new StringSelectMenuBuilder()
+    .setCustomId('setup:tk:type')
+    .setPlaceholder('🎫 Gérer un type de ticket…')
+    .addOptions([
+      ...tc.types.map((t) => new StringSelectMenuOptionBuilder()
+        .setValue(t.id)
+        .setLabel(`${t.emoji ? `${t.emoji} ` : ''}${t.label}`.slice(0, 100))
+        .setDescription((t.description || 'Configurer ce type').slice(0, 100))),
+      new StringSelectMenuOptionBuilder().setValue('__new').setLabel('➕ Créer un nouveau type').setDescription('Ajoute un choix au sélecteur du panneau'),
+    ]);
+
+  const buttons = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('setup:tk:panelmsg').setLabel('📝 Message du panneau').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('setup:tk:settings').setLabel('⚙️ Réglages').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('setup:tk:publish').setLabel('📤 Publier le panneau').setStyle(ButtonStyle.Success)
+      .setDisabled(!channel || tc.types.length === 0),
+    backButton('home'),
+  );
+
+  return {
+    embeds: [embed],
+    components: [
+      new ActionRowBuilder().addComponents(channelSelect),
+      new ActionRowBuilder().addComponents(roleSelect),
+      new ActionRowBuilder().addComponents(typeSelect),
+      buttons,
+    ],
+  };
+}
+
+function ticketSettingsView(guild) {
+  const tc = getSettings(guild.id).ticketsConfig;
+  const embed = panelEmbed(guild, '🎫 Réglages des tickets', [
+    `🔢 **Tickets max par personne** — ${tc.maxPerUser}`,
+    `${tc.closeOnLeave ? '🟢' : '🔴'} **Fermeture automatique** des tickets d'un membre qui quitte le serveur`,
+    `${tc.transcriptDM ? '🟢' : '🔴'} **Transcript en MP** à l'ouvreur quand le ticket est fermé`,
+    '',
+    '*Le transcript est toujours envoyé dans le salon 📜 logs-tickets s\'il est configuré.*',
+  ].join('\n'));
+
+  const buttons = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('setup:tk:maxper').setLabel('🔢 Max par personne').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('setup:tk:closeonleave')
+      .setLabel(tc.closeOnLeave ? '🔴 Désactiver fermeture au départ' : '🟢 Activer fermeture au départ')
+      .setStyle(tc.closeOnLeave ? ButtonStyle.Danger : ButtonStyle.Success),
+    new ButtonBuilder().setCustomId('setup:tk:transcriptdm')
+      .setLabel(tc.transcriptDM ? '🔴 Désactiver transcript MP' : '🟢 Activer transcript MP')
+      .setStyle(tc.transcriptDM ? ButtonStyle.Danger : ButtonStyle.Success),
+    backButton('tickets'),
+  );
+  return { embeds: [embed], components: [buttons] };
+}
+
+function ticketTypeView(guild, typeId) {
+  const tc = getSettings(guild.id).ticketsConfig;
+  const type = tc.types.find((t) => t.id === typeId);
+  if (!type) return ticketsView(guild);
+
+  const category = type.categoryId && guild.channels.cache.get(type.categoryId);
+  const mentions = (type.mentionRoles ?? []).map((id) => `<@&${id}>`).join(' ') || '*aucun*';
+  const access = (type.accessRoles ?? []).map((id) => `<@&${id}>`).join(' ') || '*aucun (admins du bot seulement)*';
+
+  const embed = panelEmbed(guild, `🎫 Type : ${type.emoji ? `${type.emoji} ` : ''}${type.label}`, [
+    `**Description :** ${type.description || '*aucune*'}`,
+    `📁 **Catégorie des tickets** — ${category ? `${category.name}` : '🔴 non configurée (créés hors catégorie)'}`,
+    `📣 **Rôles mentionnés à l'ouverture** — ${mentions}`,
+    `🔑 **Rôles ayant accès aux tickets** — ${access}`,
+    `💬 **Message d'ouverture :**`,
+    `> ${type.openMessage || 'Merci de nous avoir contactés, précise ce que tu souhaites.'}`,
+  ].join('\n'));
+
+  const categorySelect = new ChannelSelectMenuBuilder()
+    .setCustomId(`setup:tk:cat:${type.id}`)
+    .setPlaceholder('📁 Catégorie où créer les tickets de ce type…')
+    .setChannelTypes(ChannelType.GuildCategory);
+
+  const mentionSelect = new RoleSelectMenuBuilder()
+    .setCustomId(`setup:tk:mention:${type.id}`)
+    .setPlaceholder('📣 Rôles mentionnés à l\'ouverture…')
+    .setMinValues(0)
+    .setMaxValues(10);
+  if (type.mentionRoles?.length) mentionSelect.setDefaultRoles(type.mentionRoles.slice(0, 10));
+
+  const accessSelect = new RoleSelectMenuBuilder()
+    .setCustomId(`setup:tk:access:${type.id}`)
+    .setPlaceholder('🔑 Rôles ayant accès aux tickets de ce type…')
+    .setMinValues(0)
+    .setMaxValues(10);
+  if (type.accessRoles?.length) accessSelect.setDefaultRoles(type.accessRoles.slice(0, 10));
+
+  const buttons = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId(`setup:tk:label:${type.id}`).setLabel('📝 Nom & description').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId(`setup:tk:openmsg:${type.id}`).setLabel('💬 Message d\'ouverture').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId(`setup:tk:del:${type.id}`).setLabel('🗑️ Supprimer ce type').setStyle(ButtonStyle.Danger),
+    backButton('tickets'),
+  );
+
+  return {
+    embeds: [embed],
+    components: [
+      new ActionRowBuilder().addComponents(categorySelect),
+      new ActionRowBuilder().addComponents(mentionSelect),
+      new ActionRowBuilder().addComponents(accessSelect),
+      buttons,
+    ],
+  };
+}
+
 const PAGES = {
   home: hubView,
   general: generalView,
@@ -391,6 +540,8 @@ const PAGES = {
   logs: logsView,
   verification: verificationView,
   automod: automodView,
+  tickets: ticketsView,
+  tksettings: ticketSettingsView,
 };
 
 // ── Routeur des interactions du panneau (customId = "setup:...") ────────────
@@ -580,6 +731,50 @@ async function handleSetupComponent(interaction) {
         return interaction.update(automodView(guild));
       }
 
+      if (args[0] === 'tkmax') {
+        const max = parseInt(interaction.fields.getTextInputValue('max'), 10);
+        if (!Number.isInteger(max) || max < 1 || max > 10) {
+          return interaction.reply({ content: '❌ Valeur invalide : entre 1 et 10.', flags: MessageFlags.Ephemeral });
+        }
+        updateSettings(guild.id, (s) => { s.ticketsConfig.maxPerUser = max; });
+        return interaction.update(ticketSettingsView(guild));
+      }
+
+      if (args[0] === 'tkpanel') {
+        const message = interaction.fields.getTextInputValue('message').trim();
+        const image = interaction.fields.getTextInputValue('image').trim();
+        if (image && !/^https?:\/\/\S+$/.test(image)) {
+          return interaction.reply({ content: '❌ L\'URL de l\'image est invalide (elle doit commencer par http/https).', flags: MessageFlags.Ephemeral });
+        }
+        updateSettings(guild.id, (s) => {
+          s.ticketsConfig.panelMessage = message;
+          s.ticketsConfig.panelImage = image || null;
+        });
+        return interaction.update(ticketsView(guild));
+      }
+
+      if (args[0] === 'tklabel') {
+        const typeId = args[1];
+        updateSettings(guild.id, (s) => {
+          const type = s.ticketsConfig.types.find((t) => t.id === typeId);
+          if (type) {
+            type.emoji = interaction.fields.getTextInputValue('emoji').trim();
+            type.label = interaction.fields.getTextInputValue('label').trim() || 'Ticket';
+            type.description = interaction.fields.getTextInputValue('description').trim();
+          }
+        });
+        return interaction.update(ticketTypeView(guild, typeId));
+      }
+
+      if (args[0] === 'tkopenmsg') {
+        const typeId = args[1];
+        updateSettings(guild.id, (s) => {
+          const type = s.ticketsConfig.types.find((t) => t.id === typeId);
+          if (type) type.openMessage = interaction.fields.getTextInputValue('message').trim();
+        });
+        return interaction.update(ticketTypeView(guild, typeId));
+      }
+
       if (args[0] === 'verifmsg') {
         const template = interaction.fields.getTextInputValue('template').trim();
         updateSettings(guild.id, (s) => { s.verifConfig.message = template; });
@@ -667,6 +862,16 @@ async function handleSetupComponent(interaction) {
         return interaction.showModal(modal);
       }
 
+      if (sub === 'wordsview') {
+        const { words } = getSettings(guild.id).automodConfig.badwords;
+        return interaction.reply({
+          content: words.length
+            ? `🤬 **${words.length} mot(s) interdit(s) :**\n${words.join(', ').slice(0, 1900)}`
+            : 'La liste des mots interdits est vide. Utilise 📝 pour en ajouter ou 📥 pour charger la liste par défaut.',
+          flags: MessageFlags.Ephemeral,
+        });
+      }
+
       if (sub === 'wordsdefault') {
         const defaultWords = require('./badwords-default');
         updateSettings(guild.id, (s) => {
@@ -684,6 +889,159 @@ async function handleSetupComponent(interaction) {
             new TextInputBuilder().setCustomId('duration').setLabel('Durée (ex: 10m, 1h)')
               .setValue(getSettings(guild.id).automodConfig.muteDuration)
               .setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(10),
+          ));
+        return interaction.showModal(modal);
+      }
+      break;
+    }
+
+    case 'tk': {
+      const sub = args[0];
+
+      if (sub === 'panelchannel') {
+        updateSettings(guild.id, (s) => { s.ticketsConfig.panelChannel = interaction.values[0]; });
+        return interaction.update(ticketsView(guild));
+      }
+
+      if (sub === 'reqrole') {
+        updateSettings(guild.id, (s) => { s.ticketsConfig.requiredRole = interaction.values[0] ?? null; });
+        return interaction.update(ticketsView(guild));
+      }
+
+      if (sub === 'type') {
+        let typeId = interaction.values[0];
+        if (typeId === '__new') {
+          typeId = `t${Date.now().toString(36)}`;
+          updateSettings(guild.id, (s) => {
+            s.ticketsConfig.types.push({
+              id: typeId, emoji: '🎫', label: 'Nouveau type', description: '',
+              categoryId: null, mentionRoles: [], accessRoles: [], openMessage: '',
+            });
+          });
+        }
+        return interaction.update(ticketTypeView(guild, typeId));
+      }
+
+      if (sub === 'settings') return interaction.update(ticketSettingsView(guild));
+
+      if (sub === 'closeonleave') {
+        updateSettings(guild.id, (s) => { s.ticketsConfig.closeOnLeave = !s.ticketsConfig.closeOnLeave; });
+        return interaction.update(ticketSettingsView(guild));
+      }
+
+      if (sub === 'transcriptdm') {
+        updateSettings(guild.id, (s) => { s.ticketsConfig.transcriptDM = !s.ticketsConfig.transcriptDM; });
+        return interaction.update(ticketSettingsView(guild));
+      }
+
+      if (sub === 'maxper') {
+        const modal = new ModalBuilder()
+          .setCustomId('setup:modal:tkmax')
+          .setTitle('Tickets max par personne')
+          .addComponents(new ActionRowBuilder().addComponents(
+            new TextInputBuilder().setCustomId('max').setLabel('Nombre (1 à 10)')
+              .setValue(`${getSettings(guild.id).ticketsConfig.maxPerUser}`)
+              .setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(2),
+          ));
+        return interaction.showModal(modal);
+      }
+
+      if (sub === 'panelmsg') {
+        const tc = getSettings(guild.id).ticketsConfig;
+        const modal = new ModalBuilder()
+          .setCustomId('setup:modal:tkpanel')
+          .setTitle('Message du panneau de tickets')
+          .addComponents(
+            new ActionRowBuilder().addComponents(
+              new TextInputBuilder().setCustomId('message').setLabel('Message de l\'embed')
+                .setValue(tc.panelMessage.slice(0, 4000))
+                .setStyle(TextInputStyle.Paragraph).setRequired(true).setMaxLength(4000),
+            ),
+            new ActionRowBuilder().addComponents(
+              new TextInputBuilder().setCustomId('image').setLabel('URL de l\'image (optionnel)')
+                .setValue(tc.panelImage ?? '')
+                .setPlaceholder('https://…/banniere.png')
+                .setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(500),
+            ),
+          );
+        return interaction.showModal(modal);
+      }
+
+      if (sub === 'publish') {
+        const tc = getSettings(guild.id).ticketsConfig;
+        const channel = tc.panelChannel && guild.channels.cache.get(tc.panelChannel);
+        if (!channel || tc.types.length === 0) {
+          return interaction.reply({ content: '❌ Configure d\'abord le salon du panneau et au moins un type.', flags: MessageFlags.Ephemeral });
+        }
+        const sent = await channel.send(buildTicketPanel(guild, interaction.user)).catch(() => null);
+        if (!sent) {
+          return interaction.reply({ content: `❌ Impossible de publier dans ${channel} (vérifie mes permissions).`, flags: MessageFlags.Ephemeral });
+        }
+        updateSettings(guild.id, (s) => { s.modules.tickets = true; });
+        await interaction.reply({ content: `📤 Panneau de tickets publié dans ${channel} (module 🎫 activé au passage).`, flags: MessageFlags.Ephemeral });
+        return interaction.message.edit(ticketsView(guild)).catch(() => {});
+      }
+
+      // Sous-commandes liées à un type : cat / mention / access / label / openmsg / del
+      const typeId = args[1];
+
+      if (sub === 'cat') {
+        updateSettings(guild.id, (s) => {
+          const type = s.ticketsConfig.types.find((t) => t.id === typeId);
+          if (type) type.categoryId = interaction.values[0];
+        });
+        return interaction.update(ticketTypeView(guild, typeId));
+      }
+
+      if (sub === 'mention' || sub === 'access') {
+        updateSettings(guild.id, (s) => {
+          const type = s.ticketsConfig.types.find((t) => t.id === typeId);
+          if (type) type[sub === 'mention' ? 'mentionRoles' : 'accessRoles'] = interaction.values;
+        });
+        return interaction.update(ticketTypeView(guild, typeId));
+      }
+
+      if (sub === 'del') {
+        updateSettings(guild.id, (s) => {
+          s.ticketsConfig.types = s.ticketsConfig.types.filter((t) => t.id !== typeId);
+        });
+        return interaction.update(ticketsView(guild));
+      }
+
+      if (sub === 'label') {
+        const type = getSettings(guild.id).ticketsConfig.types.find((t) => t.id === typeId);
+        if (!type) return interaction.update(ticketsView(guild));
+        const modal = new ModalBuilder()
+          .setCustomId(`setup:modal:tklabel:${typeId}`)
+          .setTitle('Nom et description du type')
+          .addComponents(
+            new ActionRowBuilder().addComponents(
+              new TextInputBuilder().setCustomId('emoji').setLabel('Emoji (optionnel)')
+                .setValue(type.emoji ?? '').setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(10),
+            ),
+            new ActionRowBuilder().addComponents(
+              new TextInputBuilder().setCustomId('label').setLabel('Nom du type')
+                .setValue(type.label).setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(80),
+            ),
+            new ActionRowBuilder().addComponents(
+              new TextInputBuilder().setCustomId('description').setLabel('Description (affichée dans le sélecteur)')
+                .setValue(type.description ?? '').setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(100),
+            ),
+          );
+        return interaction.showModal(modal);
+      }
+
+      if (sub === 'openmsg') {
+        const type = getSettings(guild.id).ticketsConfig.types.find((t) => t.id === typeId);
+        if (!type) return interaction.update(ticketsView(guild));
+        const modal = new ModalBuilder()
+          .setCustomId(`setup:modal:tkopenmsg:${typeId}`)
+          .setTitle('Message d\'ouverture du ticket')
+          .addComponents(new ActionRowBuilder().addComponents(
+            new TextInputBuilder().setCustomId('message').setLabel('Message envoyé à l\'ouverture')
+              .setValue(type.openMessage ?? '')
+              .setPlaceholder('Merci de nous avoir contactés, précise ce que tu souhaites.')
+              .setStyle(TextInputStyle.Paragraph).setRequired(false).setMaxLength(2000),
           ));
         return interaction.showModal(modal);
       }

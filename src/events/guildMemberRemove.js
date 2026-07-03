@@ -1,9 +1,12 @@
 const { EmbedBuilder } = require('discord.js');
 const { sendLog, userAuthor, idLine } = require('../core/logs');
+const { closeTicketsForMember } = require('../core/tickets');
 
 module.exports = {
   name: 'guildMemberRemove',
   async execute(member) {
+    await closeTicketsForMember(member).catch((error) => console.error('Erreur fermeture tickets au départ :', error));
+
     const lines = [`📤 **A quitté le serveur** — reste ${member.guild.memberCount} membres`, idLine(member)];
     if (!member.partial) {
       if (member.joinedTimestamp) {

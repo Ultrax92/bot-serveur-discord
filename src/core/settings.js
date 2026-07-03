@@ -42,6 +42,16 @@ const DEFAULT_SETTINGS = {
     role: null,      // rôle attribué au clic
     message: 'Bienvenue sur **{serveur}** ! Clique sur le bouton ci-dessous pour te vérifier et accéder au serveur.',
   },
+  ticketsConfig: {
+    panelChannel: null,      // salon où le panneau (embed + sélecteur) est publié
+    panelMessage: 'Utilise le menu ci-dessous pour ouvrir un ticket dans la catégorie que tu souhaites.',
+    panelImage: null,        // URL d'image affichée dans l'embed du panneau
+    requiredRole: null,      // rôle requis pour ouvrir un ticket (ex: rôle vérifié)
+    maxPerUser: 1,
+    closeOnLeave: true,      // ferme les tickets d'un membre qui quitte le serveur
+    transcriptDM: true,      // envoie le transcript en MP à l'ouvreur à la fermeture
+    types: [],               // { id, emoji, label, description, categoryId, mentionRoles, accessRoles, openMessage }
+  },
   automodConfig: {
     antispam: { enabled: false, messages: 5, seconds: 5 },   // X messages en Y secondes
     antilink: { enabled: false, mode: 'invites' },           // invites = invitations Discord, all = tous les liens
@@ -51,7 +61,6 @@ const DEFAULT_SETTINGS = {
     muteDuration: '10m',
   },
   antiraidConfig: {},
-  ticketsConfig: {},
   tempvocConfig: {},
   color: 0x5865f2,    // couleur des embeds (modifiable via /config)
 };

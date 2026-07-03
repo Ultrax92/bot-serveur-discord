@@ -3,6 +3,7 @@ const { isModuleEnabled, MODULES } = require('../core/settings');
 const { isBotAdmin, canManageAdmins } = require('../core/permissions');
 const { handleSetupComponent } = require('../core/setupPanel');
 const { handleVerifyButton } = require('../core/verification');
+const { handleTicketComponent } = require('../core/tickets');
 const { sendLog, userAuthor, idLine } = require('../core/logs');
 
 const COMMAND_LOG_STYLES = {
@@ -37,6 +38,18 @@ module.exports = {
         await handleVerifyButton(interaction);
       } catch (error) {
         console.error('Erreur sur le bouton de vérification :', error);
+        await interaction.reply({ content: 'Une erreur est survenue, réessaie.', flags: MessageFlags.Ephemeral }).catch(() => {});
+      }
+      return;
+    }
+
+    // Système de tickets (ouvert aux membres : ouverture via sélecteur, claim/close via boutons)
+    if ((interaction.isButton() || interaction.isStringSelectMenu()) && interaction.customId.startsWith('ticket:')) {
+      if (!interaction.inGuild()) return;
+      try {
+        await handleTicketComponent(interaction);
+      } catch (error) {
+        console.error('Erreur sur le système de tickets :', error);
         await interaction.reply({ content: 'Une erreur est survenue, réessaie.', flags: MessageFlags.Ephemeral }).catch(() => {});
       }
       return;
