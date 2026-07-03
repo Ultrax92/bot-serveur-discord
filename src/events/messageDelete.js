@@ -1,11 +1,13 @@
 const { EmbedBuilder } = require('discord.js');
 const { sendLog, userAuthor, idLine } = require('../core/logs');
+const { purging } = require('../commands/moderation/purge-channel');
 
 module.exports = {
   name: 'messageDelete',
   async execute(message) {
     if (!message.guild) return;
     if (message.author?.bot) return;
+    if (purging.has(message.channelId)) return; // purge en cours : pas de spam de logs
 
     const embed = new EmbedBuilder().setColor(0xed4245).setTimestamp();
     const lines = [`**Message supprimé dans** ${message.channel}`];

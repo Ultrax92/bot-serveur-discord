@@ -5,7 +5,8 @@ const { errorEmbed, formatDuration } = require('../../core/utils');
 
 const sleep = (ms) => new Promise((resolve) => { setTimeout(resolve, ms); });
 
-// Salons en cours de purge (évite de lancer deux purges en parallèle sur le même salon)
+// Salons en cours de purge : évite les purges parallèles et permet à
+// l'événement messageDelete de ne pas inonder les logs pendant une purge
 const purging = new Set();
 
 // Supprime jusqu'à `limit` messages : bulkDelete par paquets de 100 pour les
@@ -41,6 +42,7 @@ async function runPurge(channel, limit) {
 
 module.exports = {
   module: 'moderation',
+  purging,
   data: new SlashCommandBuilder()
     .setName('purge-channel')
     .setDescription('[Owner] Supprime tous les messages du salon courant')
