@@ -2,6 +2,7 @@ const { MessageFlags, EmbedBuilder } = require('discord.js');
 const { isModuleEnabled, MODULES } = require('../core/settings');
 const { isBotAdmin, canManageAdmins } = require('../core/permissions');
 const { handleSetupComponent } = require('../core/setupPanel');
+const { handleVerifyButton } = require('../core/verification');
 const { sendLog, userAuthor, idLine } = require('../core/logs');
 
 const COMMAND_LOG_STYLES = {
@@ -29,6 +30,18 @@ function logCommand(interaction, status) {
 module.exports = {
   name: 'interactionCreate',
   async execute(interaction) {
+    // Bouton public de vérification (ouvert à tous les membres, pas de gate admin)
+    if (interaction.isButton() && interaction.customId === 'verify:go') {
+      if (!interaction.inGuild()) return;
+      try {
+        await handleVerifyButton(interaction);
+      } catch (error) {
+        console.error('Erreur sur le bouton de vérification :', error);
+        await interaction.reply({ content: 'Une erreur est survenue, réessaie.', flags: MessageFlags.Ephemeral }).catch(() => {});
+      }
+      return;
+    }
+
     // Interactions du panneau /setup (boutons, menus et formulaires)
     if ((interaction.isButton() || interaction.isAnySelectMenu() || interaction.isModalSubmit())
       && interaction.customId.startsWith('setup:')) {

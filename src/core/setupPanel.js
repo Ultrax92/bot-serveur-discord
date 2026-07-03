@@ -7,6 +7,7 @@ const {
 const { MODULES, getSettings, updateSettings } = require('./settings');
 const { LOG_TYPES, autoConfigureLogs, createLogChannel } = require('./logs');
 const { sendJoinMessage, sendLeaveMessage, TEMPLATE_VARS } = require('./joinleave');
+const { buildVerifyPanel } = require('./verification');
 const { parseDuration, formatDuration } = require('./utils');
 
 function panelEmbed(guild, title, description) {
@@ -76,6 +77,7 @@ function hubView(guild) {
     `🔨 **Modération** — MP sanction ${settings.moderationConfig.dmOnSanction ? '🟢' : '🔴'} | ${settings.moderationConfig.defaultMuteDuration}`,
     `📜 **Salons de logs** — ${logsCount}/${Object.keys(LOG_TYPES).length} configurés`,
     `👋 **Arrivées/Départs** — arrivée ${settings.joinleave.joinChannel ? '🟢' : '🔴'} | départ ${settings.joinleave.leaveChannel ? '🟢' : '🔴'} | ${settings.joinleave.autoroles.length} autorole(s)`,
+    `✅ **Vérification** — salon ${settings.verifConfig.channel ? '🟢' : '🔴'} | rôle ${settings.verifConfig.role ? '🟢' : '🔴'}`,
     '',
     'Choisis une section dans le menu pour voir et modifier ses réglages.',
   ].join('\n'));
@@ -96,6 +98,8 @@ function hubView(guild) {
         .setDescription('Un salon existant ou créé pour chaque type de log'),
       new StringSelectMenuOptionBuilder().setValue('joinleave').setLabel('Arrivées & Départs').setEmoji('👋')
         .setDescription('Messages de bienvenue/départ et rôles automatiques'),
+      new StringSelectMenuOptionBuilder().setValue('verification').setLabel('Vérification').setEmoji('✅')
+        .setDescription('Bouton de vérification qui donne un rôle'),
     );
 
   const buttons = new ActionRowBuilder().addComponents(
@@ -348,6 +352,56 @@ function jlChannelView(guild, kind) {
   return { embeds: [embed], components: [new ActionRowBuilder().addComponents(channelSelect), buttons] };
 }
 
+// ── Page vérification ─────────────────────────────────────────────────────────
+
+function verificationView(guild) {
+  const settings = getSettings(guild.id);
+  const vc = settings.verifConfig;
+  const channel = vc.channel && guild.channels.cache.get(vc.channel);
+  const role = vc.role && guild.roles.cache.get(vc.role);
+
+  const embed = panelEmbed(guild, '✅ Vérification', [
+    `${settings.modules.verification ? '🟢 Module activé' : '🔴 Module désactivé — active-le dans 🧩 Modules pour que le bouton fonctionne'}`,
+    '',
+    `📢 **Salon du panneau** — ${channel ? `${channel}` : '🔴 non configuré'}`,
+    `🎭 **Rôle donné à la vérification** — ${role ? `${role}` : '🔴 non configuré'}`,
+    `📝 **Message du panneau** (variable \`{serveur}\`) :`,
+    `> ${vc.message}`,
+    '',
+    'Une fois salon + rôle choisis, clique sur **📤 Publier le panneau** : le bot poste l\'embed avec le bouton **✅ Se vérifier** dans le salon.',
+    '💡 *Astuce : cache les autres salons au rôle @everyone et rends-les visibles au rôle vérifié.*',
+  ].join('\n'));
+
+  const channelSelect = new ChannelSelectMenuBuilder()
+    .setCustomId('setup:verif:channel')
+    .setPlaceholder('📢 Salon où publier le panneau de vérification…')
+    .setChannelTypes(ChannelType.GuildText);
+
+  const roleSelect = new RoleSelectMenuBuilder()
+    .setCustomId('setup:verif:role')
+    .setPlaceholder('🎭 Rôle donné aux membres vérifiés…')
+    .setMinValues(1)
+    .setMaxValues(1);
+  if (role) roleSelect.setDefaultRoles([role.id]);
+
+  const buttons = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('setup:verif:publish').setLabel('📤 Publier le panneau').setStyle(ButtonStyle.Success)
+      .setDisabled(!channel || !role),
+    new ButtonBuilder().setCustomId('setup:verif:msg').setLabel('📝 Message').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('setup:verif:chanid').setLabel('🆔 Salon par ID').setStyle(ButtonStyle.Primary),
+    backButton('home'),
+  );
+
+  return {
+    embeds: [embed],
+    components: [
+      new ActionRowBuilder().addComponents(channelSelect),
+      new ActionRowBuilder().addComponents(roleSelect),
+      buttons,
+    ],
+  };
+}
+
 const PAGES = {
   home: hubView,
   general: generalView,
@@ -356,6 +410,7 @@ const PAGES = {
   moderation: moderationView,
   logs: logsView,
   joinleave: joinleaveView,
+  verification: verificationView,
 };
 
 // ── Routeur des interactions du panneau (customId = "setup:...") ────────────
@@ -528,6 +583,94 @@ async function handleSetupComponent(interaction) {
           s.joinleave[kind === 'join' ? 'joinMessage' : 'leaveMessage'] = template;
         });
         return interaction.update(joinleaveView(guild));
+      }
+
+      if (args[0] === 'verifmsg') {
+        const template = interaction.fields.getTextInputValue('template').trim();
+        updateSettings(guild.id, (s) => { s.verifConfig.message = template; });
+        return interaction.update(verificationView(guild));
+      }
+
+      if (args[0] === 'verifchan') {
+        const id = extractId(interaction.fields.getTextInputValue('id'));
+        if (!id) {
+          return interaction.reply({ content: '❌ ID invalide. Colle un ID de salon, une mention `<#…>` ou un lien de salon.', flags: MessageFlags.Ephemeral });
+        }
+        const channel = await guild.channels.fetch(id).catch(() => null);
+        if (!channel || !channel.isTextBased() || channel.isThread() || channel.isVoiceBased()) {
+          return interaction.reply({ content: `❌ Aucun salon textuel trouvé sur ce serveur avec l'ID \`${id}\`.`, flags: MessageFlags.Ephemeral });
+        }
+        updateSettings(guild.id, (s) => { s.verifConfig.channel = channel.id; });
+        return interaction.update(verificationView(guild));
+      }
+      break;
+    }
+
+    case 'verif': {
+      const sub = args[0];
+
+      if (sub === 'channel') {
+        updateSettings(guild.id, (s) => { s.verifConfig.channel = interaction.values[0]; });
+        return interaction.update(verificationView(guild));
+      }
+
+      if (sub === 'role') {
+        const role = interaction.roles.first();
+        if (!role || role.managed || role.position >= guild.members.me.roles.highest.position) {
+          return interaction.reply({
+            content: '❌ Je ne peux pas attribuer ce rôle : il est géré par une intégration ou au-dessus de mon rôle. Choisis-en un autre ou monte mon rôle.',
+            flags: MessageFlags.Ephemeral,
+          });
+        }
+        updateSettings(guild.id, (s) => { s.verifConfig.role = role.id; });
+        return interaction.update(verificationView(guild));
+      }
+
+      if (sub === 'publish') {
+        const vc = getSettings(guild.id).verifConfig;
+        const channel = vc.channel && guild.channels.cache.get(vc.channel);
+        if (!channel || !vc.role) {
+          return interaction.reply({ content: '❌ Configure d\'abord le salon et le rôle.', flags: MessageFlags.Ephemeral });
+        }
+        const sent = await channel.send(buildVerifyPanel(guild)).catch(() => null);
+        if (!sent) {
+          return interaction.reply({ content: `❌ Impossible de publier dans ${channel} (vérifie mes permissions).`, flags: MessageFlags.Ephemeral });
+        }
+        updateSettings(guild.id, (s) => { s.modules.verification = true; });
+        await interaction.reply({ content: `📤 Panneau de vérification publié dans ${channel} (module ✅ activé au passage).`, flags: MessageFlags.Ephemeral });
+        return interaction.message.edit(verificationView(guild)).catch(() => {});
+      }
+
+      if (sub === 'msg') {
+        const modal = new ModalBuilder()
+          .setCustomId('setup:modal:verifmsg')
+          .setTitle('Message du panneau de vérification')
+          .addComponents(new ActionRowBuilder().addComponents(
+            new TextInputBuilder()
+              .setCustomId('template')
+              .setLabel('Variable disponible : {serveur}')
+              .setValue(getSettings(guild.id).verifConfig.message)
+              .setStyle(TextInputStyle.Paragraph)
+              .setRequired(true)
+              .setMaxLength(1000),
+          ));
+        return interaction.showModal(modal);
+      }
+
+      if (sub === 'chanid') {
+        const modal = new ModalBuilder()
+          .setCustomId('setup:modal:verifchan')
+          .setTitle('Salon de vérification')
+          .addComponents(new ActionRowBuilder().addComponents(
+            new TextInputBuilder()
+              .setCustomId('id')
+              .setLabel('ID, mention <#…> ou lien du salon')
+              .setPlaceholder('1234567890123456789')
+              .setStyle(TextInputStyle.Short)
+              .setRequired(true)
+              .setMaxLength(100),
+          ));
+        return interaction.showModal(modal);
       }
       break;
     }
