@@ -1,4 +1,5 @@
 const { SlashCommandBuilder, MessageFlags } = require('discord.js');
+const { logModAction } = require('../../core/logs');
 const { successEmbed, errorEmbed } = require('../../core/utils');
 
 module.exports = {
@@ -30,6 +31,11 @@ module.exports = {
     if (deleted === 0) {
       return interaction.editReply({ embeds: [errorEmbed(interaction.guildId, 'Aucun message supprimé (les messages de plus de 14 jours ne peuvent pas être supprimés en masse).')] });
     }
+    await logModAction(interaction, {
+      emoji: '🧹',
+      action: `Clear (${deleted} messages dans #${interaction.channel.name})`,
+      target: target ?? null,
+    });
     return interaction.editReply({
       embeds: [successEmbed(interaction.guildId, `🧹 **${deleted}** message(s) supprimé(s)${target ? ` de **${target.tag}**` : ''}.`)],
     });

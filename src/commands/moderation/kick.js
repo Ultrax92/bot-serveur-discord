@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const { addSanction } = require('../../core/sanctions');
+const { logModAction } = require('../../core/logs');
 const { successEmbed, errorEmbed, checkHierarchy } = require('../../core/utils');
 
 module.exports = {
@@ -32,6 +33,7 @@ module.exports = {
       reason,
     });
 
+    await logModAction(interaction, { emoji: '👢', action: 'Kick', target: member.user, reason });
     return interaction.reply({ embeds: [successEmbed(interaction.guildId, `👢 **${member.user.tag}** a été expulsé.\n**Raison :** ${reason}`)] });
   },
 };

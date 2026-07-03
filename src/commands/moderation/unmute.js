@@ -1,4 +1,5 @@
 const { SlashCommandBuilder, MessageFlags } = require('discord.js');
+const { logModAction } = require('../../core/logs');
 const { successEmbed, errorEmbed } = require('../../core/utils');
 
 module.exports = {
@@ -18,6 +19,7 @@ module.exports = {
     }
 
     await member.timeout(null, `Unmute par ${interaction.user.tag}`);
+    await logModAction(interaction, { emoji: '🔊', action: 'Unmute', target: member.user });
     return interaction.reply({ embeds: [successEmbed(interaction.guildId, `🔊 **${member.user.tag}** n'est plus mute.`)] });
   },
 };

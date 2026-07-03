@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const { addSanction } = require('../../core/sanctions');
+const { logModAction } = require('../../core/logs');
 const { parseDuration, formatDuration, successEmbed, errorEmbed, checkHierarchy } = require('../../core/utils');
 
 const MAX_TIMEOUT_MS = 28 * 86_400_000; // limite Discord : 28 jours
@@ -45,6 +46,7 @@ module.exports = {
       expiresAt: Date.now() + duration,
     });
 
+    await logModAction(interaction, { emoji: '🔇', action: 'Mute', target: member.user, reason, duration: formatDuration(duration) });
     return interaction.reply({
       embeds: [successEmbed(interaction.guildId, `🔇 **${member.user.tag}** a été mute pour **${formatDuration(duration)}**.\n**Raison :** ${reason}`)],
     });

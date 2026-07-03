@@ -7,9 +7,9 @@ Bot Serveur Discord . Slash commands, modules activables par serveur, stockage S
 | Module | Statut | Contenu |
 |---|---|---|
 | 🔨 Modération | ✅ Fait | warn, mute/unmute (timeout), kick, ban/tempban, unban, clear, sanctions, lock, hide, role add/remove/derank, nick |
-| ⚙️ Config | ✅ Fait | `/config module` (activer/désactiver), `/config view`, `/config couleur`, `/help` |
+| ⚙️ Config | ✅ Fait | `/config module` (activer/désactiver), `/config view`, `/config couleur`, `/help`, `/setup` (réglages de base en un clic), `/get-admin`, `/del-admin` |
 | 🧰 Utilitaire | 🔶 Partiel | serverinfo, userinfo, pic — reste : banlist, boosters, rolemembers, snipe, emoji |
-| 📜 Logs | ⬜ À faire | modlog, messagelog, voicelog, rolelog, boostlog + autoconfiglog |
+| 📜 Logs | ✅ Fait | `/logs auto` (création auto des salons), `/logs set/off/view` — logs de modération, messages supprimés/édités, vocal, rôles, boosts |
 | 🤖 Auto-modération | ⬜ À faire | antispam, antilink, antimassmention, badwords, strikes/punitions auto |
 | 🛡️ Antiraid | ⬜ À faire | antibot, antitoken, antichannel, antirole, antiwebhook, whitelist, punitions |
 | 👋 Arrivées/Départs | ⬜ À faire | messages bienvenue/départ, autorole |

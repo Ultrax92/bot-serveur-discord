@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const { addSanction } = require('../../core/sanctions');
+const { logModAction } = require('../../core/logs');
 const { successEmbed, errorEmbed, checkHierarchy } = require('../../core/utils');
 
 module.exports = {
@@ -31,6 +32,7 @@ module.exports = {
     });
 
     await member.send(`⚠️ Tu as reçu un avertissement sur **${interaction.guild.name}** : ${reason}`).catch(() => {});
+    await logModAction(interaction, { emoji: '⚠️', action: 'Warn', target: member.user, reason });
     return interaction.reply({ embeds: [successEmbed(interaction.guildId, `**${member.user.tag}** a été averti.\n**Raison :** ${reason}`)] });
   },
 };

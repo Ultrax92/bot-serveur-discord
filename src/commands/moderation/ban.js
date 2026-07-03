@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const { addSanction } = require('../../core/sanctions');
+const { logModAction } = require('../../core/logs');
 const { parseDuration, formatDuration, successEmbed, errorEmbed, checkHierarchy } = require('../../core/utils');
 
 module.exports = {
@@ -55,6 +56,7 @@ module.exports = {
       expiresAt,
     });
 
+    await logModAction(interaction, { emoji: '🔨', action: 'Ban', target: user, reason, duration: expiresAt ? durationText.replaceAll('*', '').replace(' pour ', '') : null });
     return interaction.reply({ embeds: [successEmbed(interaction.guildId, `🔨 **${user.tag}** a été banni${durationText}.\n**Raison :** ${reason}`)] });
   },
 };
