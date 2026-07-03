@@ -34,12 +34,8 @@ async function logModAction(interaction, { emoji, action, target, reason, durati
   await sendLog(interaction.guild, 'mod', embed);
 }
 
-// Crée une catégorie "📜 Logs" avec un salon par type, visible uniquement par les admins,
-// et enregistre le tout dans les settings. Réutilise les salons déjà configurés.
-async function autoConfigureLogs(guild) {
-  const settings = getSettings(guild.id);
-  const created = [];
-
+// Catégorie "📜 Logs" cachée des membres (créée si absente)
+async function ensureLogsCategory(guild) {
   let category = guild.channels.cache.find((c) => c.type === ChannelType.GuildCategory && c.name === '📜 Logs');
   if (!category) {
     category = await guild.channels.create({
@@ -50,26 +46,35 @@ async function autoConfigureLogs(guild) {
       ],
     });
   }
+  return category;
+}
 
-  const channels = { ...settings.logsChannels };
+// Crée le salon d'un type de log et l'enregistre dans les settings
+async function createLogChannel(guild, type) {
+  const category = await ensureLogsCategory(guild);
+  const channel = await guild.channels.create({
+    name: LOG_TYPES[type].channelName,
+    type: ChannelType.GuildText,
+    parent: category.id,
+  });
+  updateSettings(guild.id, (s) => { s.logsChannels[type] = channel.id; });
+  return channel;
+}
+
+// Crée tous les salons de logs manquants. Réutilise ceux déjà configurés.
+async function autoConfigureLogs(guild) {
+  const settings = getSettings(guild.id);
+  const created = [];
+
   for (const [type, meta] of Object.entries(LOG_TYPES)) {
-    const existing = channels[type] && guild.channels.cache.get(channels[type]);
+    const existing = settings.logsChannels[type] && guild.channels.cache.get(settings.logsChannels[type]);
     if (existing) continue;
-    const channel = await guild.channels.create({
-      name: meta.channelName,
-      type: ChannelType.GuildText,
-      parent: category.id,
-    });
-    channels[type] = channel.id;
+    const channel = await createLogChannel(guild, type);
     created.push(`${meta.emoji} ${channel}`);
   }
 
-  updateSettings(guild.id, (s) => {
-    s.logsChannels = channels;
-    s.modules.logs = true;
-  });
-
+  updateSettings(guild.id, (s) => { s.modules.logs = true; });
   return created;
 }
 
-module.exports = { LOG_TYPES, sendLog, logModAction, autoConfigureLogs };
+module.exports = { LOG_TYPES, sendLog, logModAction, ensureLogsCategory, createLogChannel, autoConfigureLogs };

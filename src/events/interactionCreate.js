@@ -1,10 +1,26 @@
 const { MessageFlags } = require('discord.js');
 const { isModuleEnabled, MODULES } = require('../core/settings');
-const { isBotAdmin } = require('../core/permissions');
+const { isBotAdmin, canManageAdmins } = require('../core/permissions');
+const { handleSetupComponent } = require('../core/setupPanel');
 
 module.exports = {
   name: 'interactionCreate',
   async execute(interaction) {
+    // Clics sur le panneau /setup (boutons et menus)
+    if ((interaction.isButton() || interaction.isAnySelectMenu()) && interaction.customId.startsWith('setup:')) {
+      if (!interaction.inGuild()) return;
+      if (!canManageAdmins(interaction)) {
+        return interaction.reply({ content: 'Seul le propriétaire peut utiliser ce panneau.', flags: MessageFlags.Ephemeral });
+      }
+      try {
+        await handleSetupComponent(interaction);
+      } catch (error) {
+        console.error('Erreur sur le panneau setup :', error);
+        await interaction.followUp({ content: 'Une erreur est survenue.', flags: MessageFlags.Ephemeral }).catch(() => {});
+      }
+      return;
+    }
+
     if (!interaction.isChatInputCommand()) return;
     if (!interaction.inGuild()) {
       return interaction.reply({ content: 'Les commandes ne sont utilisables que sur un serveur.', flags: MessageFlags.Ephemeral });
