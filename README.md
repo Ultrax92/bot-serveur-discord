@@ -10,7 +10,7 @@ Bot Serveur Discord . Slash commands, modules activables par serveur, stockage S
 | ⚙️ Config | ✅ Fait | `/setup` : panneau interactif unique (modules, admins du bot, couleur, réglages modération, salons de logs) + `/help` |
 | 🧰 Utilitaire | 🔶 Partiel | serverinfo, userinfo, pic — reste : banlist, boosters, rolemembers, snipe, emoji |
 | 📜 Logs | ✅ Fait | configuré via `/setup` → 📜 (salon existant, création en un clic, saisie par ID, ou désactivé, par type) — modération, messages supprimés/édités, vocal, rôles, boosts, arrivées, départs, commandes du bot (exécutées, refusées, bloquées, en erreur) + salons vérif/tickets/raid (alimentés quand leurs modules arriveront) |
-| 🤖 Auto-modération | ⬜ À faire | antispam, antilink, antimassmention, badwords, strikes/punitions auto |
+| 🤖 Auto-modération | ✅ Fait | configuré via `/setup` → 🤖 : antispam (seuil réglable), antilink (invitations ou tous liens), antimention, mots interdits — suppression + sanction auto configurable (aucune/warn/mute), admins du bot exemptés |
 | 🛡️ Antiraid | ⬜ À faire | antibot, antitoken, antichannel, antirole, antiwebhook, whitelist, punitions |
 | ✅ Vérification | ✅ Fait | configuré via `/setup` → ✅ : salon + rôle + message, panneau publié avec bouton persistant "Se vérifier", rôle attribué au clic, logs dans le salon vérif |
 | 🎫 Tickets | ⬜ À faire | panneau avec bouton, claim, rename, close, transcript |

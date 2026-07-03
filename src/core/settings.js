@@ -42,7 +42,14 @@ const DEFAULT_SETTINGS = {
     role: null,      // rôle attribué au clic
     message: 'Bienvenue sur **{serveur}** ! Clique sur le bouton ci-dessous pour te vérifier et accéder au serveur.',
   },
-  automodConfig: {},
+  automodConfig: {
+    antispam: { enabled: false, messages: 5, seconds: 5 },   // X messages en Y secondes
+    antilink: { enabled: false, mode: 'invites' },           // invites = invitations Discord, all = tous les liens
+    antimention: { enabled: false, max: 5 },                 // mentions max dans un message
+    badwords: { enabled: false, words: [] },
+    sanction: 'mute',                                        // none | warn | mute (le message est toujours supprimé)
+    muteDuration: '10m',
+  },
   antiraidConfig: {},
   ticketsConfig: {},
   tempvocConfig: {},

@@ -12,6 +12,13 @@ function isBotAdmin(interaction) {
   return getSettings(interaction.guildId).admins.includes(interaction.user.id);
 }
 
+// Variante pour les événements (pas d'interaction) : à partir d'un GuildMember
+function isBotAdminMember(member) {
+  if (isOwner(member.id)) return true;
+  if (member.id === member.guild.ownerId) return true;
+  return getSettings(member.guild.id).admins.includes(member.id);
+}
+
 // Seuls l'owner (.env) et le propriétaire du serveur peuvent gérer la liste des admins
 function canManageAdmins(interaction) {
   return isOwner(interaction.user.id) || interaction.user.id === interaction.guild.ownerId;
@@ -40,4 +47,4 @@ function removeAdmin(guildId, userId) {
   return removed;
 }
 
-module.exports = { isOwner, isBotAdmin, canManageAdmins, addAdmin, removeAdmin };
+module.exports = { isOwner, isBotAdmin, isBotAdminMember, canManageAdmins, addAdmin, removeAdmin };

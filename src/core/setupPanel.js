@@ -76,6 +76,7 @@ function hubView(guild) {
     `🔨 **Modération** — MP sanction ${settings.moderationConfig.dmOnSanction ? '🟢' : '🔴'} | ${settings.moderationConfig.defaultMuteDuration}`,
     `📜 **Salons de logs** — ${logsCount}/${Object.keys(LOG_TYPES).length} configurés`,
     `✅ **Vérification** — salon ${settings.verifConfig.channel ? '🟢' : '🔴'} | rôle ${settings.verifConfig.role ? '🟢' : '🔴'}`,
+    `🤖 **Auto-modération** — ${['antispam', 'antilink', 'antimention', 'badwords'].filter((k) => settings.automodConfig[k].enabled).length}/4 protections actives`,
     '',
     'Choisis une section dans le menu pour voir et modifier ses réglages.',
   ].join('\n'));
@@ -96,6 +97,8 @@ function hubView(guild) {
         .setDescription('Un salon existant ou créé pour chaque type de log'),
       new StringSelectMenuOptionBuilder().setValue('verification').setLabel('Vérification').setEmoji('✅')
         .setDescription('Bouton de vérification qui donne un rôle'),
+      new StringSelectMenuOptionBuilder().setValue('automod').setLabel('Auto-modération').setEmoji('🤖')
+        .setDescription('Antispam, antilink, antimention, mots interdits'),
     );
 
   const buttons = new ActionRowBuilder().addComponents(
@@ -319,6 +322,65 @@ function verificationView(guild) {
   };
 }
 
+// ── Page auto-modération ──────────────────────────────────────────────────────
+
+const SANCTION_LABELS = { none: 'aucune (suppression seule)', warn: 'warn', mute: 'mute' };
+
+function automodView(guild) {
+  const settings = getSettings(guild.id);
+  const am = settings.automodConfig;
+  const dot = (enabled) => (enabled ? '🟢' : '🔴');
+
+  const embed = panelEmbed(guild, '🤖 Auto-modération', [
+    `${settings.modules.automod ? '🟢 Module activé' : '🔴 Module désactivé — active-le dans 🧩 Modules pour que les protections agissent'}`,
+    '',
+    `${dot(am.antispam.enabled)} 💬 **Antispam** — ${am.antispam.messages} messages en ${am.antispam.seconds}s`,
+    `${dot(am.antilink.enabled)} 🔗 **Antilink** — ${am.antilink.mode === 'all' ? 'tous les liens' : 'invitations Discord uniquement'}`,
+    `${dot(am.antimention.enabled)} 📣 **Antimention** — ${am.antimention.max} mentions max par message`,
+    `${dot(am.badwords.enabled)} 🤬 **Mots interdits** — ${am.badwords.words.length} mot(s) dans la liste`,
+    '',
+    `⚖️ **Sanction automatique :** ${SANCTION_LABELS[am.sanction]}${am.sanction === 'mute' ? ` (${am.muteDuration})` : ''}`,
+    '*Le message est toujours supprimé. Les admins du bot ne sont jamais affectés.*',
+  ].join('\n'));
+
+  const toggleButton = (key, emoji, label, enabled) => new ButtonBuilder()
+    .setCustomId(`setup:am:toggle:${key}`)
+    .setLabel(`${emoji} ${label} : ${enabled ? 'ON' : 'OFF'}`)
+    .setStyle(enabled ? ButtonStyle.Success : ButtonStyle.Secondary);
+
+  return {
+    embeds: [embed],
+    components: [
+      new ActionRowBuilder().addComponents(
+        toggleButton('antispam', '💬', 'Antispam', am.antispam.enabled),
+        new ButtonBuilder().setCustomId('setup:am:spamcfg').setLabel('⚙️ Seuil antispam').setStyle(ButtonStyle.Primary),
+      ),
+      new ActionRowBuilder().addComponents(
+        toggleButton('antilink', '🔗', 'Antilink', am.antilink.enabled),
+        new ButtonBuilder().setCustomId('setup:am:linkmode')
+          .setLabel(`🔁 Mode : ${am.antilink.mode === 'all' ? 'tous les liens' : 'invitations'}`)
+          .setStyle(ButtonStyle.Primary),
+      ),
+      new ActionRowBuilder().addComponents(
+        toggleButton('antimention', '📣', 'Antimention', am.antimention.enabled),
+        new ButtonBuilder().setCustomId('setup:am:mentioncfg').setLabel('⚙️ Seuil mentions').setStyle(ButtonStyle.Primary),
+      ),
+      new ActionRowBuilder().addComponents(
+        toggleButton('badwords', '🤬', 'Mots interdits', am.badwords.enabled),
+        new ButtonBuilder().setCustomId('setup:am:wordscfg').setLabel('📝 Gérer la liste').setStyle(ButtonStyle.Primary),
+      ),
+      new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('setup:am:sanction')
+          .setLabel(`⚖️ Sanction : ${SANCTION_LABELS[am.sanction]}`)
+          .setStyle(ButtonStyle.Primary),
+        new ButtonBuilder().setCustomId('setup:am:muteduration').setLabel('⏱️ Durée du mute').setStyle(ButtonStyle.Primary)
+          .setDisabled(am.sanction !== 'mute'),
+        backButton('home'),
+      ),
+    ],
+  };
+}
+
 const PAGES = {
   home: hubView,
   general: generalView,
@@ -327,6 +389,7 @@ const PAGES = {
   moderation: moderationView,
   logs: logsView,
   verification: verificationView,
+  automod: automodView,
 };
 
 // ── Routeur des interactions du panneau (customId = "setup:...") ────────────
@@ -476,6 +539,46 @@ async function handleSetupComponent(interaction) {
         return interaction.update(logTypeView(guild, type));
       }
 
+      if (args[0] === 'amspam') {
+        const messages = parseInt(interaction.fields.getTextInputValue('messages'), 10);
+        const seconds = parseInt(interaction.fields.getTextInputValue('seconds'), 10);
+        if (!Number.isInteger(messages) || messages < 2 || messages > 20 || !Number.isInteger(seconds) || seconds < 2 || seconds > 60) {
+          return interaction.reply({ content: '❌ Valeurs invalides : 2 à 20 messages, fenêtre de 2 à 60 secondes.', flags: MessageFlags.Ephemeral });
+        }
+        updateSettings(guild.id, (s) => {
+          s.automodConfig.antispam.messages = messages;
+          s.automodConfig.antispam.seconds = seconds;
+        });
+        return interaction.update(automodView(guild));
+      }
+
+      if (args[0] === 'ammention') {
+        const max = parseInt(interaction.fields.getTextInputValue('max'), 10);
+        if (!Number.isInteger(max) || max < 2 || max > 30) {
+          return interaction.reply({ content: '❌ Valeur invalide : entre 2 et 30 mentions.', flags: MessageFlags.Ephemeral });
+        }
+        updateSettings(guild.id, (s) => { s.automodConfig.antimention.max = max; });
+        return interaction.update(automodView(guild));
+      }
+
+      if (args[0] === 'amwords') {
+        const words = interaction.fields.getTextInputValue('words')
+          .split(',')
+          .map((w) => w.trim().toLowerCase())
+          .filter((w) => w.length >= 2);
+        updateSettings(guild.id, (s) => { s.automodConfig.badwords.words = [...new Set(words)].slice(0, 200); });
+        return interaction.update(automodView(guild));
+      }
+
+      if (args[0] === 'ammute') {
+        const duration = parseDuration(interaction.fields.getTextInputValue('duration').trim());
+        if (!duration) {
+          return interaction.reply({ content: '❌ Durée invalide. Exemples : `10m`, `1h`.', flags: MessageFlags.Ephemeral });
+        }
+        updateSettings(guild.id, (s) => { s.automodConfig.muteDuration = formatDuration(duration).replaceAll(' ', ''); });
+        return interaction.update(automodView(guild));
+      }
+
       if (args[0] === 'verifmsg') {
         const template = interaction.fields.getTextInputValue('template').trim();
         updateSettings(guild.id, (s) => { s.verifConfig.message = template; });
@@ -493,6 +596,86 @@ async function handleSetupComponent(interaction) {
         }
         updateSettings(guild.id, (s) => { s.verifConfig.channel = channel.id; });
         return interaction.update(verificationView(guild));
+      }
+      break;
+    }
+
+    case 'am': {
+      const sub = args[0];
+
+      if (sub === 'toggle') {
+        const key = args[1];
+        updateSettings(guild.id, (s) => { s.automodConfig[key].enabled = !s.automodConfig[key].enabled; });
+        return interaction.update(automodView(guild));
+      }
+
+      if (sub === 'linkmode') {
+        updateSettings(guild.id, (s) => {
+          s.automodConfig.antilink.mode = s.automodConfig.antilink.mode === 'all' ? 'invites' : 'all';
+        });
+        return interaction.update(automodView(guild));
+      }
+
+      if (sub === 'sanction') {
+        const cycle = { none: 'warn', warn: 'mute', mute: 'none' };
+        updateSettings(guild.id, (s) => { s.automodConfig.sanction = cycle[s.automodConfig.sanction]; });
+        return interaction.update(automodView(guild));
+      }
+
+      if (sub === 'spamcfg') {
+        const am = getSettings(guild.id).automodConfig;
+        const modal = new ModalBuilder()
+          .setCustomId('setup:modal:amspam')
+          .setTitle('Seuil de l\'antispam')
+          .addComponents(
+            new ActionRowBuilder().addComponents(
+              new TextInputBuilder().setCustomId('messages').setLabel('Nombre de messages (2 à 20)')
+                .setValue(`${am.antispam.messages}`).setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(2),
+            ),
+            new ActionRowBuilder().addComponents(
+              new TextInputBuilder().setCustomId('seconds').setLabel('Fenêtre en secondes (2 à 60)')
+                .setValue(`${am.antispam.seconds}`).setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(2),
+            ),
+          );
+        return interaction.showModal(modal);
+      }
+
+      if (sub === 'mentioncfg') {
+        const am = getSettings(guild.id).automodConfig;
+        const modal = new ModalBuilder()
+          .setCustomId('setup:modal:ammention')
+          .setTitle('Seuil de l\'antimention')
+          .addComponents(new ActionRowBuilder().addComponents(
+            new TextInputBuilder().setCustomId('max').setLabel('Mentions max par message (2 à 30)')
+              .setValue(`${am.antimention.max}`).setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(2),
+          ));
+        return interaction.showModal(modal);
+      }
+
+      if (sub === 'wordscfg') {
+        const am = getSettings(guild.id).automodConfig;
+        const modal = new ModalBuilder()
+          .setCustomId('setup:modal:amwords')
+          .setTitle('Liste des mots interdits')
+          .addComponents(new ActionRowBuilder().addComponents(
+            new TextInputBuilder().setCustomId('words').setLabel('Mots séparés par des virgules')
+              .setValue(am.badwords.words.join(', '))
+              .setPlaceholder('mot1, mot2, mot3')
+              .setStyle(TextInputStyle.Paragraph).setRequired(false).setMaxLength(2000),
+          ));
+        return interaction.showModal(modal);
+      }
+
+      if (sub === 'muteduration') {
+        const modal = new ModalBuilder()
+          .setCustomId('setup:modal:ammute')
+          .setTitle('Durée du mute automod')
+          .addComponents(new ActionRowBuilder().addComponents(
+            new TextInputBuilder().setCustomId('duration').setLabel('Durée (ex: 10m, 1h)')
+              .setValue(getSettings(guild.id).automodConfig.muteDuration)
+              .setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(10),
+          ));
+        return interaction.showModal(modal);
       }
       break;
     }
