@@ -45,17 +45,16 @@ function errorEmbed(guildId, description) {
   return baseEmbed(guildId).setColor(0xed4245).setDescription(`❌ ${description}`);
 }
 
-// Vérifie que le modérateur ET le bot sont au-dessus de la cible dans la hiérarchie
+// Seules protections : le owner (serveur + .env), le bot lui-même, et les rôles au-dessus
+// du bot (limite imposée par Discord). Les admins du bot peuvent agir entre eux.
 function checkHierarchy(interaction, targetMember) {
+  const { isOwner } = require('./permissions');
   if (!targetMember) return null;
-  if (targetMember.id === interaction.guild.ownerId) return 'Impossible d\'agir sur le propriétaire du serveur.';
+  if (targetMember.id === interaction.guild.ownerId || isOwner(targetMember.id))
+    return 'Impossible d\'agir sur le propriétaire.';
   if (targetMember.id === interaction.client.user.id) return 'Je ne peux pas agir sur moi-même.';
-  if (
-    interaction.member.id !== interaction.guild.ownerId &&
-    targetMember.roles.highest.position >= interaction.member.roles.highest.position
-  ) return 'Ce membre a un rôle supérieur ou égal au tien.';
   if (targetMember.roles.highest.position >= interaction.guild.members.me.roles.highest.position)
-    return 'Ce membre a un rôle supérieur ou égal au mien, je ne peux pas agir sur lui.';
+    return 'Ce membre a un rôle supérieur ou égal au mien, je ne peux pas agir sur lui. Monte mon rôle dans la hiérarchie.';
   return null;
 }
 

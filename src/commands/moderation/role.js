@@ -1,12 +1,10 @@
-const { SlashCommandBuilder, PermissionFlagsBits, MessageFlags } = require('discord.js');
+const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const { successEmbed, errorEmbed, checkHierarchy } = require('../../core/utils');
 
 function checkRoleManageable(interaction, role) {
   if (role.managed) return 'Ce rôle est géré par une intégration, il ne peut pas être attribué manuellement.';
   if (role.position >= interaction.guild.members.me.roles.highest.position)
     return 'Ce rôle est au-dessus de mon rôle le plus haut, je ne peux pas le gérer.';
-  if (interaction.member.id !== interaction.guild.ownerId && role.position >= interaction.member.roles.highest.position)
-    return 'Ce rôle est au-dessus de ton rôle le plus haut.';
   return null;
 }
 
@@ -15,7 +13,6 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName('role')
     .setDescription('Gère les rôles d\'un membre')
-    .setDefaultMemberPermissions(PermissionFlagsBits.ManageRoles)
     .addSubcommand((sub) =>
       sub.setName('add')
         .setDescription('Ajoute un rôle à un membre')

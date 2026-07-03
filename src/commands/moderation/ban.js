@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, PermissionFlagsBits, MessageFlags } = require('discord.js');
+const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const { addSanction } = require('../../core/sanctions');
 const { parseDuration, formatDuration, successEmbed, errorEmbed, checkHierarchy } = require('../../core/utils');
 
@@ -7,7 +7,6 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName('ban')
     .setDescription('Bannit un membre du serveur (définitif ou temporaire)')
-    .setDefaultMemberPermissions(PermissionFlagsBits.BanMembers)
     .addUserOption((opt) => opt.setName('membre').setDescription('Le membre à bannir').setRequired(true))
     .addStringOption((opt) => opt.setName('durée').setDescription('Durée du ban, ex: 7j, 12h — vide = définitif'))
     .addStringOption((opt) => opt.setName('raison').setDescription('La raison du bannissement'))

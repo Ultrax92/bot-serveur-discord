@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, PermissionFlagsBits, MessageFlags } = require('discord.js');
+const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const { successEmbed, errorEmbed } = require('../../core/utils');
 
 module.exports = {
@@ -6,7 +6,6 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName('clear')
     .setDescription('Supprime des messages dans le salon actuel')
-    .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
     .addIntegerOption((opt) =>
       opt.setName('nombre').setDescription('Nombre de messages à supprimer (1 à 100)').setRequired(true).setMinValue(1).setMaxValue(100))
     .addUserOption((opt) => opt.setName('membre').setDescription('Ne supprimer que les messages de ce membre')),

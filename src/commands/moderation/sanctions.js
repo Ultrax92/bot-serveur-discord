@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, PermissionFlagsBits, MessageFlags } = require('discord.js');
+const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const { getSanctions, deleteSanction, clearSanctions } = require('../../core/sanctions');
 const { baseEmbed, successEmbed, errorEmbed } = require('../../core/utils');
 
@@ -9,7 +9,6 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName('sanctions')
     .setDescription('Gère les sanctions des membres')
-    .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers)
     .addSubcommand((sub) =>
       sub.setName('voir')
         .setDescription('Affiche les sanctions d\'un membre')

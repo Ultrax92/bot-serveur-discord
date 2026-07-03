@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, PermissionFlagsBits, MessageFlags } = require('discord.js');
+const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const { successEmbed, errorEmbed } = require('../../core/utils');
 
 module.exports = {
@@ -6,7 +6,6 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName('unban')
     .setDescription('Débannit un utilisateur')
-    .setDefaultMemberPermissions(PermissionFlagsBits.BanMembers)
     .addStringOption((opt) => opt.setName('utilisateur').setDescription('L\'ID de l\'utilisateur à débannir').setRequired(true)),
 
   async execute(interaction) {

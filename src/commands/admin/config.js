@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, PermissionFlagsBits, MessageFlags } = require('discord.js');
+const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const { MODULES, getSettings, updateSettings } = require('../../core/settings');
 const { baseEmbed, successEmbed } = require('../../core/utils');
 
@@ -9,7 +9,6 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName('config')
     .setDescription('Configure le bot sur ce serveur')
-    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .addSubcommand((sub) =>
       sub
         .setName('module')
@@ -43,9 +42,11 @@ module.exports = {
       const settings = getSettings(interaction.guildId);
       const lines = Object.entries(MODULES).map(([key, m]) =>
         `${settings.modules[key] ? '🟢' : '🔴'} ${m.emoji} **${m.label}** — ${m.description}`);
+      const admins = settings.admins.length ? settings.admins.map((id) => `<@${id}>`).join(', ') : 'Aucun (owner uniquement)';
       const embed = baseEmbed(interaction.guildId)
         .setTitle(`Configuration de ${interaction.guild.name}`)
         .setDescription(lines.join('\n'))
+        .addFields({ name: '👑 Admins du bot', value: admins })
         .setFooter({ text: 'Utilise /config module pour activer ou désactiver un module' });
       return interaction.reply({ embeds: [embed] });
     }

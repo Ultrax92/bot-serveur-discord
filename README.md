@@ -19,6 +19,14 @@ Bot Serveur Discord . Slash commands, modules activables par serveur, stockage S
 | 🎭 Rolemenu/Embeds | ⬜ À faire | menus de rôles, générateur d'embed |
 | 💾 Backups | ⬜ À faire | backup/restore serveur et émojis |
 
+## Système de permissions
+
+Le bot est **réservé à ses admins** : toute commande est refusée aux autres membres, quelles que soient leurs permissions Discord.
+
+- **Owner** : ton ID Discord dans `OWNER_ID` (`.env`) + le propriétaire du serveur. Accès total, seuls à pouvoir gérer les admins. Personne ne peut le sanctionner via le bot.
+- **Admins du bot** : ajoutés avec `/get-admin`, retirés avec `/del-admin`, listés dans `/config view`. Accès à toutes les commandes ; ils peuvent agir entre eux (pas de blocage par hiérarchie de rôles, sauf sur le owner).
+- Seule limite Discord incontournable : le bot ne peut pas agir sur un membre dont le rôle est **au-dessus du sien** → garder le rôle du bot tout en haut, juste sous le rôle owner.
+
 ## Installation (local ou VPS)
 
 Prérequis : Node.js ≥ 20.

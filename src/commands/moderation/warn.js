@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, PermissionFlagsBits, MessageFlags } = require('discord.js');
+const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const { addSanction } = require('../../core/sanctions');
 const { successEmbed, errorEmbed, checkHierarchy } = require('../../core/utils');
 
@@ -7,7 +7,6 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName('warn')
     .setDescription('Avertit un membre')
-    .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers)
     .addUserOption((opt) => opt.setName('membre').setDescription('Le membre à avertir').setRequired(true))
     .addStringOption((opt) => opt.setName('raison').setDescription('La raison de l\'avertissement')),
 

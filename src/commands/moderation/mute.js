@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, PermissionFlagsBits, MessageFlags } = require('discord.js');
+const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const { addSanction } = require('../../core/sanctions');
 const { parseDuration, formatDuration, successEmbed, errorEmbed, checkHierarchy } = require('../../core/utils');
 
@@ -9,7 +9,6 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName('mute')
     .setDescription('Mute un membre (timeout Discord)')
-    .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers)
     .addUserOption((opt) => opt.setName('membre').setDescription('Le membre à mute').setRequired(true))
     .addStringOption((opt) => opt.setName('durée').setDescription('Durée du mute, ex: 1h, 30m, 2j (max 28j, défaut 1h)'))
     .addStringOption((opt) => opt.setName('raison').setDescription('La raison du mute')),

@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, PermissionFlagsBits, MessageFlags } = require('discord.js');
+const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const { successEmbed, errorEmbed, checkHierarchy } = require('../../core/utils');
 
 module.exports = {
@@ -6,7 +6,6 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName('nick')
     .setDescription('Change le pseudo d\'un membre sur le serveur')
-    .setDefaultMemberPermissions(PermissionFlagsBits.ManageNicknames)
     .addUserOption((opt) => opt.setName('membre').setDescription('Le membre').setRequired(true))
     .addStringOption((opt) => opt.setName('pseudo').setDescription('Le nouveau pseudo (vide pour réinitialiser)').setMaxLength(32)),
 

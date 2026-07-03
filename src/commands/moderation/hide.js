@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, PermissionFlagsBits, ChannelType } = require('discord.js');
+const { SlashCommandBuilder, ChannelType } = require('discord.js');
 const { successEmbed } = require('../../core/utils');
 
 module.exports = {
@@ -6,7 +6,6 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName('hide')
     .setDescription('Cache ou affiche un salon')
-    .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels)
     .addSubcommand((sub) =>
       sub.setName('on')
         .setDescription('Cache un salon pour tout le monde')

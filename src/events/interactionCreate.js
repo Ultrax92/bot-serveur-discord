@@ -1,5 +1,6 @@
 const { MessageFlags } = require('discord.js');
 const { isModuleEnabled, MODULES } = require('../core/settings');
+const { isBotAdmin } = require('../core/permissions');
 
 module.exports = {
   name: 'interactionCreate',
@@ -11,6 +12,14 @@ module.exports = {
 
     const command = interaction.client.commands.get(interaction.commandName);
     if (!command) return;
+
+    // Le bot est réservé aux admins : owner (.env), propriétaire du serveur, ou ajoutés via /get-admin
+    if (!isBotAdmin(interaction)) {
+      return interaction.reply({
+        content: 'Tu n\'as pas accès aux commandes de ce bot. Seuls les admins du bot peuvent les utiliser.',
+        flags: MessageFlags.Ephemeral,
+      });
+    }
 
     if (!isModuleEnabled(interaction.guildId, command.module)) {
       const label = MODULES[command.module]?.label ?? command.module;

@@ -16,6 +16,8 @@ const MODULES = {
 };
 
 const DEFAULT_SETTINGS = {
+  // IDs des utilisateurs ayant accès à toutes les commandes du bot (gérés via /get-admin et /del-admin)
+  admins: [],
   modules: {
     moderation: true,
     automod: false,
