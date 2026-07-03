@@ -12,7 +12,7 @@ module.exports = {
     .setName('mute')
     .setDescription('Mute un membre (timeout Discord)')
     .addUserOption((opt) => opt.setName('membre').setDescription('Le membre à mute').setRequired(true))
-    .addStringOption((opt) => opt.setName('durée').setDescription('Durée du mute, ex: 1h, 30m, 2j (max 28j, défaut 1h)'))
+    .addStringOption((opt) => opt.setName('durée').setDescription('Ex: 30m, 1h, 2j — max 28j (limite Discord). Vide = durée par défaut du /setup'))
     .addStringOption((opt) => opt.setName('raison').setDescription('La raison du mute')),
 
   async execute(interaction) {
@@ -39,6 +39,9 @@ module.exports = {
     }
 
     await member.timeout(duration, `${reason} (par ${interaction.user.tag})`);
+    if (getSettings(interaction.guildId).moderationConfig.dmOnSanction) {
+      await member.send(`🔇 Tu as été mute sur **${interaction.guild.name}** pour **${formatDuration(duration)}** : ${reason}`).catch(() => {});
+    }
     addSanction({
       guildId: interaction.guildId,
       userId: member.id,
