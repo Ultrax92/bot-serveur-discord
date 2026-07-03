@@ -1,9 +1,13 @@
 const { EmbedBuilder } = require('discord.js');
 const { sendLog } = require('../core/logs');
+const { sendJoinMessage, applyAutoroles } = require('../core/joinleave');
 
 module.exports = {
   name: 'guildMemberAdd',
   async execute(member) {
+    await applyAutoroles(member);
+    await sendJoinMessage(member);
+
     const accountAgeDays = Math.floor((Date.now() - member.user.createdTimestamp) / 86_400_000);
     const embed = new EmbedBuilder()
       .setColor(0x57f287)

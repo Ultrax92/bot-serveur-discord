@@ -1,9 +1,12 @@
 const { EmbedBuilder } = require('discord.js');
 const { sendLog } = require('../core/logs');
+const { sendLeaveMessage } = require('../core/joinleave');
 
 module.exports = {
   name: 'guildMemberRemove',
   async execute(member) {
+    if (!member.partial) await sendLeaveMessage(member);
+
     const embed = new EmbedBuilder()
       .setColor(0xed4245)
       .setAuthor({ name: '📤 Membre parti' })

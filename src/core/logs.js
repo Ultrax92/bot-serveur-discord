@@ -12,6 +12,7 @@ const LOG_TYPES = {
   verif: { label: 'Vérification', emoji: '✅', channelName: 'logs-verif' },
   ticket: { label: 'Tickets', emoji: '🎫', channelName: 'logs-tickets' },
   raid: { label: 'Antiraid', emoji: '🛡️', channelName: 'logs-raid' },
+  command: { label: 'Commandes du bot', emoji: '🤖', channelName: 'logs-commandes' },
 };
 
 // Envoie un embed dans le salon de log du type donné (silencieux si non configuré)

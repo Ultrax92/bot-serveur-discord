@@ -36,8 +36,14 @@ const DEFAULT_SETTINGS = {
     dmOnSanction: true,          // envoyer un MP au membre sanctionné
     defaultMuteDuration: '1h',   // durée du mute quand aucune durée n'est précisée
   },
-  logsChannels: {},   // { mod: id, message: id, voice: id, role: id, boost: id, raid: id }
-  joinleave: {},      // { joinChannel, joinMessage, leaveChannel, leaveMessage, autoroles: [] }
+  logsChannels: {},   // un salon par type de log (voir LOG_TYPES dans core/logs.js)
+  joinleave: {
+    joinChannel: null,
+    joinMessage: '👋 Bienvenue {membre} sur **{serveur}** ! Nous sommes maintenant **{membres}** membres.',
+    leaveChannel: null,
+    leaveMessage: '📤 **{pseudo}** a quitté **{serveur}**. Nous sommes **{membres}** membres.',
+    autoroles: [],
+  },
   automodConfig: {},
   antiraidConfig: {},
   ticketsConfig: {},
