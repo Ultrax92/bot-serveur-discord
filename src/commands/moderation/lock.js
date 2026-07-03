@@ -32,7 +32,7 @@ module.exports = {
     }
 
     return interaction.reply({
-      embeds: [successEmbed(interaction.guildId, lock ? `🔒 ${channel} a été verrouillé.` : `🔓 ${channel} a été déverrouillé.`)],
+      embeds: [successEmbed(interaction, lock ? `🔒 ${channel} a été verrouillé.` : `🔓 ${channel} a été déverrouillé.`)],
     });
   },
 };

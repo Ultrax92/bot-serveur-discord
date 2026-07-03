@@ -29,7 +29,7 @@ module.exports = {
     }
 
     if (deleted === 0) {
-      return interaction.editReply({ embeds: [errorEmbed(interaction.guildId, 'Aucun message supprimé (les messages de plus de 14 jours ne peuvent pas être supprimés en masse).')] });
+      return interaction.editReply({ embeds: [errorEmbed(interaction, 'Aucun message supprimé (les messages de plus de 14 jours ne peuvent pas être supprimés en masse).')] });
     }
     await logModAction(interaction, {
       emoji: '🧹',
@@ -37,7 +37,7 @@ module.exports = {
       target: target ?? null,
     });
     return interaction.editReply({
-      embeds: [successEmbed(interaction.guildId, `🧹 **${deleted}** message(s) supprimé(s)${target ? ` de **${target.tag}**` : ''}.`)],
+      embeds: [successEmbed(interaction, `🧹 **${deleted}** message(s) supprimé(s)${target ? ` de **${target.tag}**` : ''}.`)],
     });
   },
 };

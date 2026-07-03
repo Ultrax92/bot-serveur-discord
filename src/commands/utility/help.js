@@ -20,7 +20,7 @@ module.exports = {
       byModule.get(key).push(command.data);
     }
 
-    const embed = baseEmbed(interaction.guildId)
+    const embed = baseEmbed(interaction)
       .setTitle('📖 Aide')
       .setDescription('Voici les commandes disponibles, regroupées par module.\nToute la configuration se fait via le panneau interactif `/setup`.');
 

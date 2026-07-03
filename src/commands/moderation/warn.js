@@ -17,11 +17,11 @@ module.exports = {
     const reason = interaction.options.getString('raison') ?? 'Aucune raison précisée';
 
     if (!member) {
-      return interaction.reply({ embeds: [errorEmbed(interaction.guildId, 'Membre introuvable sur ce serveur.')], flags: MessageFlags.Ephemeral });
+      return interaction.reply({ embeds: [errorEmbed(interaction, 'Membre introuvable sur ce serveur.')], flags: MessageFlags.Ephemeral });
     }
     const hierarchyError = checkHierarchy(interaction, member);
     if (hierarchyError) {
-      return interaction.reply({ embeds: [errorEmbed(interaction.guildId, hierarchyError)], flags: MessageFlags.Ephemeral });
+      return interaction.reply({ embeds: [errorEmbed(interaction, hierarchyError)], flags: MessageFlags.Ephemeral });
     }
 
     addSanction({
@@ -36,6 +36,6 @@ module.exports = {
       await member.send(`⚠️ Tu as reçu un avertissement sur **${interaction.guild.name}** : ${reason}`).catch(() => {});
     }
     await logModAction(interaction, { emoji: '⚠️', action: 'Warn', target: member.user, reason });
-    return interaction.reply({ embeds: [successEmbed(interaction.guildId, `**${member.user.tag}** a été averti.\n**Raison :** ${reason}`)] });
+    return interaction.reply({ embeds: [successEmbed(interaction, `**${member.user.tag}** a été averti.\n**Raison :** ${reason}`)] });
   },
 };

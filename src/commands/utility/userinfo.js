@@ -12,7 +12,7 @@ module.exports = {
     const user = interaction.options.getUser('membre') ?? interaction.user;
     const member = interaction.options.getMember('membre') ?? interaction.member;
 
-    const embed = baseEmbed(interaction.guildId)
+    const embed = baseEmbed(interaction)
       .setTitle(user.tag)
       .setThumbnail(user.displayAvatarURL({ size: 256 }))
       .addFields(

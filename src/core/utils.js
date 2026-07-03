@@ -33,16 +33,23 @@ function formatDuration(ms) {
   return parts.join(' ') || '0s';
 }
 
-function baseEmbed(guildId) {
-  return new EmbedBuilder().setColor(getSettings(guildId).color).setTimestamp();
+// `source` : un guildId (string) ou une interaction. Avec une interaction,
+// l'embed est signé en footer par l'avatar + pseudo de son auteur.
+function baseEmbed(source) {
+  const guildId = typeof source === 'string' ? source : source.guildId;
+  const embed = new EmbedBuilder().setColor(getSettings(guildId).color).setTimestamp();
+  if (typeof source !== 'string' && source.user) {
+    embed.setFooter({ text: source.user.username, iconURL: source.user.displayAvatarURL() });
+  }
+  return embed;
 }
 
-function successEmbed(guildId, description) {
-  return baseEmbed(guildId).setDescription(`✅ ${description}`);
+function successEmbed(source, description) {
+  return baseEmbed(source).setDescription(`✅ ${description}`);
 }
 
-function errorEmbed(guildId, description) {
-  return baseEmbed(guildId).setColor(0xed4245).setDescription(`❌ ${description}`);
+function errorEmbed(source, description) {
+  return baseEmbed(source).setColor(0xed4245).setDescription(`❌ ${description}`);
 }
 
 // Seules protections : le owner (serveur + .env), le bot lui-même, et les rôles au-dessus

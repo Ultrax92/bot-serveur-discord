@@ -14,9 +14,9 @@ module.exports = {
     try {
       const user = await interaction.guild.bans.remove(userId, `Unban par ${interaction.user.tag}`);
       await logModAction(interaction, { emoji: '🔓', action: 'Unban', target: user ?? userId });
-      return interaction.reply({ embeds: [successEmbed(interaction.guildId, `**${user?.tag ?? userId}** a été débanni.`)] });
+      return interaction.reply({ embeds: [successEmbed(interaction, `**${user?.tag ?? userId}** a été débanni.`)] });
     } catch {
-      return interaction.reply({ embeds: [errorEmbed(interaction.guildId, 'Utilisateur introuvable dans la liste des bannis (vérifie l\'ID).')], flags: MessageFlags.Ephemeral });
+      return interaction.reply({ embeds: [errorEmbed(interaction, 'Utilisateur introuvable dans la liste des bannis (vérifie l\'ID).')], flags: MessageFlags.Ephemeral });
     }
   },
 };

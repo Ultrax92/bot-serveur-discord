@@ -28,7 +28,7 @@ module.exports = {
     if (member) {
       const hierarchyError = checkHierarchy(interaction, member);
       if (hierarchyError) {
-        return interaction.reply({ embeds: [errorEmbed(interaction.guildId, hierarchyError)], flags: MessageFlags.Ephemeral });
+        return interaction.reply({ embeds: [errorEmbed(interaction, hierarchyError)], flags: MessageFlags.Ephemeral });
       }
     }
 
@@ -37,7 +37,7 @@ module.exports = {
     if (durationInput) {
       const duration = parseDuration(durationInput);
       if (!duration) {
-        return interaction.reply({ embeds: [errorEmbed(interaction.guildId, 'Durée invalide. Exemples : `12h`, `7j`, `1j12h`.')], flags: MessageFlags.Ephemeral });
+        return interaction.reply({ embeds: [errorEmbed(interaction, 'Durée invalide. Exemples : `12h`, `7j`, `1j12h`.')], flags: MessageFlags.Ephemeral });
       }
       expiresAt = Date.now() + duration;
       durationText = ` pour **${formatDuration(duration)}**`;
@@ -60,6 +60,6 @@ module.exports = {
     });
 
     await logModAction(interaction, { emoji: '🔨', action: 'Ban', target: user, reason, duration: expiresAt ? durationText.replaceAll('*', '').replace(' pour ', '') : null });
-    return interaction.reply({ embeds: [successEmbed(interaction.guildId, `🔨 **${user.tag}** a été banni${durationText}.\n**Raison :** ${reason}`)] });
+    return interaction.reply({ embeds: [successEmbed(interaction, `🔨 **${user.tag}** a été banni${durationText}.\n**Raison :** ${reason}`)] });
   },
 };

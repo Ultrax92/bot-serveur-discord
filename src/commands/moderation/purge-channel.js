@@ -55,17 +55,17 @@ module.exports = {
   async execute(interaction) {
     if (!canManageAdmins(interaction)) {
       return interaction.reply({
-        embeds: [errorEmbed(interaction.guildId, 'Seul le propriétaire peut purger un salon.')],
+        embeds: [errorEmbed(interaction, 'Seul le propriétaire peut purger un salon.')],
         flags: MessageFlags.Ephemeral,
       });
     }
 
     const channel = interaction.channel;
     if (!channel?.bulkDelete) {
-      return interaction.reply({ embeds: [errorEmbed(interaction.guildId, 'Ce type de salon ne peut pas être purgé.')], flags: MessageFlags.Ephemeral });
+      return interaction.reply({ embeds: [errorEmbed(interaction, 'Ce type de salon ne peut pas être purgé.')], flags: MessageFlags.Ephemeral });
     }
     if (purging.has(channel.id)) {
-      return interaction.reply({ embeds: [errorEmbed(interaction.guildId, 'Une purge est déjà en cours dans ce salon.')], flags: MessageFlags.Ephemeral });
+      return interaction.reply({ embeds: [errorEmbed(interaction, 'Une purge est déjà en cours dans ce salon.')], flags: MessageFlags.Ephemeral });
     }
 
     const limit = interaction.options.getInteger('limite') ?? 1000;

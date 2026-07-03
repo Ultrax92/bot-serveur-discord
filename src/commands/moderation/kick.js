@@ -17,11 +17,11 @@ module.exports = {
     const reason = interaction.options.getString('raison') ?? 'Aucune raison précisée';
 
     if (!member) {
-      return interaction.reply({ embeds: [errorEmbed(interaction.guildId, 'Membre introuvable sur ce serveur.')], flags: MessageFlags.Ephemeral });
+      return interaction.reply({ embeds: [errorEmbed(interaction, 'Membre introuvable sur ce serveur.')], flags: MessageFlags.Ephemeral });
     }
     const hierarchyError = checkHierarchy(interaction, member);
     if (hierarchyError) {
-      return interaction.reply({ embeds: [errorEmbed(interaction.guildId, hierarchyError)], flags: MessageFlags.Ephemeral });
+      return interaction.reply({ embeds: [errorEmbed(interaction, hierarchyError)], flags: MessageFlags.Ephemeral });
     }
 
     if (getSettings(interaction.guildId).moderationConfig.dmOnSanction) {
@@ -37,6 +37,6 @@ module.exports = {
     });
 
     await logModAction(interaction, { emoji: '👢', action: 'Kick', target: member.user, reason });
-    return interaction.reply({ embeds: [successEmbed(interaction.guildId, `👢 **${member.user.tag}** a été expulsé.\n**Raison :** ${reason}`)] });
+    return interaction.reply({ embeds: [successEmbed(interaction, `👢 **${member.user.tag}** a été expulsé.\n**Raison :** ${reason}`)] });
   },
 };

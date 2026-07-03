@@ -12,7 +12,7 @@ module.exports = {
     const owner = await guild.fetchOwner();
     const channels = guild.channels.cache;
 
-    const embed = baseEmbed(interaction.guildId)
+    const embed = baseEmbed(interaction)
       .setTitle(guild.name)
       .setThumbnail(guild.iconURL({ size: 256 }))
       .addFields(

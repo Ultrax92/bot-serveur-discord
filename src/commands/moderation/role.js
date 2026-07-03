@@ -33,33 +33,33 @@ module.exports = {
     const member = interaction.options.getMember('membre');
 
     if (!member) {
-      return interaction.reply({ embeds: [errorEmbed(interaction.guildId, 'Membre introuvable sur ce serveur.')], flags: MessageFlags.Ephemeral });
+      return interaction.reply({ embeds: [errorEmbed(interaction, 'Membre introuvable sur ce serveur.')], flags: MessageFlags.Ephemeral });
     }
 
     if (sub === 'derank') {
       const hierarchyError = checkHierarchy(interaction, member);
       if (hierarchyError) {
-        return interaction.reply({ embeds: [errorEmbed(interaction.guildId, hierarchyError)], flags: MessageFlags.Ephemeral });
+        return interaction.reply({ embeds: [errorEmbed(interaction, hierarchyError)], flags: MessageFlags.Ephemeral });
       }
       const removable = member.roles.cache.filter((r) =>
         r.id !== interaction.guild.roles.everyone.id && !r.managed && r.position < interaction.guild.members.me.roles.highest.position);
       await member.roles.remove(removable, `Derank par ${interaction.user.tag}`);
-      return interaction.reply({ embeds: [successEmbed(interaction.guildId, `**${member.user.tag}** a perdu **${removable.size}** rôle(s).`)] });
+      return interaction.reply({ embeds: [successEmbed(interaction, `**${member.user.tag}** a perdu **${removable.size}** rôle(s).`)] });
     }
 
     const role = interaction.options.getRole('rôle');
     const roleError = checkRoleManageable(interaction, role);
     if (roleError) {
-      return interaction.reply({ embeds: [errorEmbed(interaction.guildId, roleError)], flags: MessageFlags.Ephemeral });
+      return interaction.reply({ embeds: [errorEmbed(interaction, roleError)], flags: MessageFlags.Ephemeral });
     }
 
     if (sub === 'add') {
       await member.roles.add(role, `Rôle ajouté par ${interaction.user.tag}`);
-      return interaction.reply({ embeds: [successEmbed(interaction.guildId, `Le rôle ${role} a été ajouté à **${member.user.tag}**.`)] });
+      return interaction.reply({ embeds: [successEmbed(interaction, `Le rôle ${role} a été ajouté à **${member.user.tag}**.`)] });
     }
     if (sub === 'remove') {
       await member.roles.remove(role, `Rôle retiré par ${interaction.user.tag}`);
-      return interaction.reply({ embeds: [successEmbed(interaction.guildId, `Le rôle ${role} a été retiré à **${member.user.tag}**.`)] });
+      return interaction.reply({ embeds: [successEmbed(interaction, `Le rôle ${role} a été retiré à **${member.user.tag}**.`)] });
     }
   },
 };

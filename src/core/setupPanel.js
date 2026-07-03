@@ -365,8 +365,8 @@ function verificationView(guild) {
     '',
     `📢 **Salon du panneau** — ${channel ? `${channel}` : '🔴 non configuré'}`,
     `🎭 **Rôle donné à la vérification** — ${role ? `${role}` : '🔴 non configuré'}`,
-    `📝 **Message du panneau** (variable \`{serveur}\`) :`,
-    `> ${vc.message}`,
+    `📝 **Message du panneau** (variable \`{serveur}\`, jusqu'à 4000 caractères — mets-y tes règles !) :`,
+    `> ${vc.message.length > 300 ? `${vc.message.slice(0, 300)}…` : vc.message}`,
     '',
     'Une fois salon + rôle choisis, clique sur **📤 Publier le panneau** : le bot poste l\'embed avec le bouton **✅ Se vérifier** dans le salon.',
     '💡 *Astuce : cache les autres salons au rôle @everyone et rends-les visibles au rôle vérifié.*',
@@ -632,7 +632,7 @@ async function handleSetupComponent(interaction) {
         if (!channel || !vc.role) {
           return interaction.reply({ content: '❌ Configure d\'abord le salon et le rôle.', flags: MessageFlags.Ephemeral });
         }
-        const sent = await channel.send(buildVerifyPanel(guild)).catch(() => null);
+        const sent = await channel.send(buildVerifyPanel(guild, interaction.user)).catch(() => null);
         if (!sent) {
           return interaction.reply({ content: `❌ Impossible de publier dans ${channel} (vérifie mes permissions).`, flags: MessageFlags.Ephemeral });
         }
@@ -648,11 +648,11 @@ async function handleSetupComponent(interaction) {
           .addComponents(new ActionRowBuilder().addComponents(
             new TextInputBuilder()
               .setCustomId('template')
-              .setLabel('Variable disponible : {serveur}')
+              .setLabel('Variable : {serveur} — règles bienvenues !')
               .setValue(getSettings(guild.id).verifConfig.message)
               .setStyle(TextInputStyle.Paragraph)
               .setRequired(true)
-              .setMaxLength(1000),
+              .setMaxLength(4000),
           ));
         return interaction.showModal(modal);
       }

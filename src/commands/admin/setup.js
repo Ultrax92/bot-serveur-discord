@@ -12,7 +12,7 @@ module.exports = {
   async execute(interaction) {
     if (!canManageAdmins(interaction)) {
       return interaction.reply({
-        embeds: [errorEmbed(interaction.guildId, 'Seul le propriétaire peut lancer le setup.')],
+        embeds: [errorEmbed(interaction, 'Seul le propriétaire peut lancer le setup.')],
         flags: MessageFlags.Ephemeral,
       });
     }

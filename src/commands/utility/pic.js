@@ -20,13 +20,13 @@ module.exports = {
       if (!fetched.bannerURL()) {
         return interaction.reply({ content: `**${user.tag}** n'a pas de bannière.`, ephemeral: true });
       }
-      const embed = baseEmbed(interaction.guildId)
+      const embed = baseEmbed(interaction)
         .setTitle(`Bannière de ${user.tag}`)
         .setImage(fetched.bannerURL({ size: 1024 }));
       return interaction.reply({ embeds: [embed] });
     }
 
-    const embed = baseEmbed(interaction.guildId)
+    const embed = baseEmbed(interaction)
       .setTitle(`Avatar de ${user.tag}`)
       .setImage(user.displayAvatarURL({ size: 1024 }));
     return interaction.reply({ embeds: [embed] });

@@ -14,16 +14,16 @@ module.exports = {
     const nickname = interaction.options.getString('pseudo');
 
     if (!member) {
-      return interaction.reply({ embeds: [errorEmbed(interaction.guildId, 'Membre introuvable sur ce serveur.')], flags: MessageFlags.Ephemeral });
+      return interaction.reply({ embeds: [errorEmbed(interaction, 'Membre introuvable sur ce serveur.')], flags: MessageFlags.Ephemeral });
     }
     const hierarchyError = checkHierarchy(interaction, member);
     if (hierarchyError) {
-      return interaction.reply({ embeds: [errorEmbed(interaction.guildId, hierarchyError)], flags: MessageFlags.Ephemeral });
+      return interaction.reply({ embeds: [errorEmbed(interaction, hierarchyError)], flags: MessageFlags.Ephemeral });
     }
 
     await member.setNickname(nickname ?? null, `Pseudo changé par ${interaction.user.tag}`);
     return interaction.reply({
-      embeds: [successEmbed(interaction.guildId, nickname
+      embeds: [successEmbed(interaction, nickname
         ? `Le pseudo de **${member.user.tag}** est maintenant **${nickname}**.`
         : `Le pseudo de **${member.user.tag}** a été réinitialisé.`)],
     });

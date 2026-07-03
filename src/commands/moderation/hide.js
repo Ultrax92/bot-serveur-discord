@@ -27,7 +27,7 @@ module.exports = {
     await channel.permissionOverwrites.edit(interaction.guild.roles.everyone, { ViewChannel: hide ? false : null });
 
     return interaction.reply({
-      embeds: [successEmbed(interaction.guildId, hide ? `🙈 ${channel} a été caché.` : `👁️ ${channel} est de nouveau visible.`)],
+      embeds: [successEmbed(interaction, hide ? `🙈 ${channel} a été caché.` : `👁️ ${channel} est de nouveau visible.`)],
     });
   },
 };

@@ -21,11 +21,11 @@ module.exports = {
     const reason = interaction.options.getString('raison') ?? 'Aucune raison précisée';
 
     if (!member) {
-      return interaction.reply({ embeds: [errorEmbed(interaction.guildId, 'Membre introuvable sur ce serveur.')], flags: MessageFlags.Ephemeral });
+      return interaction.reply({ embeds: [errorEmbed(interaction, 'Membre introuvable sur ce serveur.')], flags: MessageFlags.Ephemeral });
     }
     const hierarchyError = checkHierarchy(interaction, member);
     if (hierarchyError) {
-      return interaction.reply({ embeds: [errorEmbed(interaction.guildId, hierarchyError)], flags: MessageFlags.Ephemeral });
+      return interaction.reply({ embeds: [errorEmbed(interaction, hierarchyError)], flags: MessageFlags.Ephemeral });
     }
 
     // Durée par défaut configurable via /setup → Modération
@@ -33,7 +33,7 @@ module.exports = {
     if (durationInput) {
       duration = parseDuration(durationInput);
       if (!duration) {
-        return interaction.reply({ embeds: [errorEmbed(interaction.guildId, 'Durée invalide. Exemples : `30m`, `1h`, `2j`, `1j12h`.')], flags: MessageFlags.Ephemeral });
+        return interaction.reply({ embeds: [errorEmbed(interaction, 'Durée invalide. Exemples : `30m`, `1h`, `2j`, `1j12h`.')], flags: MessageFlags.Ephemeral });
       }
       if (duration > MAX_TIMEOUT_MS) duration = MAX_TIMEOUT_MS;
     }
@@ -50,7 +50,7 @@ module.exports = {
 
     await logModAction(interaction, { emoji: '🔇', action: 'Mute', target: member.user, reason, duration: formatDuration(duration) });
     return interaction.reply({
-      embeds: [successEmbed(interaction.guildId, `🔇 **${member.user.tag}** a été mute pour **${formatDuration(duration)}**.\n**Raison :** ${reason}`)],
+      embeds: [successEmbed(interaction, `🔇 **${member.user.tag}** a été mute pour **${formatDuration(duration)}**.\n**Raison :** ${reason}`)],
     });
   },
 };

@@ -29,11 +29,11 @@ module.exports = {
       const user = interaction.options.getUser('membre');
       const sanctions = getSanctions(interaction.guildId, user.id);
       if (sanctions.length === 0) {
-        return interaction.reply({ embeds: [successEmbed(interaction.guildId, `**${user.tag}** n'a aucune sanction. 🎉`)] });
+        return interaction.reply({ embeds: [successEmbed(interaction, `**${user.tag}** n'a aucune sanction. 🎉`)] });
       }
       const lines = sanctions.slice(0, 20).map((s) =>
         `\`#${s.id}\` ${TYPE_EMOJI[s.type] ?? ''} **${s.type}** — <t:${Math.floor(s.created_at / 1000)}:R> par <@${s.moderator_id}>\n> ${s.reason ?? 'Aucune raison'}`);
-      const embed = baseEmbed(interaction.guildId)
+      const embed = baseEmbed(interaction)
         .setTitle(`Sanctions de ${user.tag} (${sanctions.length})`)
         .setDescription(lines.join('\n'))
         .setThumbnail(user.displayAvatarURL());
@@ -45,15 +45,15 @@ module.exports = {
       const id = interaction.options.getInteger('numéro');
       const ok = deleteSanction(interaction.guildId, id);
       if (!ok) {
-        return interaction.reply({ embeds: [errorEmbed(interaction.guildId, `Aucune sanction \`#${id}\` sur ce serveur.`)], flags: MessageFlags.Ephemeral });
+        return interaction.reply({ embeds: [errorEmbed(interaction, `Aucune sanction \`#${id}\` sur ce serveur.`)], flags: MessageFlags.Ephemeral });
       }
-      return interaction.reply({ embeds: [successEmbed(interaction.guildId, `Sanction \`#${id}\` supprimée.`)] });
+      return interaction.reply({ embeds: [successEmbed(interaction, `Sanction \`#${id}\` supprimée.`)] });
     }
 
     if (sub === 'reset') {
       const user = interaction.options.getUser('membre');
       const count = clearSanctions(interaction.guildId, user.id);
-      return interaction.reply({ embeds: [successEmbed(interaction.guildId, `**${count}** sanction(s) de **${user.tag}** supprimée(s).`)] });
+      return interaction.reply({ embeds: [successEmbed(interaction, `**${count}** sanction(s) de **${user.tag}** supprimée(s).`)] });
     }
   },
 };

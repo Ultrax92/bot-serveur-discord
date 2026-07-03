@@ -3,13 +3,15 @@ const { getSettings, isModuleEnabled } = require('./settings');
 const { sendLog, userAuthor, idLine } = require('./logs');
 
 // Le panneau publié dans le salon de vérification (bouton persistant : il
-// survit aux redémarrages du bot car identifié par son customId)
-function buildVerifyPanel(guild) {
+// survit aux redémarrages du bot car identifié par son customId).
+// `publisher` : signe l'embed en footer avec l'avatar + pseudo de l'auteur.
+function buildVerifyPanel(guild, publisher = null) {
   const settings = getSettings(guild.id);
   const embed = new EmbedBuilder()
     .setColor(settings.color)
     .setTitle('✅ Vérification')
-    .setDescription(settings.verifConfig.message.replaceAll('{serveur}', guild.name));
+    .setDescription(settings.verifConfig.message.replaceAll('{serveur}', guild.name).slice(0, 4096));
+  if (publisher) embed.setFooter({ text: publisher.username, iconURL: publisher.displayAvatarURL() });
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('verify:go').setLabel('Se vérifier').setEmoji('✅').setStyle(ButtonStyle.Success),
   );
