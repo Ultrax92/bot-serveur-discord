@@ -1,5 +1,5 @@
 const { EmbedBuilder } = require('discord.js');
-const { sendLog } = require('../core/logs');
+const { sendLog, userAuthor } = require('../core/logs');
 
 module.exports = {
   name: 'voiceStateUpdate',
@@ -8,17 +8,14 @@ module.exports = {
     if (!member || member.user.bot) return;
     if (oldState.channelId === newState.channelId) return; // mute/deafen : pas loggé
 
-    const embed = new EmbedBuilder().setTimestamp();
+    const embed = new EmbedBuilder().setAuthor(userAuthor(member.user)).setTimestamp();
 
     if (!oldState.channelId) {
-      embed.setColor(0x57f287).setAuthor({ name: '🔊 Connexion en vocal' })
-        .setDescription(`${member} a rejoint ${newState.channel}`);
+      embed.setColor(0x57f287).setDescription(`🔊 **A rejoint le vocal** ${newState.channel}`);
     } else if (!newState.channelId) {
-      embed.setColor(0xed4245).setAuthor({ name: '🔇 Déconnexion du vocal' })
-        .setDescription(`${member} a quitté ${oldState.channel}`);
+      embed.setColor(0xed4245).setDescription(`🔇 **A quitté le vocal** ${oldState.channel}`);
     } else {
-      embed.setColor(0xfaa61a).setAuthor({ name: '🔀 Changement de salon vocal' })
-        .setDescription(`${member} est passé de ${oldState.channel} à ${newState.channel}`);
+      embed.setColor(0xfaa61a).setDescription(`🔀 **Passé de** ${oldState.channel} **à** ${newState.channel}`);
     }
 
     await sendLog(member.guild, 'voice', embed);

@@ -1,5 +1,5 @@
 const { EmbedBuilder } = require('discord.js');
-const { sendLog } = require('../core/logs');
+const { sendLog, userAuthor } = require('../core/logs');
 
 module.exports = {
   name: 'guildMemberUpdate',
@@ -10,15 +10,15 @@ module.exports = {
     if (!oldMember.premiumSince && newMember.premiumSince) {
       const embed = new EmbedBuilder()
         .setColor(0xf47fff)
-        .setAuthor({ name: '🚀 Nouveau boost' })
-        .setDescription(`${newMember} vient de booster le serveur ! Merci 💜`)
+        .setAuthor(userAuthor(newMember.user))
+        .setDescription('🚀 **A boosté le serveur !** Merci 💜')
         .setTimestamp();
       await sendLog(newMember.guild, 'boost', embed);
     } else if (oldMember.premiumSince && !newMember.premiumSince) {
       const embed = new EmbedBuilder()
         .setColor(0x99aab5)
-        .setAuthor({ name: '🚀 Fin de boost' })
-        .setDescription(`${newMember} ne booste plus le serveur.`)
+        .setAuthor(userAuthor(newMember.user))
+        .setDescription('🚀 **Ne booste plus le serveur**')
         .setTimestamp();
       await sendLog(newMember.guild, 'boost', embed);
     }
@@ -27,13 +27,14 @@ module.exports = {
     const added = newMember.roles.cache.filter((r) => !oldMember.roles.cache.has(r.id));
     const removed = oldMember.roles.cache.filter((r) => !newMember.roles.cache.has(r.id));
     if (added.size || removed.size) {
+      const lines = ['🎭 **Rôles modifiés**'];
+      if (added.size) lines.push(`**Ajoutés :** ${added.map((r) => `${r}`).join(' ').slice(0, 900)}`);
+      if (removed.size) lines.push(`**Retirés :** ${removed.map((r) => `${r}`).join(' ').slice(0, 900)}`);
       const embed = new EmbedBuilder()
         .setColor(0x5865f2)
-        .setAuthor({ name: '🎭 Rôles modifiés' })
-        .setDescription(`Membre : ${newMember} (\`${newMember.id}\`)`)
+        .setAuthor(userAuthor(newMember.user))
+        .setDescription(lines.join('\n'))
         .setTimestamp();
-      if (added.size) embed.addFields({ name: 'Ajoutés', value: added.map((r) => `${r}`).join(' ').slice(0, 1024), inline: true });
-      if (removed.size) embed.addFields({ name: 'Retirés', value: removed.map((r) => `${r}`).join(' ').slice(0, 1024), inline: true });
       await sendLog(newMember.guild, 'role', embed);
     }
   },

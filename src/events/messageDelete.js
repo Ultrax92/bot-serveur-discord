@@ -1,5 +1,5 @@
 const { EmbedBuilder } = require('discord.js');
-const { sendLog } = require('../core/logs');
+const { sendLog, userAuthor } = require('../core/logs');
 
 module.exports = {
   name: 'messageDelete',
@@ -7,28 +7,21 @@ module.exports = {
     if (!message.guild) return;
     if (message.author?.bot) return;
 
-    const embed = new EmbedBuilder()
-      .setColor(0xed4245)
-      .setAuthor({ name: '💬 Message supprimé' })
-      .addFields({ name: 'Salon', value: `${message.channel}`, inline: true })
-      .setTimestamp();
+    const embed = new EmbedBuilder().setColor(0xed4245).setTimestamp();
+    const lines = [`**Message supprimé dans** ${message.channel}`];
 
     if (message.partial || message.author == null) {
       // Message envoyé avant le démarrage du bot : contenu inconnu
-      embed.setDescription('*Message non mis en cache : contenu et auteur inconnus.*');
+      lines.push('*Message non mis en cache : contenu et auteur inconnus.*');
     } else {
-      embed.addFields({ name: 'Auteur', value: `${message.author} (\`${message.author.id}\`)`, inline: true });
-      if (message.content) {
-        embed.setDescription(message.content.slice(0, 4000));
-      }
+      embed.setAuthor(userAuthor(message.author));
+      if (message.content) lines.push(message.content.slice(0, 3800));
       if (message.attachments.size > 0) {
-        embed.addFields({
-          name: 'Pièces jointes',
-          value: message.attachments.map((a) => a.name).join(', ').slice(0, 1024),
-        });
+        lines.push(`📎 ${message.attachments.map((a) => a.name).join(', ').slice(0, 500)}`);
       }
     }
 
+    embed.setDescription(lines.join('\n'));
     await sendLog(message.guild, 'message', embed);
   },
 };

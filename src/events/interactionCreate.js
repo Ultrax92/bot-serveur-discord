@@ -2,7 +2,7 @@ const { MessageFlags, EmbedBuilder } = require('discord.js');
 const { isModuleEnabled, MODULES } = require('../core/settings');
 const { isBotAdmin, canManageAdmins } = require('../core/permissions');
 const { handleSetupComponent } = require('../core/setupPanel');
-const { sendLog } = require('../core/logs');
+const { sendLog, userAuthor } = require('../core/logs');
 
 const COMMAND_LOG_STYLES = {
   ok: { color: 0x57f287, label: '✅ Commande exécutée' },
@@ -16,12 +16,11 @@ function logCommand(interaction, status) {
   const style = COMMAND_LOG_STYLES[status];
   const embed = new EmbedBuilder()
     .setColor(style.color)
-    .setAuthor({ name: style.label })
-    .addFields(
-      { name: 'Utilisateur', value: `${interaction.user} (\`${interaction.user.id}\`)`, inline: true },
-      { name: 'Salon', value: `${interaction.channel}`, inline: true },
-      { name: 'Commande', value: `\`${interaction.toString().slice(0, 1000)}\`` },
-    )
+    .setAuthor(userAuthor(interaction.user))
+    .setDescription([
+      `${style.label} **dans** ${interaction.channel}`,
+      `\`${interaction.toString().slice(0, 1000)}\``,
+    ].join('\n'))
     .setTimestamp();
   sendLog(interaction.guild, 'command', embed).catch(() => {});
 }

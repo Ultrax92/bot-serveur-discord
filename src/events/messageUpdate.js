@@ -1,5 +1,5 @@
 const { EmbedBuilder } = require('discord.js');
-const { sendLog } = require('../core/logs');
+const { sendLog, userAuthor } = require('../core/logs');
 
 module.exports = {
   name: 'messageUpdate',
@@ -11,13 +11,12 @@ module.exports = {
 
     const embed = new EmbedBuilder()
       .setColor(0xfaa61a)
-      .setAuthor({ name: '✏️ Message modifié' })
-      .addFields(
-        { name: 'Auteur', value: `${newMessage.author} (\`${newMessage.author.id}\`)`, inline: true },
-        { name: 'Salon', value: `${newMessage.channel} — [aller au message](${newMessage.url})`, inline: true },
-        { name: 'Avant', value: (oldMessage.content || '*vide*').slice(0, 1024) },
-        { name: 'Après', value: (newMessage.content || '*vide*').slice(0, 1024) },
-      )
+      .setAuthor(userAuthor(newMessage.author))
+      .setDescription([
+        `**Message modifié dans** ${newMessage.channel} — [voir le message](${newMessage.url})`,
+        `**Avant :** ${(oldMessage.content || '*vide*').slice(0, 900)}`,
+        `**Après :** ${(newMessage.content || '*vide*').slice(0, 900)}`,
+      ].join('\n'))
       .setTimestamp();
 
     await sendLog(newMessage.guild, 'message', embed);

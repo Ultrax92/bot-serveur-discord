@@ -15,6 +15,15 @@ const LOG_TYPES = {
   command: { label: 'Commandes du bot', emoji: '🤖', channelName: 'logs-commandes' },
 };
 
+// En-tête d'embed au format compact : avatar + nom cliquable (profil) + ID
+function userAuthor(user) {
+  return {
+    name: `${user.username ?? user.tag ?? 'Inconnu'} (${user.id})`,
+    iconURL: typeof user.displayAvatarURL === 'function' ? user.displayAvatarURL() : undefined,
+    url: `https://discord.com/users/${user.id}`,
+  };
+}
+
 // Envoie un embed dans le salon de log du type donné (silencieux si non configuré)
 async function sendLog(guild, type, embed) {
   if (!isModuleEnabled(guild.id, 'logs')) return;
@@ -27,16 +36,15 @@ async function sendLog(guild, type, embed) {
 
 // Log d'une action de modération effectuée via le bot
 async function logModAction(interaction, { emoji, action, target, reason, duration }) {
-  const embed = new EmbedBuilder()
-    .setColor(0xed4245)
-    .setAuthor({ name: `${emoji} ${action}` })
-    .addFields(
-      { name: 'Membre', value: target ? `${target} (\`${target.id ?? target}\`)` : 'N/A', inline: true },
-      { name: 'Modérateur', value: `${interaction.user} (\`${interaction.user.id}\`)`, inline: true },
-    )
-    .setTimestamp();
-  if (duration) embed.addFields({ name: 'Durée', value: duration, inline: true });
-  if (reason) embed.addFields({ name: 'Raison', value: reason });
+  const embed = new EmbedBuilder().setColor(0xed4245).setTimestamp();
+  const lines = [`${emoji} **${action}** par ${interaction.user} (\`${interaction.user.id}\`)`];
+
+  if (target?.id) embed.setAuthor(userAuthor(target));
+  else if (target) lines.push(`**Cible :** \`${target}\``);
+  if (duration) lines.push(`**Durée :** ${duration}`);
+  if (reason) lines.push(`**Raison :** ${reason}`);
+
+  embed.setDescription(lines.join('\n'));
   await sendLog(interaction.guild, 'mod', embed);
 }
 
@@ -83,4 +91,4 @@ async function autoConfigureLogs(guild) {
   return created;
 }
 
-module.exports = { LOG_TYPES, sendLog, logModAction, ensureLogsCategory, createLogChannel, autoConfigureLogs };
+module.exports = { LOG_TYPES, userAuthor, sendLog, logModAction, ensureLogsCategory, createLogChannel, autoConfigureLogs };
