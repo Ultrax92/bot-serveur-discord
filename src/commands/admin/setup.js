@@ -1,5 +1,5 @@
 const { SlashCommandBuilder, MessageFlags } = require('discord.js');
-const { hubView } = require('../../core/setupPanel');
+const { hubView, watchPanel } = require('../../core/setupPanel');
 const { canManageAdmins } = require('../../core/permissions');
 const { errorEmbed } = require('../../core/utils');
 
@@ -16,6 +16,8 @@ module.exports = {
         flags: MessageFlags.Ephemeral,
       });
     }
-    return interaction.reply(hubView(interaction.guild));
+    await interaction.reply(hubView(interaction.guild));
+    // Le panneau se ferme tout seul après 1 minute sans interaction
+    watchPanel(await interaction.fetchReply().catch(() => null));
   },
 };

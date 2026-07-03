@@ -31,6 +31,34 @@ function extractId(input) {
   return match ? match[0] : null;
 }
 
+// ── Fermeture automatique des panneaux inactifs ───────────────────────────────
+
+const PANEL_TIMEOUT_MS = 60_000; // 1 minute sans interaction → le panneau se ferme
+const activePanels = new Map(); // messageId → timeout
+
+function expiredView() {
+  const embed = new EmbedBuilder()
+    .setColor(0x99aab5)
+    .setTitle('⏱️ Panneau fermé pour inactivité')
+    .setDescription('Relance `/setup` pour continuer la configuration.');
+  return { embeds: [embed], components: [] };
+}
+
+// (Re)lance le compte à rebours d'inactivité d'un panneau
+function watchPanel(message) {
+  if (!message) return;
+  clearTimeout(activePanels.get(message.id));
+  activePanels.set(message.id, setTimeout(() => {
+    activePanels.delete(message.id);
+    message.edit(expiredView()).catch(() => {});
+  }, PANEL_TIMEOUT_MS));
+}
+
+function releasePanel(messageId) {
+  clearTimeout(activePanels.get(messageId));
+  activePanels.delete(messageId);
+}
+
 // ── Page d'accueil ────────────────────────────────────────────────────────────
 
 function hubView(guild) {
@@ -336,6 +364,9 @@ async function handleSetupComponent(interaction) {
   const [, action, ...args] = interaction.customId.split(':');
   const guild = interaction.guild;
 
+  // Chaque interaction relance le compte à rebours d'inactivité
+  if (interaction.message) watchPanel(interaction.message);
+
   switch (action) {
     case 'nav':
       return interaction.update((PAGES[interaction.values[0]] ?? hubView)(guild));
@@ -344,6 +375,7 @@ async function handleSetupComponent(interaction) {
       return interaction.update((PAGES[args[0]] ?? hubView)(guild));
 
     case 'done': {
+      releasePanel(interaction.message.id);
       const embed = panelEmbed(guild, '✅ Setup terminé', 'Relance `/setup` à tout moment pour modifier la configuration.\nUtilise `/help` pour voir les commandes disponibles.');
       return interaction.update({ embeds: [embed], components: [] });
     }
@@ -635,4 +667,4 @@ async function handleSetupComponent(interaction) {
   }
 }
 
-module.exports = { hubView, handleSetupComponent };
+module.exports = { hubView, handleSetupComponent, watchPanel };
