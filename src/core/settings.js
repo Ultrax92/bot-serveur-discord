@@ -32,6 +32,10 @@ const DEFAULT_SETTINGS = {
     backups: false,
   },
   // Chaque module range ses options sous sa propre clé (remplies au fur et à mesure).
+  moderationConfig: {
+    dmOnSanction: true,          // envoyer un MP au membre sanctionné
+    defaultMuteDuration: '1h',   // durée du mute quand aucune durée n'est précisée
+  },
   logsChannels: {},   // { mod: id, message: id, voice: id, role: id, boost: id, raid: id }
   joinleave: {},      // { joinChannel, joinMessage, leaveChannel, leaveMessage, autoroles: [] }
   automodConfig: {},

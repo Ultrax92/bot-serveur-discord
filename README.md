@@ -7,9 +7,9 @@ Bot Serveur Discord . Slash commands, modules activables par serveur, stockage S
 | Module | Statut | Contenu |
 |---|---|---|
 | 🔨 Modération | ✅ Fait | warn, mute/unmute (timeout), kick, ban/tempban, unban, clear, sanctions, lock, hide, role add/remove/derank, nick |
-| ⚙️ Config | ✅ Fait | `/config module` (activer/désactiver), `/config view`, `/config couleur`, `/help`, `/setup` (réglages de base en un clic), `/get-admin`, `/del-admin` |
+| ⚙️ Config | ✅ Fait | `/setup` : panneau interactif unique (modules, admins du bot, couleur, réglages modération, salons de logs) + `/help` |
 | 🧰 Utilitaire | 🔶 Partiel | serverinfo, userinfo, pic — reste : banlist, boosters, rolemembers, snipe, emoji |
-| 📜 Logs | ✅ Fait | `/logs auto` (création auto des salons), `/logs set/off/view` — logs de modération, messages supprimés/édités, vocal, rôles, boosts |
+| 📜 Logs | ✅ Fait | configuré via `/setup` → 📜 (salon existant, création en un clic, ou désactivé, par type) — logs de modération, messages supprimés/édités, vocal, rôles, boosts |
 | 🤖 Auto-modération | ⬜ À faire | antispam, antilink, antimassmention, badwords, strikes/punitions auto |
 | 🛡️ Antiraid | ⬜ À faire | antibot, antitoken, antichannel, antirole, antiwebhook, whitelist, punitions |
 | 👋 Arrivées/Départs | ⬜ À faire | messages bienvenue/départ, autorole |
@@ -24,7 +24,7 @@ Bot Serveur Discord . Slash commands, modules activables par serveur, stockage S
 Le bot est **réservé à ses admins** : toute commande est refusée aux autres membres, quelles que soient leurs permissions Discord.
 
 - **Owner** : ton ID Discord dans `OWNER_ID` (`.env`) + le propriétaire du serveur. Accès total, seuls à pouvoir gérer les admins. Personne ne peut le sanctionner via le bot.
-- **Admins du bot** : ajoutés avec `/get-admin`, retirés avec `/del-admin`, listés dans `/config view`. Accès à toutes les commandes ; ils peuvent agir entre eux (pas de blocage par hiérarchie de rôles, sauf sur le owner).
+- **Admins du bot** : gérés via `/setup` → 👑 Admins (sélecteur d'utilisateurs). Accès à toutes les commandes ; ils peuvent agir entre eux (pas de blocage par hiérarchie de rôles, sauf sur le owner).
 - Seule limite Discord incontournable : le bot ne peut pas agir sur un membre dont le rôle est **au-dessus du sien** → garder le rôle du bot tout en haut, juste sous le rôle owner.
 
 ## Installation (local ou VPS)

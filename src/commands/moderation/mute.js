@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const { addSanction } = require('../../core/sanctions');
+const { getSettings } = require('../../core/settings');
 const { logModAction } = require('../../core/logs');
 const { parseDuration, formatDuration, successEmbed, errorEmbed, checkHierarchy } = require('../../core/utils');
 
@@ -27,7 +28,8 @@ module.exports = {
       return interaction.reply({ embeds: [errorEmbed(interaction.guildId, hierarchyError)], flags: MessageFlags.Ephemeral });
     }
 
-    let duration = 3_600_000; // 1h par défaut
+    // Durée par défaut configurable via /setup → Modération
+    let duration = parseDuration(getSettings(interaction.guildId).moderationConfig.defaultMuteDuration) ?? 3_600_000;
     if (durationInput) {
       duration = parseDuration(durationInput);
       if (!duration) {

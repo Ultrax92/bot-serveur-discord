@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const { addSanction } = require('../../core/sanctions');
+const { getSettings } = require('../../core/settings');
 const { logModAction } = require('../../core/logs');
 const { parseDuration, formatDuration, successEmbed, errorEmbed, checkHierarchy } = require('../../core/utils');
 
@@ -42,7 +43,9 @@ module.exports = {
       durationText = ` pour **${formatDuration(duration)}**`;
     }
 
-    await user.send(`🔨 Tu as été banni de **${interaction.guild.name}**${durationText ? durationText.replaceAll('**', '') : ''} : ${reason}`).catch(() => {});
+    if (getSettings(interaction.guildId).moderationConfig.dmOnSanction) {
+      await user.send(`🔨 Tu as été banni de **${interaction.guild.name}**${durationText ? durationText.replaceAll('**', '') : ''} : ${reason}`).catch(() => {});
+    }
     await interaction.guild.bans.create(user.id, {
       reason: `${reason} (par ${interaction.user.tag})`,
       deleteMessageSeconds: deleteDays * 86_400,

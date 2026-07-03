@@ -22,7 +22,7 @@ module.exports = {
 
     const embed = baseEmbed(interaction.guildId)
       .setTitle('📖 Aide')
-      .setDescription('Voici les commandes disponibles, regroupées par module.\nLes administrateurs peuvent activer/désactiver des modules avec `/config module`.');
+      .setDescription('Voici les commandes disponibles, regroupées par module.\nToute la configuration se fait via le panneau interactif `/setup`.');
 
     const coreFirst = ['core', ...Object.keys(MODULES)];
     for (const key of coreFirst) {

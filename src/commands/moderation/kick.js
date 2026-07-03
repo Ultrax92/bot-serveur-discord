@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const { addSanction } = require('../../core/sanctions');
+const { getSettings } = require('../../core/settings');
 const { logModAction } = require('../../core/logs');
 const { successEmbed, errorEmbed, checkHierarchy } = require('../../core/utils');
 
@@ -23,7 +24,9 @@ module.exports = {
       return interaction.reply({ embeds: [errorEmbed(interaction.guildId, hierarchyError)], flags: MessageFlags.Ephemeral });
     }
 
-    await member.send(`👢 Tu as été expulsé de **${interaction.guild.name}** : ${reason}`).catch(() => {});
+    if (getSettings(interaction.guildId).moderationConfig.dmOnSanction) {
+      await member.send(`👢 Tu as été expulsé de **${interaction.guild.name}** : ${reason}`).catch(() => {});
+    }
     await member.kick(`${reason} (par ${interaction.user.tag})`);
     addSanction({
       guildId: interaction.guildId,

@@ -1,10 +1,12 @@
 const {
   ActionRowBuilder, ButtonBuilder, ButtonStyle,
   StringSelectMenuBuilder, StringSelectMenuOptionBuilder,
-  ChannelSelectMenuBuilder, ChannelType, EmbedBuilder,
+  ChannelSelectMenuBuilder, UserSelectMenuBuilder, ChannelType, EmbedBuilder,
+  ModalBuilder, TextInputBuilder, TextInputStyle, MessageFlags,
 } = require('discord.js');
 const { MODULES, getSettings, updateSettings } = require('./settings');
 const { LOG_TYPES, autoConfigureLogs, createLogChannel } = require('./logs');
+const { parseDuration, formatDuration } = require('./utils');
 
 function panelEmbed(guild, title, description) {
   return new EmbedBuilder()
@@ -18,32 +20,44 @@ function backButton(target, label = '◀️ Retour') {
   return new ButtonBuilder().setCustomId(`setup:goto:${target}`).setLabel(label).setStyle(ButtonStyle.Secondary);
 }
 
+function colorHex(settings) {
+  return `#${settings.color.toString(16).padStart(6, '0').toUpperCase()}`;
+}
+
 // ── Page d'accueil ────────────────────────────────────────────────────────────
 
 function hubView(guild) {
   const settings = getSettings(guild.id);
   const enabledCount = Object.keys(MODULES).filter((k) => settings.modules[k]).length;
-  const logsCount = Object.keys(LOG_TYPES).filter((t) => {
-    return settings.logsChannels[t] && guild.channels.cache.get(settings.logsChannels[t]);
-  }).length;
+  const logsCount = Object.keys(LOG_TYPES).filter((t) =>
+    settings.logsChannels[t] && guild.channels.cache.get(settings.logsChannels[t])).length;
 
   const embed = panelEmbed(guild, `🛠️ Setup de ${guild.name}`, [
-    'Bienvenue dans le panneau de configuration !',
+    'Bienvenue dans le panneau de configuration ! Chaque section montre les réglages actuels et permet de les modifier.',
     '',
+    `⚙️ **Général** — couleur des embeds : ${colorHex(settings)}`,
+    `👑 **Admins du bot** — ${settings.admins.length} admin(s)`,
     `🧩 **Modules** — ${enabledCount}/${Object.keys(MODULES).length} activés`,
+    `🔨 **Modération** — MP sanction : ${settings.moderationConfig.dmOnSanction ? '🟢' : '🔴'} · mute par défaut : ${settings.moderationConfig.defaultMuteDuration}`,
     `📜 **Salons de logs** — ${logsCount}/${Object.keys(LOG_TYPES).length} configurés`,
     '',
-    'Choisis une section dans le menu, ou clique sur **⚡ Setup rapide** pour tout configurer d\'un coup avec les réglages recommandés.',
+    'Choisis une section, ou clique sur **⚡ Setup rapide** pour appliquer les réglages recommandés d\'un coup.',
   ].join('\n'));
 
   const nav = new StringSelectMenuBuilder()
     .setCustomId('setup:nav')
     .setPlaceholder('📂 Choisis une section à configurer…')
     .addOptions(
+      new StringSelectMenuOptionBuilder().setValue('general').setLabel('Général').setEmoji('⚙️')
+        .setDescription('Couleur des embeds du bot'),
+      new StringSelectMenuOptionBuilder().setValue('admins').setLabel('Admins du bot').setEmoji('👑')
+        .setDescription('Qui a accès aux commandes du bot'),
       new StringSelectMenuOptionBuilder().setValue('modules').setLabel('Modules').setEmoji('🧩')
-        .setDescription('Activer ou désactiver les fonctionnalités du bot'),
+        .setDescription('Activer ou désactiver les fonctionnalités'),
+      new StringSelectMenuOptionBuilder().setValue('moderation').setLabel('Modération').setEmoji('🔨')
+        .setDescription('MP aux sanctionnés, durée de mute par défaut'),
       new StringSelectMenuOptionBuilder().setValue('logs').setLabel('Salons de logs').setEmoji('📜')
-        .setDescription('Choisir ou créer un salon pour chaque type de log'),
+        .setDescription('Un salon existant ou créé pour chaque type de log'),
     );
 
   const buttons = new ActionRowBuilder().addComponents(
@@ -52,6 +66,51 @@ function hubView(guild) {
   );
 
   return { embeds: [embed], components: [new ActionRowBuilder().addComponents(nav), buttons] };
+}
+
+// ── Page générale ─────────────────────────────────────────────────────────────
+
+function generalView(guild) {
+  const settings = getSettings(guild.id);
+  const embed = panelEmbed(guild, '⚙️ Général', [
+    `🎨 **Couleur des embeds :** ${colorHex(settings)} (c'est la couleur de ce panneau)`,
+  ].join('\n'));
+
+  const buttons = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('setup:color').setLabel('🎨 Changer la couleur').setStyle(ButtonStyle.Primary),
+    backButton('home'),
+  );
+  return { embeds: [embed], components: [buttons] };
+}
+
+// ── Page admins ───────────────────────────────────────────────────────────────
+
+function adminsView(guild) {
+  const settings = getSettings(guild.id);
+  const list = settings.admins.length ? settings.admins.map((id) => `• <@${id}>`).join('\n') : '*Aucun admin ajouté.*';
+
+  const embed = panelEmbed(guild, '👑 Admins du bot', [
+    'Les admins ont accès à **toutes les commandes** du bot. Le owner (toi) l\'est toujours, sans apparaître ici.',
+    '',
+    list,
+    '',
+    '👇 Sélectionne dans le menu **l\'ensemble des admins** : ajoute ou retire des personnes, la sélection remplace la liste.',
+  ].join('\n'));
+
+  const select = new UserSelectMenuBuilder()
+    .setCustomId('setup:admins')
+    .setPlaceholder('👑 Sélectionne les admins du bot…')
+    .setMinValues(0)
+    .setMaxValues(25);
+  if (settings.admins.length) select.setDefaultUsers(settings.admins.slice(0, 25));
+
+  return {
+    embeds: [embed],
+    components: [
+      new ActionRowBuilder().addComponents(select),
+      new ActionRowBuilder().addComponents(backButton('home')),
+    ],
+  };
 }
 
 // ── Page modules ──────────────────────────────────────────────────────────────
@@ -87,6 +146,29 @@ function modulesView(guild) {
       new ActionRowBuilder().addComponents(backButton('home')),
     ],
   };
+}
+
+// ── Page modération ───────────────────────────────────────────────────────────
+
+function moderationView(guild) {
+  const settings = getSettings(guild.id);
+  const { dmOnSanction, defaultMuteDuration } = settings.moderationConfig;
+
+  const embed = panelEmbed(guild, '🔨 Réglages de modération', [
+    `${dmOnSanction ? '🟢' : '🔴'} **MP au membre sanctionné** — le bot prévient en privé lors d'un warn/mute/kick/ban`,
+    `⏱️ **Durée de mute par défaut** — \`${defaultMuteDuration}\` quand /mute est utilisé sans durée`,
+    '',
+    '*Les commandes d\'action (/warn, /mute, /ban…) restent des commandes : c\'est plus rapide au quotidien.*',
+  ].join('\n'));
+
+  const buttons = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('setup:mod:dm')
+      .setLabel(dmOnSanction ? '🔴 Désactiver le MP sanction' : '🟢 Activer le MP sanction')
+      .setStyle(dmOnSanction ? ButtonStyle.Danger : ButtonStyle.Success),
+    new ButtonBuilder().setCustomId('setup:mod:muteduration').setLabel('⏱️ Durée de mute par défaut').setStyle(ButtonStyle.Primary),
+    backButton('home'),
+  );
+  return { embeds: [embed], components: [buttons] };
 }
 
 // ── Page logs ─────────────────────────────────────────────────────────────────
@@ -147,6 +229,15 @@ function logTypeView(guild, type) {
   return { embeds: [embed], components: [new ActionRowBuilder().addComponents(channelSelect), buttons] };
 }
 
+const PAGES = {
+  home: hubView,
+  general: generalView,
+  admins: adminsView,
+  modules: modulesView,
+  moderation: moderationView,
+  logs: logsView,
+};
+
 // ── Routeur des interactions du panneau (customId = "setup:...") ────────────
 
 async function handleSetupComponent(interaction) {
@@ -154,16 +245,11 @@ async function handleSetupComponent(interaction) {
   const guild = interaction.guild;
 
   switch (action) {
-    case 'nav': {
-      const page = interaction.values[0];
-      return interaction.update(page === 'modules' ? modulesView(guild) : logsView(guild));
-    }
+    case 'nav':
+      return interaction.update((PAGES[interaction.values[0]] ?? hubView)(guild));
 
-    case 'goto': {
-      const target = args[0];
-      if (target === 'logs') return interaction.update(logsView(guild));
-      return interaction.update(hubView(guild));
-    }
+    case 'goto':
+      return interaction.update((PAGES[args[0]] ?? hubView)(guild));
 
     case 'quick': {
       await interaction.deferUpdate();
@@ -187,6 +273,72 @@ async function handleSetupComponent(interaction) {
         for (const key of Object.keys(MODULES)) s.modules[key] = enabled.has(key);
       });
       return interaction.update(modulesView(guild));
+    }
+
+    case 'admins': {
+      const ids = [...interaction.users.filter((u) => !u.bot).keys()];
+      updateSettings(guild.id, (s) => { s.admins = ids; });
+      return interaction.update(adminsView(guild));
+    }
+
+    case 'color': {
+      const modal = new ModalBuilder()
+        .setCustomId('setup:modal:color')
+        .setTitle('Couleur des embeds')
+        .addComponents(new ActionRowBuilder().addComponents(
+          new TextInputBuilder()
+            .setCustomId('hex')
+            .setLabel('Couleur au format hexadécimal')
+            .setPlaceholder('#5865F2')
+            .setStyle(TextInputStyle.Short)
+            .setRequired(true)
+            .setMaxLength(7),
+        ));
+      return interaction.showModal(modal);
+    }
+
+    case 'mod': {
+      if (args[0] === 'dm') {
+        updateSettings(guild.id, (s) => { s.moderationConfig.dmOnSanction = !s.moderationConfig.dmOnSanction; });
+        return interaction.update(moderationView(guild));
+      }
+      if (args[0] === 'muteduration') {
+        const modal = new ModalBuilder()
+          .setCustomId('setup:modal:muteduration')
+          .setTitle('Durée de mute par défaut')
+          .addComponents(new ActionRowBuilder().addComponents(
+            new TextInputBuilder()
+              .setCustomId('duration')
+              .setLabel('Durée (ex: 30m, 1h, 2j)')
+              .setPlaceholder('1h')
+              .setStyle(TextInputStyle.Short)
+              .setRequired(true)
+              .setMaxLength(10),
+          ));
+        return interaction.showModal(modal);
+      }
+      break;
+    }
+
+    case 'modal': {
+      if (args[0] === 'color') {
+        const hex = interaction.fields.getTextInputValue('hex').replace(/^#/, '');
+        if (!/^[0-9a-f]{6}$/i.test(hex)) {
+          return interaction.reply({ content: '❌ Format invalide. Exemple attendu : `#5865F2`', flags: MessageFlags.Ephemeral });
+        }
+        updateSettings(guild.id, (s) => { s.color = parseInt(hex, 16); });
+        return interaction.update(generalView(guild));
+      }
+      if (args[0] === 'muteduration') {
+        const input = interaction.fields.getTextInputValue('duration').trim();
+        const duration = parseDuration(input);
+        if (!duration) {
+          return interaction.reply({ content: '❌ Durée invalide. Exemples : `30m`, `1h`, `2j`.', flags: MessageFlags.Ephemeral });
+        }
+        updateSettings(guild.id, (s) => { s.moderationConfig.defaultMuteDuration = formatDuration(duration).replaceAll(' ', ''); });
+        return interaction.update(moderationView(guild));
+      }
+      break;
     }
 
     case 'logs': {

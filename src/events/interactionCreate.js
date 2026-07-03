@@ -6,8 +6,9 @@ const { handleSetupComponent } = require('../core/setupPanel');
 module.exports = {
   name: 'interactionCreate',
   async execute(interaction) {
-    // Clics sur le panneau /setup (boutons et menus)
-    if ((interaction.isButton() || interaction.isAnySelectMenu()) && interaction.customId.startsWith('setup:')) {
+    // Interactions du panneau /setup (boutons, menus et formulaires)
+    if ((interaction.isButton() || interaction.isAnySelectMenu() || interaction.isModalSubmit())
+      && interaction.customId.startsWith('setup:')) {
       if (!interaction.inGuild()) return;
       if (!canManageAdmins(interaction)) {
         return interaction.reply({ content: 'Seul le propriétaire peut utiliser ce panneau.', flags: MessageFlags.Ephemeral });
@@ -40,7 +41,7 @@ module.exports = {
     if (!isModuleEnabled(interaction.guildId, command.module)) {
       const label = MODULES[command.module]?.label ?? command.module;
       return interaction.reply({
-        content: `Le module **${label}** est désactivé sur ce serveur. Un administrateur peut l'activer avec \`/config module\`.`,
+        content: `Le module **${label}** est désactivé sur ce serveur. Le propriétaire peut l'activer via \`/setup\` → 🧩 Modules.`,
         flags: MessageFlags.Ephemeral,
       });
     }
