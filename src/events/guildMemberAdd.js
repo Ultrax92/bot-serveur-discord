@@ -1,5 +1,5 @@
 const { EmbedBuilder } = require('discord.js');
-const { sendLog, userAuthor } = require('../core/logs');
+const { sendLog, userAuthor, idLine } = require('../core/logs');
 const { sendJoinMessage, applyAutoroles } = require('../core/joinleave');
 
 module.exports = {
@@ -14,6 +14,7 @@ module.exports = {
       .setAuthor(userAuthor(member.user))
       .setDescription([
         `📥 **A rejoint le serveur** — ${member.guild.memberCount}ᵉ membre`,
+        idLine(member),
         `**Compte créé** <t:${Math.floor(member.user.createdTimestamp / 1000)}:R>${accountAgeDays < 7 ? ' ⚠️ **compte récent**' : ''}`,
       ].join('\n'))
       .setTimestamp();

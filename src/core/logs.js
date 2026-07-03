@@ -15,13 +15,18 @@ const LOG_TYPES = {
   command: { label: 'Commandes du bot', emoji: '🤖', channelName: 'logs-commandes' },
 };
 
-// En-tête d'embed au format compact : avatar + nom cliquable (profil) + ID
+// En-tête d'embed au format compact : avatar + nom cliquable (lien vers le profil)
 function userAuthor(user) {
   return {
-    name: `${user.username ?? user.tag ?? 'Inconnu'} (${user.id})`,
+    name: user.username ?? user.tag ?? 'Inconnu',
     iconURL: typeof user.displayAvatarURL === 'function' ? user.displayAvatarURL() : undefined,
     url: `https://discord.com/users/${user.id}`,
   };
+}
+
+// Ligne d'ID copiable en un clic (l'en-tête d'un embed n'est pas sélectionnable)
+function idLine(userOrId) {
+  return `🆔 \`${userOrId.id ?? userOrId}\``;
 }
 
 // Envoie un embed dans le salon de log du type donné (silencieux si non configuré)
@@ -39,8 +44,10 @@ async function logModAction(interaction, { emoji, action, target, reason, durati
   const embed = new EmbedBuilder().setColor(0xed4245).setTimestamp();
   const lines = [`${emoji} **${action}** par ${interaction.user} (\`${interaction.user.id}\`)`];
 
-  if (target?.id) embed.setAuthor(userAuthor(target));
-  else if (target) lines.push(`**Cible :** \`${target}\``);
+  if (target?.id) {
+    embed.setAuthor(userAuthor(target));
+    lines.push(idLine(target));
+  } else if (target) lines.push(`**Cible :** \`${target}\``);
   if (duration) lines.push(`**Durée :** ${duration}`);
   if (reason) lines.push(`**Raison :** ${reason}`);
 
@@ -91,4 +98,4 @@ async function autoConfigureLogs(guild) {
   return created;
 }
 
-module.exports = { LOG_TYPES, userAuthor, sendLog, logModAction, ensureLogsCategory, createLogChannel, autoConfigureLogs };
+module.exports = { LOG_TYPES, userAuthor, idLine, sendLog, logModAction, ensureLogsCategory, createLogChannel, autoConfigureLogs };

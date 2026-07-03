@@ -1,5 +1,5 @@
 const { EmbedBuilder } = require('discord.js');
-const { sendLog, userAuthor } = require('../core/logs');
+const { sendLog, userAuthor, idLine } = require('../core/logs');
 
 module.exports = {
   name: 'messageUpdate',
@@ -14,6 +14,7 @@ module.exports = {
       .setAuthor(userAuthor(newMessage.author))
       .setDescription([
         `**Message modifié dans** ${newMessage.channel} — [voir le message](${newMessage.url})`,
+        idLine(newMessage.author),
         `**Avant :** ${(oldMessage.content || '*vide*').slice(0, 900)}`,
         `**Après :** ${(newMessage.content || '*vide*').slice(0, 900)}`,
       ].join('\n'))

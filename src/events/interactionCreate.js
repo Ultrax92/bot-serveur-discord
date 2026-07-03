@@ -2,7 +2,7 @@ const { MessageFlags, EmbedBuilder } = require('discord.js');
 const { isModuleEnabled, MODULES } = require('../core/settings');
 const { isBotAdmin, canManageAdmins } = require('../core/permissions');
 const { handleSetupComponent } = require('../core/setupPanel');
-const { sendLog, userAuthor } = require('../core/logs');
+const { sendLog, userAuthor, idLine } = require('../core/logs');
 
 const COMMAND_LOG_STYLES = {
   ok: { color: 0x57f287, label: '✅ Commande exécutée' },
@@ -19,6 +19,7 @@ function logCommand(interaction, status) {
     .setAuthor(userAuthor(interaction.user))
     .setDescription([
       `${style.label} **dans** ${interaction.channel}`,
+      idLine(interaction.user),
       `\`${interaction.toString().slice(0, 1000)}\``,
     ].join('\n'))
     .setTimestamp();

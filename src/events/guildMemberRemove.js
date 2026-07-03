@@ -1,5 +1,5 @@
 const { EmbedBuilder } = require('discord.js');
-const { sendLog, userAuthor } = require('../core/logs');
+const { sendLog, userAuthor, idLine } = require('../core/logs');
 const { sendLeaveMessage } = require('../core/joinleave');
 
 module.exports = {
@@ -7,7 +7,7 @@ module.exports = {
   async execute(member) {
     if (!member.partial) await sendLeaveMessage(member);
 
-    const lines = [`📤 **A quitté le serveur** — reste ${member.guild.memberCount} membres`];
+    const lines = [`📤 **A quitté le serveur** — reste ${member.guild.memberCount} membres`, idLine(member)];
     if (!member.partial) {
       if (member.joinedTimestamp) {
         lines.push(`**Avait rejoint** <t:${Math.floor(member.joinedTimestamp / 1000)}:R>`);
