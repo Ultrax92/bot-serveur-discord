@@ -1,0 +1,20 @@
+{
+  "name": "bot-serveur-discord",
+  "version": "0.1.0",
+  "description": "Bot Serveur Discord : modération, automod, logs, antiraid, tickets, giveaways, vocaux temporaires, rolemenu, backups.",
+  "main": "src/index.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node src/index.js",
+    "deploy": "node scripts/deploy-commands.js",
+    "dev": "node --watch src/index.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.2.0",
+    "discord.js": "^14.16.0",
+    "dotenv": "^16.4.5"
+  }
+}
