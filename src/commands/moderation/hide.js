@@ -5,24 +5,20 @@ module.exports = {
   module: 'moderation',
   data: new SlashCommandBuilder()
     .setName('hide')
-    .setDescription('Cache ou affiche un salon')
-    .addSubcommand((sub) =>
-      sub.setName('on')
-        .setDescription('Cache un salon pour tout le monde')
-        .addChannelOption((opt) =>
-          opt.setName('salon').setDescription('Le salon à cacher (défaut : salon actuel)')
-            .addChannelTypes(ChannelType.GuildText, ChannelType.GuildVoice)))
-    .addSubcommand((sub) =>
-      sub.setName('off')
-        .setDescription('Ré-affiche un salon caché')
-        .addChannelOption((opt) =>
-          opt.setName('salon').setDescription('Le salon à ré-afficher (défaut : salon actuel)')
-            .addChannelTypes(ChannelType.GuildText, ChannelType.GuildVoice))),
+    .setDescription('Cache ou ré-affiche un salon')
+    .addStringOption((opt) =>
+      opt.setName('action').setDescription('L\'action à effectuer').setRequired(true)
+        .addChoices(
+          { name: '🙈 Cacher', value: 'on' },
+          { name: '👁️ Afficher', value: 'off' },
+        ))
+    .addChannelOption((opt) =>
+      opt.setName('salon').setDescription('Le salon concerné (défaut : salon actuel)')
+        .addChannelTypes(ChannelType.GuildText, ChannelType.GuildVoice)),
 
   async execute(interaction) {
-    const sub = interaction.options.getSubcommand();
+    const hide = interaction.options.getString('action') === 'on';
     const channel = interaction.options.getChannel('salon') ?? interaction.channel;
-    const hide = sub === 'on';
 
     await channel.permissionOverwrites.edit(interaction.guild.roles.everyone, { ViewChannel: hide ? false : null });
 

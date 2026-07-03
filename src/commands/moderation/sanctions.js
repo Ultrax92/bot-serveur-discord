@@ -9,24 +9,25 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName('sanctions')
     .setDescription('Gère les sanctions des membres')
-    .addSubcommand((sub) =>
-      sub.setName('voir')
-        .setDescription('Affiche les sanctions d\'un membre')
-        .addUserOption((opt) => opt.setName('membre').setDescription('Le membre concerné').setRequired(true)))
-    .addSubcommand((sub) =>
-      sub.setName('supprimer')
-        .setDescription('Supprime une sanction par son numéro')
-        .addIntegerOption((opt) => opt.setName('numéro').setDescription('Le numéro de la sanction (visible dans /sanctions voir)').setRequired(true)))
-    .addSubcommand((sub) =>
-      sub.setName('reset')
-        .setDescription('Supprime toutes les sanctions d\'un membre')
-        .addUserOption((opt) => opt.setName('membre').setDescription('Le membre concerné').setRequired(true))),
+    .addStringOption((opt) =>
+      opt.setName('action').setDescription('L\'action à effectuer').setRequired(true)
+        .addChoices(
+          { name: '📋 Voir le casier d\'un membre', value: 'voir' },
+          { name: '🗑️ Supprimer une sanction (par numéro)', value: 'supprimer' },
+          { name: '♻️ Reset le casier d\'un membre', value: 'reset' },
+        ))
+    .addUserOption((opt) => opt.setName('membre').setDescription('Le membre (requis pour voir/reset)'))
+    .addIntegerOption((opt) => opt.setName('numéro').setDescription('Le numéro de la sanction (requis pour supprimer)')),
 
   async execute(interaction) {
-    const sub = interaction.options.getSubcommand();
+    const action = interaction.options.getString('action');
+    const user = interaction.options.getUser('membre');
+    const id = interaction.options.getInteger('numéro');
 
-    if (sub === 'voir') {
-      const user = interaction.options.getUser('membre');
+    if (action === 'voir') {
+      if (!user) {
+        return interaction.reply({ embeds: [errorEmbed(interaction, 'Précise le membre dont tu veux voir le casier.')], flags: MessageFlags.Ephemeral });
+      }
       const sanctions = getSanctions(interaction.guildId, user.id);
       if (sanctions.length === 0) {
         return interaction.reply({ embeds: [successEmbed(interaction, `**${user.tag}** n'a aucune sanction. 🎉`)] });
@@ -41,8 +42,10 @@ module.exports = {
       return interaction.reply({ embeds: [embed] });
     }
 
-    if (sub === 'supprimer') {
-      const id = interaction.options.getInteger('numéro');
+    if (action === 'supprimer') {
+      if (!id) {
+        return interaction.reply({ embeds: [errorEmbed(interaction, 'Précise le numéro de la sanction (visible dans le casier).')], flags: MessageFlags.Ephemeral });
+      }
       const ok = deleteSanction(interaction.guildId, id);
       if (!ok) {
         return interaction.reply({ embeds: [errorEmbed(interaction, `Aucune sanction \`#${id}\` sur ce serveur.`)], flags: MessageFlags.Ephemeral });
@@ -50,8 +53,10 @@ module.exports = {
       return interaction.reply({ embeds: [successEmbed(interaction, `Sanction \`#${id}\` supprimée.`)] });
     }
 
-    if (sub === 'reset') {
-      const user = interaction.options.getUser('membre');
+    if (action === 'reset') {
+      if (!user) {
+        return interaction.reply({ embeds: [errorEmbed(interaction, 'Précise le membre dont tu veux reset le casier.')], flags: MessageFlags.Ephemeral });
+      }
       const count = clearSanctions(interaction.guildId, user.id);
       return interaction.reply({ embeds: [successEmbed(interaction, `**${count}** sanction(s) de **${user.tag}** supprimée(s).`)] });
     }
