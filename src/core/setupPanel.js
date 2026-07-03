@@ -33,7 +33,7 @@ function extractId(input) {
 
 // ── Fermeture automatique des panneaux inactifs ───────────────────────────────
 
-const PANEL_TIMEOUT_MS = 60_000; // 1 minute sans interaction → le panneau se ferme
+const PANEL_TIMEOUT_MS = 120_000; // 2 minutes sans interaction → le panneau se ferme
 const activePanels = new Map(); // messageId → timeout
 
 function expiredView() {

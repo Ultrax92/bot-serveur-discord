@@ -9,7 +9,6 @@ function buildVerifyPanel(guild, publisher = null) {
   const settings = getSettings(guild.id);
   const embed = new EmbedBuilder()
     .setColor(settings.color)
-    .setTitle('✅ Vérification')
     .setDescription(settings.verifConfig.message.replaceAll('{serveur}', guild.name).slice(0, 4096));
   if (publisher) embed.setFooter({ text: publisher.username, iconURL: publisher.displayAvatarURL() });
   const row = new ActionRowBuilder().addComponents(
