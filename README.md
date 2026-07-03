@@ -9,10 +9,11 @@ Bot Serveur Discord . Slash commands, modules activables par serveur, stockage S
 | 🔨 Modération | ✅ Fait | warn, mute/unmute (timeout), kick, ban/tempban, unban, clear, sanctions, lock, hide, role add/remove/derank, nick |
 | ⚙️ Config | ✅ Fait | `/setup` : panneau interactif unique (modules, admins du bot, couleur, réglages modération, salons de logs) + `/help` |
 | 🧰 Utilitaire | 🔶 Partiel | serverinfo, userinfo, pic — reste : banlist, boosters, rolemembers, snipe, emoji |
-| 📜 Logs | ✅ Fait | configuré via `/setup` → 📜 (salon existant, création en un clic, ou désactivé, par type) — logs de modération, messages supprimés/édités, vocal, rôles, boosts |
+| 📜 Logs | ✅ Fait | configuré via `/setup` → 📜 (salon existant, création en un clic, saisie par ID, ou désactivé, par type) — modération, messages supprimés/édités, vocal, rôles, boosts, arrivées, départs + salons vérif/tickets/raid (alimentés quand leurs modules arriveront) |
 | 🤖 Auto-modération | ⬜ À faire | antispam, antilink, antimassmention, badwords, strikes/punitions auto |
 | 🛡️ Antiraid | ⬜ À faire | antibot, antitoken, antichannel, antirole, antiwebhook, whitelist, punitions |
 | 👋 Arrivées/Départs | ⬜ À faire | messages bienvenue/départ, autorole |
+| ✅ Vérification | ⬜ À faire | vérification à l'arrivée (bouton/captcha) qui donne un rôle, logs dans le salon vérif |
 | 🎫 Tickets | ⬜ À faire | panneau avec bouton, claim, rename, close, transcript |
 | 🎉 Giveaways | ⬜ À faire | création avec bouton, end, reroll, choose |
 | 🔊 Vocaux temporaires | ⬜ À faire | salon générateur, panneau de contrôle |

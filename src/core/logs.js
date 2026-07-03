@@ -7,6 +7,11 @@ const LOG_TYPES = {
   voice: { label: 'Vocal', emoji: '🔊', channelName: 'logs-vocal' },
   role: { label: 'Rôles', emoji: '🎭', channelName: 'logs-roles' },
   boost: { label: 'Boosts', emoji: '🚀', channelName: 'logs-boosts' },
+  join: { label: 'Arrivées', emoji: '📥', channelName: 'logs-join' },
+  leave: { label: 'Départs', emoji: '📤', channelName: 'logs-leave' },
+  verif: { label: 'Vérification', emoji: '✅', channelName: 'logs-verif' },
+  ticket: { label: 'Tickets', emoji: '🎫', channelName: 'logs-tickets' },
+  raid: { label: 'Antiraid', emoji: '🛡️', channelName: 'logs-raid' },
 };
 
 // Envoie un embed dans le salon de log du type donné (silencieux si non configuré)

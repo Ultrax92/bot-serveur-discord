@@ -44,7 +44,7 @@ function hubView(guild) {
     `⚙️ **Général** — couleur des embeds : ${colorHex(settings)}`,
     `👑 **Admins du bot** — ${settings.admins.length} admin(s)`,
     `🧩 **Modules** — ${enabledCount}/${Object.keys(MODULES).length} activés`,
-    `🔨 **Modération** — MP sanction ${settings.moderationConfig.dmOnSanction ? '🟢' : '🔴'} | Mute par défaut ${settings.moderationConfig.defaultMuteDuration}`,
+    `🔨 **Modération** — MP sanction ${settings.moderationConfig.dmOnSanction ? '🟢' : '🔴'} | ${settings.moderationConfig.defaultMuteDuration}`,
     `📜 **Salons de logs** — ${logsCount}/${Object.keys(LOG_TYPES).length} configurés`,
     '',
     'Choisis une section, ou clique sur **⚡ Setup rapide** pour appliquer les réglages recommandés d\'un coup.',
