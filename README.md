@@ -46,13 +46,19 @@ curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
 sudo apt-get install -y nodejs git
 sudo npm install -g pm2
 
-git clone <ton-repo> bot-discord && cd bot-discord
+git clone https://github.com/Ultrax92/Bot-Serveur-Discord.git bot-discord && cd bot-discord
 npm install
 nano .env               # remplir le token etc.
 npm run deploy
 pm2 start src/index.js --name bot-discord
-pm2 save && pm2 startup # redémarre le bot automatiquement au reboot du VPS
+
+# Démarrage automatique au reboot du VPS :
+pm2 startup             # affiche une commande "sudo env PATH=..." → la recopier et l'exécuter
+pm2 save                # enregistre la liste des apps à relancer au boot
 ```
+
+> ℹ️ `pm2 startup` ne configure rien tout seul : il **génère une commande sudo à copier-coller**.
+> Équivalent direct (pm2 installé en global) : `sudo pm2 startup -u $USER --hp $HOME`, puis `pm2 save`.
 
 Mise à jour : `git pull && npm install && npm run deploy && pm2 restart bot-discord`
 
