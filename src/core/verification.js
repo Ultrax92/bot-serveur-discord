@@ -13,7 +13,7 @@ function buildVerifyPanel(guild, publisher = null) {
     .setDescription(settings.verifConfig.message.replaceAll('{serveur}', guild.name).slice(0, 4096));
   if (publisher) embed.setFooter({ text: publisher.username, iconURL: publisher.displayAvatarURL() });
   const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('verify:go').setLabel('Se vérifier').setEmoji('✅').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId('verify:go').setLabel('Vérification ').setEmoji('✅').setStyle(ButtonStyle.Success),
   );
   return { embeds: [embed], components: [row] };
 }

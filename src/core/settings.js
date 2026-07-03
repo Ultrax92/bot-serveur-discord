@@ -10,7 +10,6 @@ const MODULES = {
   giveaways: { label: 'Giveaways', emoji: '🎉', description: 'giveaways avec bouton, reroll, tirage au sort' },
   tempvoc: { label: 'Vocaux temporaires', emoji: '🔊', description: 'salons vocaux créés à la demande' },
   rolemenu: { label: 'Rolemenu / Embeds', emoji: '🎭', description: 'menus de rôles interactifs et générateur d\'embeds' },
-  joinleave: { label: 'Arrivées / Départs', emoji: '👋', description: 'messages de bienvenue/départ et autorole' },
   verification: { label: 'Vérification', emoji: '✅', description: 'bouton de vérification à l\'arrivée qui donne un rôle' },
   utility: { label: 'Utilitaire', emoji: '🧰', description: 'serverinfo, userinfo, avatars…' },
   backups: { label: 'Backups', emoji: '💾', description: 'sauvegarde et restauration du serveur' },
@@ -28,7 +27,6 @@ const DEFAULT_SETTINGS = {
     giveaways: false,
     tempvoc: false,
     rolemenu: false,
-    joinleave: false,
     verification: false,
     utility: true,
     backups: false,
@@ -39,13 +37,6 @@ const DEFAULT_SETTINGS = {
     defaultMuteDuration: '1h',   // durée du mute quand aucune durée n'est précisée
   },
   logsChannels: {},   // un salon par type de log (voir LOG_TYPES dans core/logs.js)
-  joinleave: {
-    joinChannel: null,
-    joinMessage: '👋 Bienvenue {membre} sur **{serveur}** ! Nous sommes maintenant **{membres}** membres.',
-    leaveChannel: null,
-    leaveMessage: '📤 **{pseudo}** a quitté **{serveur}**. Nous sommes **{membres}** membres.',
-    autoroles: [],
-  },
   verifConfig: {
     channel: null,   // salon où le panneau de vérification est publié
     role: null,      // rôle attribué au clic

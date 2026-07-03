@@ -1,12 +1,9 @@
 const { EmbedBuilder } = require('discord.js');
 const { sendLog, userAuthor, idLine } = require('../core/logs');
-const { sendLeaveMessage } = require('../core/joinleave');
 
 module.exports = {
   name: 'guildMemberRemove',
   async execute(member) {
-    if (!member.partial) await sendLeaveMessage(member);
-
     const lines = [`📤 **A quitté le serveur** — reste ${member.guild.memberCount} membres`, idLine(member)];
     if (!member.partial) {
       if (member.joinedTimestamp) {

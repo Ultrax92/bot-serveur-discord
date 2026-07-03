@@ -6,7 +6,6 @@ const {
 } = require('discord.js');
 const { MODULES, getSettings, updateSettings } = require('./settings');
 const { LOG_TYPES, autoConfigureLogs, createLogChannel } = require('./logs');
-const { sendJoinMessage, sendLeaveMessage, TEMPLATE_VARS } = require('./joinleave');
 const { buildVerifyPanel } = require('./verification');
 const { parseDuration, formatDuration } = require('./utils');
 
@@ -76,7 +75,6 @@ function hubView(guild) {
     `🧩 **Modules** — ${enabledCount}/${Object.keys(MODULES).length} activés`,
     `🔨 **Modération** — MP sanction ${settings.moderationConfig.dmOnSanction ? '🟢' : '🔴'} | ${settings.moderationConfig.defaultMuteDuration}`,
     `📜 **Salons de logs** — ${logsCount}/${Object.keys(LOG_TYPES).length} configurés`,
-    `👋 **Arrivées/Départs** — arrivée ${settings.joinleave.joinChannel ? '🟢' : '🔴'} | départ ${settings.joinleave.leaveChannel ? '🟢' : '🔴'} | ${settings.joinleave.autoroles.length} autorole(s)`,
     `✅ **Vérification** — salon ${settings.verifConfig.channel ? '🟢' : '🔴'} | rôle ${settings.verifConfig.role ? '🟢' : '🔴'}`,
     '',
     'Choisis une section dans le menu pour voir et modifier ses réglages.',
@@ -96,8 +94,6 @@ function hubView(guild) {
         .setDescription('MP aux sanctionnés, durée de mute par défaut'),
       new StringSelectMenuOptionBuilder().setValue('logs').setLabel('Salons de logs').setEmoji('📜')
         .setDescription('Un salon existant ou créé pour chaque type de log'),
-      new StringSelectMenuOptionBuilder().setValue('joinleave').setLabel('Arrivées & Départs').setEmoji('👋')
-        .setDescription('Messages de bienvenue/départ et rôles automatiques'),
       new StringSelectMenuOptionBuilder().setValue('verification').setLabel('Vérification').setEmoji('✅')
         .setDescription('Bouton de vérification qui donne un rôle'),
     );
@@ -273,85 +269,6 @@ function logTypeView(guild, type) {
   return { embeds: [embed], components: [new ActionRowBuilder().addComponents(channelSelect), buttons] };
 }
 
-// ── Page arrivées & départs ───────────────────────────────────────────────────
-
-function joinleaveView(guild) {
-  const settings = getSettings(guild.id);
-  const jl = settings.joinleave;
-  const joinChannel = jl.joinChannel && guild.channels.cache.get(jl.joinChannel);
-  const leaveChannel = jl.leaveChannel && guild.channels.cache.get(jl.leaveChannel);
-  const autoroles = jl.autoroles.map((id) => `<@&${id}>`).join(' ') || '*aucun*';
-
-  const embed = panelEmbed(guild, '👋 Arrivées & Départs', [
-    `${settings.modules.joinleave ? '🟢 Module activé' : '🔴 Module désactivé — active-le dans 🧩 Modules pour que tout ceci prenne effet'}`,
-    '',
-    `📥 **Salon d'arrivée** — ${joinChannel ? `${joinChannel}` : '🔴 non configuré'}`,
-    `> ${jl.joinMessage}`,
-    `📤 **Salon de départ** — ${leaveChannel ? `${leaveChannel}` : '🔴 non configuré'}`,
-    `> ${jl.leaveMessage}`,
-    `🎭 **Autoroles à l'arrivée** — ${autoroles}`,
-    '',
-    `**Variables des messages :** ${TEMPLATE_VARS}`,
-  ].join('\n'));
-
-  const joinRow = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('setup:jl:channel:join').setLabel('📥 Salon d\'arrivée').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId('setup:jl:msg:join').setLabel('📝 Message d\'arrivée').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId('setup:jl:test:join').setLabel('🧪 Tester').setStyle(ButtonStyle.Secondary).setDisabled(!joinChannel),
-  );
-  const leaveRow = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('setup:jl:channel:leave').setLabel('📤 Salon de départ').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId('setup:jl:msg:leave').setLabel('📝 Message de départ').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId('setup:jl:test:leave').setLabel('🧪 Tester').setStyle(ButtonStyle.Secondary).setDisabled(!leaveChannel),
-  );
-
-  const roleSelect = new RoleSelectMenuBuilder()
-    .setCustomId('setup:jl:autoroles')
-    .setPlaceholder('🎭 Rôles donnés automatiquement à l\'arrivée…')
-    .setMinValues(0)
-    .setMaxValues(10);
-  if (jl.autoroles.length) roleSelect.setDefaultRoles(jl.autoroles.slice(0, 10));
-
-  return {
-    embeds: [embed],
-    components: [
-      joinRow,
-      leaveRow,
-      new ActionRowBuilder().addComponents(roleSelect),
-      new ActionRowBuilder().addComponents(backButton('home')),
-    ],
-  };
-}
-
-// Sous-page : choix du salon d'arrivée ou de départ
-function jlChannelView(guild, kind) {
-  const isJoin = kind === 'join';
-  const settings = getSettings(guild.id);
-  const channelId = isJoin ? settings.joinleave.joinChannel : settings.joinleave.leaveChannel;
-  const channel = channelId && guild.channels.cache.get(channelId);
-
-  const embed = panelEmbed(guild, isJoin ? '📥 Salon d\'arrivée' : '📤 Salon de départ', [
-    `**Salon actuel :** ${channel ? `${channel}` : '🔴 non configuré'}`,
-    '',
-    '• Sélectionne un **salon existant** dans le menu, ou',
-    '• Clique sur **🆔 Par ID** pour coller un ID, une mention `<#…>` ou un lien de salon',
-  ].join('\n'));
-
-  const channelSelect = new ChannelSelectMenuBuilder()
-    .setCustomId(`setup:jl:chanselect:${kind}`)
-    .setPlaceholder('🔍 Choisir un salon existant…')
-    .setChannelTypes(ChannelType.GuildText);
-
-  const buttons = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId(`setup:jl:chanid:${kind}`).setLabel('🆔 Par ID').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId(`setup:jl:chanoff:${kind}`).setLabel('🔴 Désactiver').setStyle(ButtonStyle.Danger)
-      .setDisabled(!channelId),
-    backButton('joinleave'),
-  );
-
-  return { embeds: [embed], components: [new ActionRowBuilder().addComponents(channelSelect), buttons] };
-}
-
 // ── Page vérification ─────────────────────────────────────────────────────────
 
 function verificationView(guild) {
@@ -368,7 +285,7 @@ function verificationView(guild) {
     `📝 **Message du panneau** (variable \`{serveur}\`, jusqu'à 4000 caractères — mets-y tes règles !) :`,
     `> ${vc.message.length > 300 ? `${vc.message.slice(0, 300)}…` : vc.message}`,
     '',
-    'Une fois salon + rôle choisis, clique sur **📤 Publier le panneau** : le bot poste l\'embed avec le bouton **✅ Se vérifier** dans le salon.',
+    'Une fois salon + rôle choisis, clique sur **📤 Publier le panneau** : le bot poste l\'embed avec le bouton **✅ Vérification** dans le salon.',
     '💡 *Astuce : cache les autres salons au rôle @everyone et rends-les visibles au rôle vérifié.*',
   ].join('\n'));
 
@@ -409,7 +326,6 @@ const PAGES = {
   modules: modulesView,
   moderation: moderationView,
   logs: logsView,
-  joinleave: joinleaveView,
   verification: verificationView,
 };
 
@@ -560,31 +476,6 @@ async function handleSetupComponent(interaction) {
         return interaction.update(logTypeView(guild, type));
       }
 
-      if (args[0] === 'jlchan') {
-        const kind = args[1];
-        const id = extractId(interaction.fields.getTextInputValue('id'));
-        if (!id) {
-          return interaction.reply({ content: '❌ ID invalide. Colle un ID de salon, une mention `<#…>` ou un lien de salon.', flags: MessageFlags.Ephemeral });
-        }
-        const channel = await guild.channels.fetch(id).catch(() => null);
-        if (!channel || !channel.isTextBased() || channel.isThread() || channel.isVoiceBased()) {
-          return interaction.reply({ content: `❌ Aucun salon textuel trouvé sur ce serveur avec l'ID \`${id}\`.`, flags: MessageFlags.Ephemeral });
-        }
-        updateSettings(guild.id, (s) => {
-          s.joinleave[kind === 'join' ? 'joinChannel' : 'leaveChannel'] = channel.id;
-        });
-        return interaction.update(jlChannelView(guild, kind));
-      }
-
-      if (args[0] === 'jlmsg') {
-        const kind = args[1];
-        const template = interaction.fields.getTextInputValue('template').trim();
-        updateSettings(guild.id, (s) => {
-          s.joinleave[kind === 'join' ? 'joinMessage' : 'leaveMessage'] = template;
-        });
-        return interaction.update(joinleaveView(guild));
-      }
-
       if (args[0] === 'verifmsg') {
         const template = interaction.fields.getTextInputValue('template').trim();
         updateSettings(guild.id, (s) => { s.verifConfig.message = template; });
@@ -671,86 +562,6 @@ async function handleSetupComponent(interaction) {
               .setMaxLength(100),
           ));
         return interaction.showModal(modal);
-      }
-      break;
-    }
-
-    case 'jl': {
-      const sub = args[0];
-      const kind = args[1];
-
-      if (sub === 'channel') return interaction.update(jlChannelView(guild, kind));
-
-      if (sub === 'chanselect') {
-        updateSettings(guild.id, (s) => {
-          s.joinleave[kind === 'join' ? 'joinChannel' : 'leaveChannel'] = interaction.values[0];
-        });
-        return interaction.update(jlChannelView(guild, kind));
-      }
-
-      if (sub === 'chanoff') {
-        updateSettings(guild.id, (s) => {
-          s.joinleave[kind === 'join' ? 'joinChannel' : 'leaveChannel'] = null;
-        });
-        return interaction.update(jlChannelView(guild, kind));
-      }
-
-      if (sub === 'chanid') {
-        const modal = new ModalBuilder()
-          .setCustomId(`setup:modal:jlchan:${kind}`)
-          .setTitle(kind === 'join' ? 'Salon d\'arrivée' : 'Salon de départ')
-          .addComponents(new ActionRowBuilder().addComponents(
-            new TextInputBuilder()
-              .setCustomId('id')
-              .setLabel('ID, mention <#…> ou lien du salon')
-              .setPlaceholder('1234567890123456789')
-              .setStyle(TextInputStyle.Short)
-              .setRequired(true)
-              .setMaxLength(100),
-          ));
-        return interaction.showModal(modal);
-      }
-
-      if (sub === 'msg') {
-        const jl = getSettings(guild.id).joinleave;
-        const modal = new ModalBuilder()
-          .setCustomId(`setup:modal:jlmsg:${kind}`)
-          .setTitle(kind === 'join' ? 'Message d\'arrivée' : 'Message de départ')
-          .addComponents(new ActionRowBuilder().addComponents(
-            new TextInputBuilder()
-              .setCustomId('template')
-              .setLabel('{membre} {pseudo} {serveur} {membres}')
-              .setValue(kind === 'join' ? jl.joinMessage : jl.leaveMessage)
-              .setStyle(TextInputStyle.Paragraph)
-              .setRequired(true)
-              .setMaxLength(1000),
-          ));
-        return interaction.showModal(modal);
-      }
-
-      if (sub === 'autoroles') {
-        const manageable = interaction.roles.filter((r) =>
-          !r.managed && r.id !== guild.roles.everyone.id
-          && r.position < guild.members.me.roles.highest.position);
-        updateSettings(guild.id, (s) => { s.joinleave.autoroles = [...manageable.keys()]; });
-        if (manageable.size < interaction.values.length) {
-          await interaction.reply({
-            content: '⚠️ Certains rôles ont été ignorés : rôles gérés par une intégration ou au-dessus de mon rôle.',
-            flags: MessageFlags.Ephemeral,
-          });
-          return interaction.message.edit(joinleaveView(guild));
-        }
-        return interaction.update(joinleaveView(guild));
-      }
-
-      if (sub === 'test') {
-        const sent = kind === 'join'
-          ? await sendJoinMessage(interaction.member, { test: true })
-          : await sendLeaveMessage(interaction.member, { test: true });
-        return interaction.reply({
-          content: sent ? `🧪 Message de test envoyé dans ${sent}.` : '❌ Impossible d\'envoyer le test (salon non configuré ou inaccessible).',
-          flags: MessageFlags.Ephemeral,
-        });
       }
       break;
     }
