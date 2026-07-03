@@ -24,6 +24,12 @@ function colorHex(settings) {
   return `#${settings.color.toString(16).padStart(6, '0').toUpperCase()}`;
 }
 
+// Extrait un ID Discord d'une saisie libre : ID brut, mention <#id>/<@id>, ou lien de salon
+function extractId(input) {
+  const match = input.match(/\d{15,20}/);
+  return match ? match[0] : null;
+}
+
 // ── Page d'accueil ────────────────────────────────────────────────────────────
 
 function hubView(guild) {
@@ -38,7 +44,7 @@ function hubView(guild) {
     `⚙️ **Général** — couleur des embeds : ${colorHex(settings)}`,
     `👑 **Admins du bot** — ${settings.admins.length} admin(s)`,
     `🧩 **Modules** — ${enabledCount}/${Object.keys(MODULES).length} activés`,
-    `🔨 **Modération** — MP sanction : ${settings.moderationConfig.dmOnSanction ? '🟢' : '🔴'} · mute par défaut : ${settings.moderationConfig.defaultMuteDuration}`,
+    `🔨 **Modération** — MP sanction ${settings.moderationConfig.dmOnSanction ? '🟢' : '🔴'} | Mute par défaut ${settings.moderationConfig.defaultMuteDuration}`,
     `📜 **Salons de logs** — ${logsCount}/${Object.keys(LOG_TYPES).length} configurés`,
     '',
     'Choisis une section, ou clique sur **⚡ Setup rapide** pour appliquer les réglages recommandés d\'un coup.',
@@ -95,6 +101,7 @@ function adminsView(guild) {
     list,
     '',
     '👇 Sélectionne dans le menu **l\'ensemble des admins** : ajoute ou retire des personnes, la sélection remplace la liste.',
+    'Introuvable dans le menu ? Utilise **🆔 Ajouter/retirer par ID**.',
   ].join('\n'));
 
   const select = new UserSelectMenuBuilder()
@@ -104,12 +111,14 @@ function adminsView(guild) {
     .setMaxValues(25);
   if (settings.admins.length) select.setDefaultUsers(settings.admins.slice(0, 25));
 
+  const buttons = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('setup:admins:byid').setLabel('🆔 Ajouter/retirer par ID').setStyle(ButtonStyle.Primary),
+    backButton('home'),
+  );
+
   return {
     embeds: [embed],
-    components: [
-      new ActionRowBuilder().addComponents(select),
-      new ActionRowBuilder().addComponents(backButton('home')),
-    ],
+    components: [new ActionRowBuilder().addComponents(select), buttons],
   };
 }
 
@@ -157,8 +166,6 @@ function moderationView(guild) {
   const embed = panelEmbed(guild, '🔨 Réglages de modération', [
     `${dmOnSanction ? '🟢' : '🔴'} **MP au membre sanctionné** — le bot prévient en privé lors d'un warn/mute/kick/ban`,
     `⏱️ **Durée de mute par défaut** — \`${defaultMuteDuration}\` quand /mute est utilisé sans durée`,
-    '',
-    '*Les commandes d\'action (/warn, /mute, /ban…) restent des commandes : c\'est plus rapide au quotidien.*',
   ].join('\n'));
 
   const buttons = new ActionRowBuilder().addComponents(
@@ -211,7 +218,8 @@ function logTypeView(guild, type) {
     `**Salon actuel :** ${channel ? `${channel}` : '🔴 non configuré'}`,
     '',
     '• Sélectionne un **salon existant** dans le menu ci-dessous, ou',
-    `• Clique sur **➕ Créer** pour créer \`#${meta.channelName}\` dans la catégorie 📜 Logs`,
+    `• Clique sur **➕ Créer** pour créer \`#${meta.channelName}\` dans la catégorie 📜 Logs, ou`,
+    '• Clique sur **🆔 Par ID** pour coller un ID, une mention `<#…>` ou un lien de salon',
   ].join('\n'));
 
   const channelSelect = new ChannelSelectMenuBuilder()
@@ -221,6 +229,7 @@ function logTypeView(guild, type) {
 
   const buttons = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId(`setup:logs:create:${type}`).setLabel('➕ Créer le salon').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId(`setup:logs:byid:${type}`).setLabel('🆔 Par ID').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId(`setup:logs:off:${type}`).setLabel('🔴 Désactiver ce log').setStyle(ButtonStyle.Danger)
       .setDisabled(!settings.logsChannels[type]),
     backButton('logs'),
@@ -276,6 +285,21 @@ async function handleSetupComponent(interaction) {
     }
 
     case 'admins': {
+      if (args[0] === 'byid') {
+        const modal = new ModalBuilder()
+          .setCustomId('setup:modal:admin')
+          .setTitle('Admin par ID Discord')
+          .addComponents(new ActionRowBuilder().addComponents(
+            new TextInputBuilder()
+              .setCustomId('id')
+              .setLabel('ID du membre (ajout si absent, retrait sinon)')
+              .setPlaceholder('1234567890123456789')
+              .setStyle(TextInputStyle.Short)
+              .setRequired(true)
+              .setMaxLength(30),
+          ));
+        return interaction.showModal(modal);
+      }
       const ids = [...interaction.users.filter((u) => !u.bot).keys()];
       updateSettings(guild.id, (s) => { s.admins = ids; });
       return interaction.update(adminsView(guild));
@@ -338,6 +362,44 @@ async function handleSetupComponent(interaction) {
         updateSettings(guild.id, (s) => { s.moderationConfig.defaultMuteDuration = formatDuration(duration).replaceAll(' ', ''); });
         return interaction.update(moderationView(guild));
       }
+
+      if (args[0] === 'admin') {
+        const id = extractId(interaction.fields.getTextInputValue('id'));
+        if (!id) {
+          return interaction.reply({ content: '❌ ID invalide. Colle un ID Discord (Mode développeur → clic droit → Copier l\'identifiant).', flags: MessageFlags.Ephemeral });
+        }
+        const settings = getSettings(guild.id);
+        if (settings.admins.includes(id)) {
+          updateSettings(guild.id, (s) => { s.admins = s.admins.filter((a) => a !== id); });
+          return interaction.update(adminsView(guild));
+        }
+        const user = await interaction.client.users.fetch(id).catch(() => null);
+        if (!user) {
+          return interaction.reply({ content: `❌ Aucun utilisateur Discord trouvé avec l'ID \`${id}\`.`, flags: MessageFlags.Ephemeral });
+        }
+        if (user.bot) {
+          return interaction.reply({ content: '❌ Un bot ne peut pas être admin.', flags: MessageFlags.Ephemeral });
+        }
+        updateSettings(guild.id, (s) => { s.admins.push(id); });
+        return interaction.update(adminsView(guild));
+      }
+
+      if (args[0] === 'logchannel') {
+        const type = args[1];
+        const id = extractId(interaction.fields.getTextInputValue('id'));
+        if (!id) {
+          return interaction.reply({ content: '❌ ID invalide. Colle un ID de salon, une mention `<#…>` ou un lien de salon.', flags: MessageFlags.Ephemeral });
+        }
+        const channel = await guild.channels.fetch(id).catch(() => null);
+        if (!channel || !channel.isTextBased() || channel.isThread() || channel.isVoiceBased()) {
+          return interaction.reply({ content: `❌ Aucun salon textuel trouvé sur ce serveur avec l'ID \`${id}\`.`, flags: MessageFlags.Ephemeral });
+        }
+        updateSettings(guild.id, (s) => {
+          s.logsChannels[type] = channel.id;
+          s.modules.logs = true;
+        });
+        return interaction.update(logTypeView(guild, type));
+      }
       break;
     }
 
@@ -373,6 +435,23 @@ async function handleSetupComponent(interaction) {
         const type = args[1];
         updateSettings(guild.id, (s) => { delete s.logsChannels[type]; });
         return interaction.update(logTypeView(guild, type));
+      }
+
+      if (sub === 'byid') {
+        const type = args[1];
+        const modal = new ModalBuilder()
+          .setCustomId(`setup:modal:logchannel:${type}`)
+          .setTitle(`Salon des logs ${LOG_TYPES[type].label}`)
+          .addComponents(new ActionRowBuilder().addComponents(
+            new TextInputBuilder()
+              .setCustomId('id')
+              .setLabel('ID, mention <#…> ou lien du salon')
+              .setPlaceholder('1234567890123456789')
+              .setStyle(TextInputStyle.Short)
+              .setRequired(true)
+              .setMaxLength(100),
+          ));
+        return interaction.showModal(modal);
       }
       break;
     }
