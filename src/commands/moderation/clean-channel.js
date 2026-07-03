@@ -44,7 +44,7 @@ module.exports = {
   module: 'moderation',
   purging,
   data: new SlashCommandBuilder()
-    .setName('purge-channel')
+    .setName('clean-channel')
     .setDescription('[Owner] Supprime tous les messages du salon courant')
     .addIntegerOption((opt) =>
       opt.setName('limite')

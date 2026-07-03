@@ -8,6 +8,19 @@ const { parseDuration, formatDuration } = require('./utils');
 const INVITE_REGEX = /(discord\.(gg|io|me)|discord(app)?\.com\/invite)\/[\w-]+/i;
 const URL_REGEX = /https?:\/\/\S+/i;
 
+// Minuscules + suppression des accents, pour comparer "Enculé" à "encule"
+function normalize(text) {
+  return text.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+}
+
+// Mot entier pour les mots simples ("con" ne bloque pas "conversation"),
+// recherche brute pour les expressions avec espaces
+function matchesWord(normalizedContent, word) {
+  if (word.includes(' ')) return normalizedContent.includes(word);
+  const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`).test(normalizedContent);
+}
+
 const NOTICES = {
   antispam: 'doucement sur le spam !',
   antilink: 'les liens ne sont pas autorisés ici.',
@@ -28,8 +41,8 @@ function detectTrigger(message, config) {
   }
 
   if (config.badwords.enabled && config.badwords.words.length) {
-    const lower = content.toLowerCase();
-    if (config.badwords.words.some((word) => lower.includes(word))) return 'badwords';
+    const normalized = normalize(content);
+    if (config.badwords.words.some((word) => matchesWord(normalized, word))) return 'badwords';
   }
 
   if (config.antimention.enabled) {

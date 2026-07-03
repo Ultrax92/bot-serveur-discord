@@ -1,6 +1,6 @@
 const { EmbedBuilder } = require('discord.js');
 const { sendLog, userAuthor, idLine } = require('../core/logs');
-const { purging } = require('../commands/moderation/purge-channel');
+const { purging } = require('../commands/moderation/clean-channel');
 
 module.exports = {
   name: 'messageDelete',

@@ -368,6 +368,7 @@ function automodView(guild) {
       new ActionRowBuilder().addComponents(
         toggleButton('badwords', '🤬', 'Mots interdits', am.badwords.enabled),
         new ButtonBuilder().setCustomId('setup:am:wordscfg').setLabel('📝 Gérer la liste').setStyle(ButtonStyle.Primary),
+        new ButtonBuilder().setCustomId('setup:am:wordsdefault').setLabel('📥 Liste par défaut').setStyle(ButtonStyle.Primary),
       ),
       new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId('setup:am:sanction')
@@ -659,11 +660,20 @@ async function handleSetupComponent(interaction) {
           .setTitle('Liste des mots interdits')
           .addComponents(new ActionRowBuilder().addComponents(
             new TextInputBuilder().setCustomId('words').setLabel('Mots séparés par des virgules')
-              .setValue(am.badwords.words.join(', '))
+              .setValue(am.badwords.words.join(', ').slice(0, 4000))
               .setPlaceholder('mot1, mot2, mot3')
-              .setStyle(TextInputStyle.Paragraph).setRequired(false).setMaxLength(2000),
+              .setStyle(TextInputStyle.Paragraph).setRequired(false).setMaxLength(4000),
           ));
         return interaction.showModal(modal);
+      }
+
+      if (sub === 'wordsdefault') {
+        const defaultWords = require('./badwords-default');
+        updateSettings(guild.id, (s) => {
+          s.automodConfig.badwords.words = [...new Set([...s.automodConfig.badwords.words, ...defaultWords])].slice(0, 300);
+          s.automodConfig.badwords.enabled = true;
+        });
+        return interaction.update(automodView(guild));
       }
 
       if (sub === 'muteduration') {
