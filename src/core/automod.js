@@ -95,6 +95,9 @@ async function handleMessage(message) {
   if (!message.inGuild() || message.author.bot || message.system) return;
   if (!isModuleEnabled(message.guildId, 'automod')) return;
   if (!message.member || isBotAdminMember(message.member)) return;
+  // Les tickets sont privés : liens, images et gifs y sont libres
+  const { isOpenTicketChannel } = require('./tickets');
+  if (isOpenTicketChannel(message.channelId)) return;
 
   const config = getSettings(message.guildId).automodConfig;
   const trigger = detectTrigger(message, config);

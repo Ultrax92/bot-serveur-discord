@@ -77,7 +77,7 @@ async function openTicket(interaction) {
   const accessRoles = (type.accessRoles ?? []).filter((id) => guild.roles.cache.has(id));
 
   const channel = await guild.channels.create({
-    name: `ticket-${String(number).padStart(4, '0')}`,
+    name: String(number).padStart(4, '0'),
     type: ChannelType.GuildText,
     parent: category?.id ?? null,
     permissionOverwrites: [
@@ -152,11 +152,12 @@ async function claimTicket(interaction) {
   return interaction.reply({ embeds: [embed] });
 }
 
-// Génère le transcript texte du salon (jusqu'à 500 messages)
+// Génère le transcript texte complet du salon (parcourt tout l'historique)
 async function buildTranscript(channel) {
   const lines = [];
   let beforeId;
-  for (let i = 0; i < 5; i++) {
+  // Garde-fou à 20 000 messages pour ne pas bloquer le bot sur un ticket anormal
+  for (let i = 0; i < 200; i++) {
     const batch = await channel.messages.fetch({ limit: 100, before: beforeId }).catch(() => null);
     if (!batch || batch.size === 0) break;
     for (const message of batch.values()) {
@@ -241,4 +242,17 @@ async function handleTicketComponent(interaction) {
   if (action === 'close') return closeTicket(interaction);
 }
 
-module.exports = { buildTicketPanel, handleTicketComponent, closeTicketsForMember };
+// Le salon est-il un ticket ouvert ? (utilisé par l'automod pour exempter les tickets)
+function isOpenTicketChannel(channelId) {
+  const row = byChannelStmt.get(channelId);
+  return Boolean(row && row.status === 'open');
+}
+
+function getTicketByChannel(channelId) {
+  return byChannelStmt.get(channelId);
+}
+
+module.exports = {
+  buildTicketPanel, handleTicketComponent, closeTicketsForMember,
+  closeTicket, canManageTicket, isOpenTicketChannel, getTicketByChannel,
+};

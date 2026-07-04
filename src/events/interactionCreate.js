@@ -79,8 +79,9 @@ module.exports = {
     const command = interaction.client.commands.get(interaction.commandName);
     if (!command) return;
 
-    // Le bot est réservé aux admins : owner (.env), propriétaire du serveur, ou ajoutés via le panneau
-    if (!isBotAdmin(interaction)) {
+    // Le bot est réservé aux admins : owner (.env), propriétaire du serveur, ou ajoutés via le panneau.
+    // Exception : les commandes marquées public (ex: /close et /add dans un ticket) font leurs propres vérifications.
+    if (!command.public && !isBotAdmin(interaction)) {
       logCommand(interaction, 'denied');
       return interaction.reply({
         content: 'Tu n\'as pas accès aux commandes de ce bot. Seuls les admins du bot peuvent les utiliser.',
