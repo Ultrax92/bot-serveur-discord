@@ -1,7 +1,126 @@
-const { EmbedBuilder } = require('discord.js');
-const { getSettings, isModuleEnabled } = require('./settings');
+const fs = require('node:fs');
+const path = require('node:path');
+const { EmbedBuilder, AttachmentBuilder } = require('discord.js');
+const { getSettings, updateSettings, isModuleEnabled } = require('./settings');
 const { isBotAdminMember } = require('./permissions');
 const { sendLog, userAuthor, idLine } = require('./logs');
+
+// Images uploadées pour les commandes custom : stockées sur le disque car les
+// liens de pièces jointes Discord expirent au bout de quelques jours
+const imagesDir = path.join(__dirname, '..', '..', 'data', 'images');
+
+const pendingImages = new Map(); // "guildId:userId" → { commandId, channelId, expires, panelMessage }
+
+function requestImageUpload(interaction, commandId) {
+  pendingImages.set(`${interaction.guildId}:${interaction.user.id}`, {
+    commandId,
+    channelId: interaction.channelId,
+    expires: Date.now() + 120_000,
+    panelMessage: interaction.message,
+  });
+}
+
+function deleteStoredImage(imageRef) {
+  if (!imageRef?.startsWith('file:')) return;
+  const filePath = path.join(imagesDir, imageRef.slice(5));
+  if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+}
+
+async function tempReply(channel, content) {
+  const notice = await channel.send(content).catch(() => null);
+  if (notice) setTimeout(() => notice.delete().catch(() => {}), 6000);
+}
+
+// Attend l'image envoyée après un clic sur 🖼️ dans le panneau. Retourne true
+// si le message faisait partie de ce flux.
+async function handlePendingImage(message) {
+  if (!message.inGuild() || message.author.bot) return false;
+  const key = `${message.guildId}:${message.author.id}`;
+  const pending = pendingImages.get(key);
+  if (!pending) return false;
+  if (Date.now() > pending.expires) {
+    pendingImages.delete(key);
+    return false;
+  }
+  if (message.channelId !== pending.channelId) return false;
+
+  const refreshPanel = async () => {
+    const { customEditView } = require('./setupPanel');
+    await pending.panelMessage?.edit(customEditView(message.guild, pending.commandId)).catch(() => {});
+  };
+
+  if (message.content.trim().toLowerCase() === 'supprimer') {
+    pendingImages.delete(key);
+    updateSettings(message.guildId, (s) => {
+      const c = s.customCommands.find((cc) => cc.id === pending.commandId);
+      if (c) {
+        deleteStoredImage(c.response.image);
+        c.response.image = null;
+      }
+    });
+    await message.delete().catch(() => {});
+    await tempReply(message.channel, '✅ Image retirée de la commande.');
+    await refreshPanel();
+    return true;
+  }
+
+  // URL externe collée (imgur…) : acceptée telle quelle, sauf les liens Discord qui expirent
+  const trimmed = message.content.trim();
+  if (/^https?:\/\/\S+$/.test(trimmed) && !message.attachments.size) {
+    if (/(cdn|media)\.discordapp\.(com|net)/.test(trimmed)) {
+      await tempReply(message.channel, '❌ Les liens d\'images Discord expirent au bout de quelques jours — envoie plutôt l\'image en pièce jointe, je la stockerai durablement.');
+      return true;
+    }
+    pendingImages.delete(key);
+    updateSettings(message.guildId, (s) => {
+      const c = s.customCommands.find((cc) => cc.id === pending.commandId);
+      if (c) {
+        deleteStoredImage(c.response.image);
+        c.response.image = trimmed;
+      }
+    });
+    await message.delete().catch(() => {});
+    await tempReply(message.channel, '✅ URL d\'image enregistrée pour la commande.');
+    await refreshPanel();
+    return true;
+  }
+
+  const attachment = message.attachments.first();
+  if (!attachment) return false; // pas une pièce jointe : message normal, on n'y touche pas
+
+  if (!attachment.contentType?.startsWith('image/')) {
+    await tempReply(message.channel, '❌ Ce fichier n\'est pas une image, réessaie.');
+    return true;
+  }
+  if (attachment.size > 8 * 1024 * 1024) {
+    await tempReply(message.channel, '❌ Image trop lourde (8 Mo max), réessaie.');
+    return true;
+  }
+
+  const response = await fetch(attachment.url).catch(() => null);
+  if (!response?.ok) {
+    await tempReply(message.channel, '❌ Impossible de télécharger l\'image, réessaie.');
+    return true;
+  }
+  const buffer = Buffer.from(await response.arrayBuffer());
+  const ext = (attachment.name?.split('.').pop() ?? 'png').toLowerCase().replace(/[^a-z0-9]/g, '') || 'png';
+  const filename = `cc-${pending.commandId}-${Date.now()}.${ext}`;
+  fs.mkdirSync(imagesDir, { recursive: true });
+  fs.writeFileSync(path.join(imagesDir, filename), buffer);
+
+  pendingImages.delete(key);
+  updateSettings(message.guildId, (s) => {
+    const c = s.customCommands.find((cc) => cc.id === pending.commandId);
+    if (c) {
+      deleteStoredImage(c.response.image);
+      c.response.image = `file:${filename}`;
+    }
+  });
+  await message.delete().catch(() => {});
+  await tempReply(message.channel, '✅ Image enregistrée pour la commande (stockée sur le serveur, elle n\'expirera pas).');
+  await refreshPanel();
+  return true;
+}
 
 function formatResponse(text, message) {
   return text
@@ -38,8 +157,17 @@ async function handleCustomCommand(message) {
   if (command.response.embed) {
     const embed = new EmbedBuilder().setColor(settings.color).setDescription(responseText.slice(0, 4096));
     if (command.response.title) embed.setTitle(formatResponse(command.response.title, message).slice(0, 256));
-    if (command.response.image) embed.setImage(command.response.image);
-    await message.channel.send({ embeds: [embed] }).catch(() => {});
+    const files = [];
+    if (command.response.image?.startsWith('file:')) {
+      const filePath = path.join(imagesDir, command.response.image.slice(5));
+      if (fs.existsSync(filePath)) {
+        files.push(new AttachmentBuilder(filePath));
+        embed.setImage(`attachment://${path.basename(filePath)}`);
+      }
+    } else if (command.response.image) {
+      embed.setImage(command.response.image);
+    }
+    await message.channel.send({ embeds: [embed], files }).catch(() => {});
   } else {
     await message.channel.send({ content: responseText.slice(0, 2000) }).catch(() => {});
   }
@@ -58,4 +186,4 @@ async function handleCustomCommand(message) {
   return true;
 }
 
-module.exports = { handleCustomCommand };
+module.exports = { handleCustomCommand, handlePendingImage, requestImageUpload };

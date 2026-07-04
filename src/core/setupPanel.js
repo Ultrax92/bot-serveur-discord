@@ -577,10 +577,15 @@ function customEditView(guild, commandId) {
   if (!command) return customView(guild);
 
   const roles = command.allowedRoles.map((id) => `<@&${id}>`).join(' ') || '*tout le monde*';
+  const imageStatus = !command.response.image ? '🔴 aucune'
+    : command.response.image.startsWith('file:') ? '🟢 image uploadée (stockée sur le serveur)'
+      : `🔗 ${command.response.image.slice(0, 80)}`;
   const embed = panelEmbed(guild, `🧩 Commande \`${command.prefix}${command.name}\``, [
     `🎭 **Rôles autorisés** — ${roles}`,
+    '*(les admins du bot peuvent toujours l\'utiliser, teste avec un compte non-admin)*',
     `🗑️ **Suppression auto du message déclencheur** — ${command.deleteTrigger ? '🟢' : '🔴'}`,
-    `📦 **Format de la réponse** — ${command.response.embed ? 'embed' : 'texte simple'}${command.response.title ? ` (titre : ${command.response.title})` : ''}${command.response.image ? ' + image' : ''}`,
+    `📦 **Format de la réponse** — ${command.response.embed ? 'embed' : 'texte simple'}${command.response.title ? ` (titre : ${command.response.title})` : ''}`,
+    `🖼️ **Image (embed)** — ${imageStatus}`,
     `💬 **Réponse :**`,
     `> ${(command.response.content || '*vide — configure-la avec 💬*').slice(0, 300)}`,
   ].join('\n'));
@@ -606,6 +611,9 @@ function customEditView(guild, commandId) {
     new ButtonBuilder().setCustomId(`setup:cc:embed:${command.id}`)
       .setLabel(command.response.embed ? '📦 Réponse : embed' : '📦 Réponse : texte')
       .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId(`setup:cc:img:${command.id}`)
+      .setLabel('🖼️ Image').setStyle(ButtonStyle.Primary)
+      .setDisabled(!command.response.embed),
   );
 
   return {
@@ -838,16 +846,11 @@ async function handleSetupComponent(interaction) {
 
       if (args[0] === 'ccresp') {
         const commandId = args[1];
-        const image = interaction.fields.getTextInputValue('image').trim();
-        if (image && !/^https?:\/\/\S+$/.test(image)) {
-          return interaction.reply({ content: '❌ L\'URL de l\'image est invalide (elle doit commencer par http/https).', flags: MessageFlags.Ephemeral });
-        }
         updateSettings(guild.id, (s) => {
           const c = s.customCommands.find((cc) => cc.id === commandId);
           if (c) {
             c.response.title = interaction.fields.getTextInputValue('title').trim();
             c.response.content = interaction.fields.getTextInputValue('content').trim();
-            c.response.image = image || null;
           }
         });
         return interaction.update(customEditView(guild, commandId));
@@ -1245,12 +1248,17 @@ async function handleSetupComponent(interaction) {
               new TextInputBuilder().setCustomId('content').setLabel('Message ({membre} {salon} {serveur}…)')
                 .setValue(command.response.content ?? '').setStyle(TextInputStyle.Paragraph).setRequired(true).setMaxLength(4000),
             ),
-            new ActionRowBuilder().addComponents(
-              new TextInputBuilder().setCustomId('image').setLabel('URL image (embed seulement, optionnel)')
-                .setValue(command.response.image ?? '').setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(500),
-            ),
           );
         return interaction.showModal(modal);
+      }
+
+      if (sub === 'img') {
+        const { requestImageUpload } = require('./customCommands');
+        requestImageUpload(interaction, commandId);
+        return interaction.reply({
+          content: '🖼️ **Envoie maintenant l\'image dans ce salon** (en pièce jointe — je la stocke sur le serveur, elle n\'expirera jamais).\nTu peux aussi coller une URL externe (imgur…), ou taper `supprimer` pour retirer l\'image actuelle. ⏱️ 2 minutes.',
+          flags: MessageFlags.Ephemeral,
+        });
       }
       break;
     }
@@ -1379,4 +1387,4 @@ async function handleSetupComponent(interaction) {
   }
 }
 
-module.exports = { hubView, customView, handleSetupComponent, watchPanel };
+module.exports = { hubView, customView, customEditView, handleSetupComponent, watchPanel };
