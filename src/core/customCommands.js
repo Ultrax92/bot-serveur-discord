@@ -186,4 +186,4 @@ async function handleCustomCommand(message) {
   return true;
 }
 
-module.exports = { handleCustomCommand, handlePendingImage, requestImageUpload };
+module.exports = { handleCustomCommand, handlePendingImage, requestImageUpload, deleteStoredImage };

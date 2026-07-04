@@ -915,7 +915,10 @@ async function handleSetupComponent(interaction) {
         if (!channel || !channel.isTextBased() || channel.isThread() || channel.isVoiceBased()) {
           return interaction.reply({ content: `❌ Aucun salon textuel trouvé sur ce serveur avec l'ID \`${id}\`.`, flags: MessageFlags.Ephemeral });
         }
-        updateSettings(guild.id, (s) => { s.verifConfig.channel = channel.id; });
+        updateSettings(guild.id, (s) => {
+          s.verifConfig.channel = channel.id;
+          s.modules.verification = true;
+        });
         return interaction.update(verificationView(guild));
       }
       break;
@@ -926,7 +929,10 @@ async function handleSetupComponent(interaction) {
 
       if (sub === 'toggle') {
         const key = args[1];
-        updateSettings(guild.id, (s) => { s.automodConfig[key].enabled = !s.automodConfig[key].enabled; });
+        updateSettings(guild.id, (s) => {
+          s.automodConfig[key].enabled = !s.automodConfig[key].enabled;
+          if (s.automodConfig[key].enabled) s.modules.automod = true; // on active une protection → le module s'active
+        });
         return interaction.update(automodView(guild));
       }
 
@@ -1002,6 +1008,7 @@ async function handleSetupComponent(interaction) {
         updateSettings(guild.id, (s) => {
           s.automodConfig.badwords.words = [...new Set([...s.automodConfig.badwords.words, ...defaultWords])].slice(0, 300);
           s.automodConfig.badwords.enabled = true;
+          s.modules.automod = true;
         });
         return interaction.update(automodView(guild));
       }
@@ -1024,7 +1031,10 @@ async function handleSetupComponent(interaction) {
       const sub = args[0];
 
       if (sub === 'panelchannel') {
-        updateSettings(guild.id, (s) => { s.ticketsConfig.panelChannel = interaction.values[0]; });
+        updateSettings(guild.id, (s) => {
+          s.ticketsConfig.panelChannel = interaction.values[0];
+          s.modules.tickets = true; // on configure → le module s'active
+        });
         return interaction.update(ticketsView(guild));
       }
 
@@ -1042,6 +1052,7 @@ async function handleSetupComponent(interaction) {
               id: typeId, emoji: '🎫', label: 'Nouveau type', description: '',
               categoryId: null, mentionRoles: [], accessRoles: [], openMessage: '',
             });
+            s.modules.tickets = true;
           });
         }
         return interaction.update(ticketTypeView(guild, typeId));
@@ -1186,6 +1197,7 @@ async function handleSetupComponent(interaction) {
               allowedRoles: [], deleteTrigger: true,
               response: { embed: true, title: '', content: '', image: null },
             });
+            s.modules.custom = true; // on configure → le module s'active
           });
         }
         return interaction.update(customEditView(guild, commandId));
@@ -1210,7 +1222,15 @@ async function handleSetupComponent(interaction) {
       }
 
       if (sub === 'del') {
-        updateSettings(guild.id, (s) => { s.customCommands = s.customCommands.filter((c) => c.id !== commandId); });
+        updateSettings(guild.id, (s) => {
+          const command = s.customCommands.find((c) => c.id === commandId);
+          if (command) {
+            // Nettoie l'image stockée sur le disque avec la commande
+            const { deleteStoredImage } = require('./customCommands');
+            deleteStoredImage(command.response.image);
+          }
+          s.customCommands = s.customCommands.filter((c) => c.id !== commandId);
+        });
         return interaction.update(customView(guild));
       }
 
@@ -1267,7 +1287,10 @@ async function handleSetupComponent(interaction) {
       const sub = args[0];
 
       if (sub === 'channel') {
-        updateSettings(guild.id, (s) => { s.verifConfig.channel = interaction.values[0]; });
+        updateSettings(guild.id, (s) => {
+          s.verifConfig.channel = interaction.values[0];
+          s.modules.verification = true; // on configure → le module s'active
+        });
         return interaction.update(verificationView(guild));
       }
 
@@ -1279,7 +1302,10 @@ async function handleSetupComponent(interaction) {
             flags: MessageFlags.Ephemeral,
           });
         }
-        updateSettings(guild.id, (s) => { s.verifConfig.role = role.id; });
+        updateSettings(guild.id, (s) => {
+          s.verifConfig.role = role.id;
+          s.modules.verification = true;
+        });
         return interaction.update(verificationView(guild));
       }
 
