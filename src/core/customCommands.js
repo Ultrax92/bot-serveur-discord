@@ -44,9 +44,18 @@ async function handlePendingImage(message) {
   }
   if (message.channelId !== pending.channelId) return false;
 
+  // Republie le panneau tout en bas du salon (et supprime l'ancien) pour ne pas
+  // avoir à remonter la conversation pour continuer la configuration
   const refreshPanel = async () => {
-    const { customEditView } = require('./setupPanel');
-    await pending.panelMessage?.edit(customEditView(message.guild, pending.commandId)).catch(() => {});
+    const { customEditView, watchPanel } = require('./setupPanel');
+    const view = customEditView(message.guild, pending.commandId);
+    const newPanel = await message.channel.send(view).catch(() => null);
+    if (newPanel) {
+      watchPanel(newPanel);
+      await pending.panelMessage?.delete().catch(() => {});
+    } else {
+      await pending.panelMessage?.edit(view).catch(() => {});
+    }
   };
 
   if (message.content.trim().toLowerCase() === 'supprimer') {
@@ -68,6 +77,7 @@ async function handlePendingImage(message) {
   const trimmed = message.content.trim();
   if (/^https?:\/\/\S+$/.test(trimmed) && !message.attachments.size) {
     if (/(cdn|media)\.discordapp\.(com|net)/.test(trimmed)) {
+      await message.delete().catch(() => {});
       await tempReply(message.channel, '❌ Les liens d\'images Discord expirent au bout de quelques jours — envoie plutôt l\'image en pièce jointe, je la stockerai durablement.');
       return true;
     }
@@ -89,16 +99,19 @@ async function handlePendingImage(message) {
   if (!attachment) return false; // pas une pièce jointe : message normal, on n'y touche pas
 
   if (!attachment.contentType?.startsWith('image/')) {
+    await message.delete().catch(() => {});
     await tempReply(message.channel, '❌ Ce fichier n\'est pas une image, réessaie.');
     return true;
   }
   if (attachment.size > 8 * 1024 * 1024) {
+    await message.delete().catch(() => {});
     await tempReply(message.channel, '❌ Image trop lourde (8 Mo max), réessaie.');
     return true;
   }
 
   const response = await fetch(attachment.url).catch(() => null);
   if (!response?.ok) {
+    await message.delete().catch(() => {});
     await tempReply(message.channel, '❌ Impossible de télécharger l\'image, réessaie.');
     return true;
   }
