@@ -69,7 +69,7 @@ pm2 save                # enregistre la liste des apps à relancer au boot
 > ℹ️ `pm2 startup` ne configure rien tout seul : il **génère une commande sudo à copier-coller**.
 > Équivalent direct (pm2 installé en global) : `sudo pm2 startup -u $USER --hp $HOME`, puis `pm2 save`.
 
-Mise à jour : `git pull && npm install && npm run deploy && pm2 restart bot-serveur-discord`
+Mise à jour : **`/update` directement sur Discord** (owner uniquement) — vérifie GitHub, applique les commits, réinstalle les dépendances si besoin, redéploie les commandes et redémarre via pm2, avec confirmation après redémarrage. Équivalent manuel : `git pull && npm install && npm run deploy && pm2 restart bot-serveur-discord`
 
 ## Structure du projet
 

@@ -40,6 +40,11 @@ CREATE TABLE IF NOT EXISTS tickets (
   created_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_tickets_guild_user ON tickets (guild_id, user_id, status);
+
+CREATE TABLE IF NOT EXISTS kv (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
 `);
 
 module.exports = db;
