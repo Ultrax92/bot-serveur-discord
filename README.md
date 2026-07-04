@@ -15,7 +15,7 @@ Bot Serveur Discord . Slash commands, modules activables par serveur, stockage S
 | ✅ Vérification | ✅ Fait | configuré via `/setup` → ✅ : salon + rôle + message, panneau publié avec bouton persistant "Se vérifier", rôle attribué au clic, logs dans le salon vérif |
 | 🧩 Commandes custom | ✅ Fait | `/custom` (ou `/setup` → 🧩) : commandes à préfixe (`+regles`, `!boutique`…) créées via panneau — préfixe + ! . ? -, rôles autorisés, suppression auto du déclencheur, réponse texte ou embed (titre, message, image) avec variables |
 | 🎫 Tickets | ✅ Fait | configuré via `/setup` → 🎫 : types créés/modifiés/supprimés librement (catégorie, rôles mentionnés/accès, message d'ouverture chacun), panneau à sélecteur publié, salons numérotés (0001…), claim/close (bouton + `/close`), `/add` pour ajouter un membre, max par personne, rôle requis, fermeture au départ du membre, transcript complet .txt en MP + logs-tickets, automod inactif dans les tickets |
-| 🎉 Giveaways | ⬜ À faire | création avec bouton, end, reroll, choose |
+| 🎉 Giveaways | ✅ Fait | `/giveaway` (formulaire lot/durée/gagnants) publié dans le salon courant, participation par bouton 🎉 (retrait en re-cliquant), rôle requis configurable via `/setup` → 🎉, tirage auto à échéance (survit aux redémarrages), fin anticipée ⏹️ et reroll 🔁 sur le message |
 | 🔊 Vocaux temporaires | ⬜ À faire | salon générateur, panneau de contrôle |
 | 🎭 Rolemenu/Embeds | ⬜ À faire | menus de rôles, générateur d'embed |
 | 💾 Backups | ⬜ À faire | backup/restore serveur et émojis |

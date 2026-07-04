@@ -46,6 +46,9 @@ const DEFAULT_SETTINGS = {
   },
   // Commandes custom : { id, prefix, name, allowedRoles: [], deleteTrigger, response: { embed, title, content, image } }
   customCommands: [],
+  giveawaysConfig: {
+    requiredRole: null,  // rôle requis pour participer (null = tout le monde)
+  },
   ticketsConfig: {
     panelChannel: null,      // salon où le panneau (embed + sélecteur) est publié
     panelMessage: 'Utilise le menu ci-dessous pour ouvrir un ticket dans la catégorie que tu souhaites.',

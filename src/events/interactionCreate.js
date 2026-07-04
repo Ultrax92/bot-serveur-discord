@@ -4,6 +4,7 @@ const { isBotAdmin, canManageAdmins } = require('../core/permissions');
 const { handleSetupComponent } = require('../core/setupPanel');
 const { handleVerifyButton } = require('../core/verification');
 const { handleTicketComponent } = require('../core/tickets');
+const { handleGiveawayComponent } = require('../core/giveaways');
 const { sendLog, userAuthor, idLine } = require('../core/logs');
 
 const COMMAND_LOG_STYLES = {
@@ -50,6 +51,18 @@ module.exports = {
         await handleTicketComponent(interaction);
       } catch (error) {
         console.error('Erreur sur le système de tickets :', error);
+        await interaction.reply({ content: 'Une erreur est survenue, réessaie.', flags: MessageFlags.Ephemeral }).catch(() => {});
+      }
+      return;
+    }
+
+    // Giveaways : participation publique, fin/reroll vérifiés côté handler
+    if ((interaction.isButton() || interaction.isModalSubmit()) && interaction.customId.startsWith('gw:')) {
+      if (!interaction.inGuild()) return;
+      try {
+        await handleGiveawayComponent(interaction);
+      } catch (error) {
+        console.error('Erreur sur les giveaways :', error);
         await interaction.reply({ content: 'Une erreur est survenue, réessaie.', flags: MessageFlags.Ephemeral }).catch(() => {});
       }
       return;

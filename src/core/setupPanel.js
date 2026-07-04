@@ -80,6 +80,7 @@ function hubView(guild) {
     `🤖 **Auto-modération** — ${['antispam', 'antilink', 'antimention', 'badwords'].filter((k) => settings.automodConfig[k].enabled).length}/4 protections actives`,
     `🎫 **Tickets** — salon ${settings.ticketsConfig.panelChannel ? '🟢' : '🔴'} | ${settings.ticketsConfig.types.length} type(s)`,
     `🧩 **Commandes custom** — ${settings.customCommands.length} commande(s)`,
+    `🎉 **Giveaways** — ${require('./giveaways').activeGiveaways(guild.id).length} en cours | rôle requis ${settings.giveawaysConfig.requiredRole ? '🟢' : '🔴 aucun'}`,
     '',
     'Choisis une section dans le menu pour voir et modifier ses réglages.',
   ].join('\n'));
@@ -106,6 +107,8 @@ function hubView(guild) {
         .setDescription('Panneau à sélecteur, types de tickets, transcript'),
       new StringSelectMenuOptionBuilder().setValue('custom').setLabel('Commandes custom').setEmoji('🧩')
         .setDescription('Commandes à préfixe avec réponse personnalisée'),
+      new StringSelectMenuOptionBuilder().setValue('giveaways').setLabel('Giveaways').setEmoji('🎉')
+        .setDescription('Rôle requis pour participer, giveaways en cours'),
     );
 
   const buttons = new ActionRowBuilder().addComponents(
@@ -622,6 +625,44 @@ function customEditView(guild, commandId) {
   };
 }
 
+// ── Page giveaways ────────────────────────────────────────────────────────────
+
+function giveawaysView(guild) {
+  const settings = getSettings(guild.id);
+  const { activeGiveaways } = require('./giveaways');
+  const active = activeGiveaways(guild.id);
+  const role = settings.giveawaysConfig.requiredRole && guild.roles.cache.get(settings.giveawaysConfig.requiredRole);
+  const list = active.length
+    ? active.map((g) => `• **${g.prize}** — fin <t:${Math.floor(g.ends_at / 1000)}:R> · ${JSON.parse(g.participants).length} participant(s) · <#${g.channel_id}>`).join('\n')
+    : '*Aucun giveaway en cours.*';
+
+  const embed = panelEmbed(guild, '🎉 Giveaways', [
+    `${settings.modules.giveaways ? '🟢 Module activé' : '🔴 Module désactivé — active-le dans 🧩 Modules ou choisis un rôle requis ci-dessous'}`,
+    '',
+    `🎭 **Rôle requis pour participer** — ${role ? `${role}` : 'aucun (tout le monde)'}`,
+    '',
+    `**Giveaways en cours (${active.length}) :**`,
+    list,
+    '',
+    'Lance un giveaway avec **`/giveaway`** dans le salon voulu : lot, durée, nombre de gagnants. Fin anticipée et reroll directement sur le message du giveaway.',
+  ].join('\n'));
+
+  const roleSelect = new RoleSelectMenuBuilder()
+    .setCustomId('setup:gv:reqrole')
+    .setPlaceholder('🎭 Rôle requis pour participer (vide = tout le monde)…')
+    .setMinValues(0)
+    .setMaxValues(1);
+  if (role) roleSelect.setDefaultRoles([role.id]);
+
+  return {
+    embeds: [embed],
+    components: [
+      new ActionRowBuilder().addComponents(roleSelect),
+      new ActionRowBuilder().addComponents(backButton('home')),
+    ],
+  };
+}
+
 const PAGES = {
   home: hubView,
   general: generalView,
@@ -634,6 +675,7 @@ const PAGES = {
   tickets: ticketsView,
   tksettings: ticketSettingsView,
   custom: customView,
+  giveaways: giveawaysView,
 };
 
 // ── Routeur des interactions du panneau (customId = "setup:...") ────────────
@@ -1279,6 +1321,17 @@ async function handleSetupComponent(interaction) {
           content: '🖼️ **Envoie maintenant l\'image dans ce salon** (en pièce jointe — je la stocke sur le serveur, elle n\'expirera jamais).\nTu peux aussi coller une URL externe (imgur…), ou taper `supprimer` pour retirer l\'image actuelle. ⏱️ 2 minutes.',
           flags: MessageFlags.Ephemeral,
         });
+      }
+      break;
+    }
+
+    case 'gv': {
+      if (args[0] === 'reqrole') {
+        updateSettings(guild.id, (s) => {
+          s.giveawaysConfig.requiredRole = interaction.values[0] ?? null;
+          s.modules.giveaways = true; // on configure → le module s'active
+        });
+        return interaction.update(giveawaysView(guild));
       }
       break;
     }

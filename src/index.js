@@ -3,6 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { Client, Collection, GatewayIntentBits, Partials } = require('discord.js');
 const { startExpiryWorker } = require('./core/sanctions');
+const { startGiveawayWorker } = require('./core/giveaways');
 
 const client = new Client({
   intents: [
@@ -40,6 +41,9 @@ for (const file of fs.readdirSync(eventsDir).filter((f) => f.endsWith('.js'))) {
   else client.on(event.name, (...args) => event.execute(...args));
 }
 
-client.once('clientReady', () => startExpiryWorker(client));
+client.once('clientReady', () => {
+  startExpiryWorker(client);
+  startGiveawayWorker(client);
+});
 
 client.login(process.env.DISCORD_TOKEN);
