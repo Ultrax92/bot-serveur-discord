@@ -19,7 +19,8 @@ module.exports = {
     if (!member) {
       return interaction.reply({ embeds: [errorEmbed(interaction, 'Membre introuvable sur ce serveur.')], flags: MessageFlags.Ephemeral });
     }
-    const hierarchyError = checkHierarchy(interaction, member);
+    // Un warn n'exécute aucune action Discord : pas besoin que le bot soit au-dessus
+    const hierarchyError = checkHierarchy(interaction, member, { needsBotAbove: false });
     if (hierarchyError) {
       return interaction.reply({ embeds: [errorEmbed(interaction, hierarchyError)], flags: MessageFlags.Ephemeral });
     }

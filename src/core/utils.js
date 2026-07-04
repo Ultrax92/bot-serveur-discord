@@ -54,13 +54,15 @@ function errorEmbed(source, description) {
 
 // Seules protections : le owner (serveur + .env), le bot lui-même, et les rôles au-dessus
 // du bot (limite imposée par Discord). Les admins du bot peuvent agir entre eux.
-function checkHierarchy(interaction, targetMember) {
+// `needsBotAbove: false` pour les actions sans opération Discord (ex: warn, simple
+// écriture en base) : la position du rôle du bot n'a alors aucune importance.
+function checkHierarchy(interaction, targetMember, { needsBotAbove = true } = {}) {
   const { isOwner } = require('./permissions');
   if (!targetMember) return null;
   if (targetMember.id === interaction.guild.ownerId || isOwner(targetMember.id))
     return 'Impossible d\'agir sur le propriétaire.';
   if (targetMember.id === interaction.client.user.id) return 'Je ne peux pas agir sur moi-même.';
-  if (targetMember.roles.highest.position >= interaction.guild.members.me.roles.highest.position)
+  if (needsBotAbove && targetMember.roles.highest.position >= interaction.guild.members.me.roles.highest.position)
     return 'Ce membre a un rôle supérieur ou égal au mien, je ne peux pas agir sur lui. Monte mon rôle dans la hiérarchie.';
   return null;
 }
