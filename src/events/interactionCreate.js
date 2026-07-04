@@ -5,6 +5,7 @@ const { handleSetupComponent } = require('../core/setupPanel');
 const { handleVerifyButton } = require('../core/verification');
 const { handleTicketComponent } = require('../core/tickets');
 const { handleGiveawayComponent } = require('../core/giveaways');
+const { handleTempvocComponent } = require('../core/tempvoc');
 const { sendLog, userAuthor, idLine } = require('../core/logs');
 
 const COMMAND_LOG_STYLES = {
@@ -63,6 +64,18 @@ module.exports = {
         await handleGiveawayComponent(interaction);
       } catch (error) {
         console.error('Erreur sur les giveaways :', error);
+        await interaction.reply({ content: 'Une erreur est survenue, réessaie.', flags: MessageFlags.Ephemeral }).catch(() => {});
+      }
+      return;
+    }
+
+    // Vocaux temporaires : panneau de contrôle du salon (propriétaire vérifié côté handler)
+    if ((interaction.isButton() || interaction.isModalSubmit()) && interaction.customId.startsWith('tv:')) {
+      if (!interaction.inGuild()) return;
+      try {
+        await handleTempvocComponent(interaction);
+      } catch (error) {
+        console.error('Erreur sur les vocaux temporaires :', error);
         await interaction.reply({ content: 'Une erreur est survenue, réessaie.', flags: MessageFlags.Ephemeral }).catch(() => {});
       }
       return;

@@ -12,6 +12,8 @@ const MODULES = {
   rolemenu: { label: 'Rolemenu / Embeds', emoji: '🎭', description: 'menus de rôles interactifs et générateur d\'embeds' },
   verification: { label: 'Vérification', emoji: '✅', description: 'bouton de vérification à l\'arrivée qui donne un rôle' },
   custom: { label: 'Commandes custom', emoji: '🧩', description: 'commandes à préfixe (+regles, !boutique…) créées via /custom' },
+  invites: { label: 'Invite tracker', emoji: '📨', description: 'qui a invité qui, compteurs d\'invitations, /invites et /leaderboard' },
+  stats: { label: 'Stats du serveur', emoji: '📊', description: 'compteurs membres/rôles en salons vocaux verrouillés' },
   utility: { label: 'Utilitaire', emoji: '🧰', description: 'serverinfo, userinfo, avatars…' },
   backups: { label: 'Backups', emoji: '💾', description: 'sauvegarde et restauration du serveur' },
 };
@@ -30,6 +32,8 @@ const DEFAULT_SETTINGS = {
     rolemenu: false,
     verification: false,
     custom: false,
+    invites: false,
+    stats: false,
     utility: true,
     backups: false,
   },
@@ -68,7 +72,13 @@ const DEFAULT_SETTINGS = {
     muteDuration: '10m',
   },
   antiraidConfig: {},
-  tempvocConfig: {},
+  tempvocConfig: {
+    generatorChannel: null,                 // salon vocal "➕ Crée ton salon"
+    nameTemplate: '🔊 Salon de {pseudo}',   // nom des salons créés
+  },
+  statsConfig: {
+    counters: [],  // { id, type: 'members'|'role', roleId, channelId, label }
+  },
   color: 0x5865f2,    // couleur des embeds (modifiable via /config)
 };
 

@@ -1,6 +1,7 @@
 const { EmbedBuilder } = require('discord.js');
 const { sendLog, userAuthor, idLine } = require('../core/logs');
 const { closeTicketsForMember } = require('../core/tickets');
+const { recordLeave } = require('../core/invites');
 
 module.exports = {
   name: 'guildMemberRemove',
@@ -8,6 +9,12 @@ module.exports = {
     await closeTicketsForMember(member).catch((error) => console.error('Erreur fermeture tickets au départ :', error));
 
     const lines = [`📤 **A quitté le serveur** — reste ${member.guild.memberCount} membres`, idLine(member)];
+
+    // Met à jour le compteur de l'inviteur et l'affiche dans le log de départ
+    const inviteInfo = recordLeave(member);
+    if (inviteInfo) {
+      lines.push(`📨 **Avait été invité par** <@${inviteInfo.inviterId}> — il lui reste **${inviteInfo.stats.active}** invitation(s)`);
+    }
     if (!member.partial) {
       if (member.joinedTimestamp) {
         lines.push(`**Avait rejoint** <t:${Math.floor(member.joinedTimestamp / 1000)}:R>`);

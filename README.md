@@ -16,7 +16,9 @@ Bot Serveur Discord . Slash commands, modules activables par serveur, stockage S
 | 🧩 Commandes custom | ✅ Fait | `/custom` (ou `/setup` → 🧩) : commandes à préfixe (`+regles`, `!boutique`…) créées via panneau — préfixe + ! . ? -, rôles autorisés, suppression auto du déclencheur, réponse texte ou embed (titre, message, image) avec variables |
 | 🎫 Tickets | ✅ Fait | configuré via `/setup` → 🎫 : types créés/modifiés/supprimés librement (catégorie, rôles mentionnés/accès, message d'ouverture chacun), panneau à sélecteur publié, salons numérotés (0001…), claim/close (bouton + `/close`), `/add` pour ajouter un membre, max par personne, rôle requis, fermeture au départ du membre, transcript complet .txt en MP + logs-tickets, automod inactif dans les tickets |
 | 🎉 Giveaways | ✅ Fait | `/giveaway` (formulaire lot/durée/gagnants) publié dans le salon courant, participation par bouton 🎉 (retrait en re-cliquant), rôle requis configurable via `/setup` → 🎉, tirage auto à échéance (survit aux redémarrages), fin anticipée ⏹️ et reroll 🔁 sur le message |
-| 🔊 Vocaux temporaires | ⬜ À faire | salon générateur, panneau de contrôle |
+| 🔊 Vocaux temporaires | ✅ Fait | configuré via `/setup` → 🔊 : salon générateur (existant ou créé), rejoindre = salon perso + panneau de contrôle dans le chat du vocal (renommer, verrouiller, limite), supprimé quand vide — remplace ChannelManager |
+| 📨 Invite tracker | ✅ Fait | qui a invité qui dans logs-join, décompte mis à jour dans logs-leave au départ d'un invité, `/invites`, `/leaderboard`, détection comptes récents — remplace Invite Tracker |
+| 📊 Stats serveur | ✅ Fait | configuré via `/setup` → 📊 : compteurs Membres + par rôle en salons vocaux verrouillés (connexion et chat bloqués), actualisés toutes les 10 min — remplace ServerStats |
 | 🎭 Rolemenu/Embeds | ⬜ À faire | menus de rôles, générateur d'embed |
 | 💾 Backups | ⬜ À faire | backup/restore serveur et émojis |
 

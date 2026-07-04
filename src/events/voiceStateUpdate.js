@@ -1,9 +1,12 @@
 const { EmbedBuilder } = require('discord.js');
 const { sendLog, userAuthor, idLine } = require('../core/logs');
+const { handleVoiceState } = require('../core/tempvoc');
 
 module.exports = {
   name: 'voiceStateUpdate',
   async execute(oldState, newState) {
+    await handleVoiceState(oldState, newState).catch((error) => console.error('Erreur tempvoc :', error));
+
     const member = newState.member ?? oldState.member;
     if (!member || member.user.bot) return;
     if (oldState.channelId === newState.channelId) return; // mute/deafen : pas loggé

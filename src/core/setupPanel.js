@@ -81,6 +81,9 @@ function hubView(guild) {
     `🎫 **Tickets** — salon ${settings.ticketsConfig.panelChannel ? '🟢' : '🔴'} | ${settings.ticketsConfig.types.length} type(s)`,
     `🧩 **Commandes custom** — ${settings.customCommands.length} commande(s)`,
     `🎉 **Giveaways** — ${require('./giveaways').activeGiveaways(guild.id).length} en cours | rôle requis ${settings.giveawaysConfig.requiredRole ? '🟢' : '🔴 aucun'}`,
+    `🔊 **Vocaux temporaires** — générateur ${settings.tempvocConfig.generatorChannel ? '🟢' : '🔴'}`,
+    `📊 **Stats** — ${settings.statsConfig.counters.length} compteur(s)`,
+    `📨 **Invite tracker** — ${settings.modules.invites ? '🟢 actif' : '🔴 inactif'}`,
     '',
     'Choisis une section dans le menu pour voir et modifier ses réglages.',
   ].join('\n'));
@@ -109,6 +112,10 @@ function hubView(guild) {
         .setDescription('Commandes à préfixe avec réponse personnalisée'),
       new StringSelectMenuOptionBuilder().setValue('giveaways').setLabel('Giveaways').setEmoji('🎉')
         .setDescription('Rôle requis pour participer, giveaways en cours'),
+      new StringSelectMenuOptionBuilder().setValue('tempvoc').setLabel('Vocaux temporaires').setEmoji('🔊')
+        .setDescription('Salon générateur et modèle de nom'),
+      new StringSelectMenuOptionBuilder().setValue('stats').setLabel('Stats du serveur').setEmoji('📊')
+        .setDescription('Compteurs membres et rôles en vocaux verrouillés'),
     );
 
   const buttons = new ActionRowBuilder().addComponents(
@@ -663,6 +670,88 @@ function giveawaysView(guild) {
   };
 }
 
+// ── Page vocaux temporaires ───────────────────────────────────────────────────
+
+function tempvocView(guild) {
+  const settings = getSettings(guild.id);
+  const tv = settings.tempvocConfig;
+  const generator = tv.generatorChannel && guild.channels.cache.get(tv.generatorChannel);
+
+  const embed = panelEmbed(guild, '🔊 Vocaux temporaires', [
+    `${settings.modules.tempvoc ? '🟢 Module activé' : '🔴 Module désactivé — configure le générateur ci-dessous pour l\'activer'}`,
+    '',
+    `➕ **Salon générateur** — ${generator ? `${generator.name}` : '🔴 non configuré'}`,
+    `📝 **Modèle de nom** — \`${tv.nameTemplate}\` (variable \`{pseudo}\`)`,
+    '',
+    '**Fonctionnement :** un membre rejoint le générateur → son salon perso est créé et il y est déplacé, avec un panneau de contrôle dans le chat du vocal (✏️ renommer, 🔒 verrouiller, 👥 limite). Le salon est supprimé dès qu\'il est vide.',
+  ].join('\n'));
+
+  const channelSelect = new ChannelSelectMenuBuilder()
+    .setCustomId('setup:tv:generator')
+    .setPlaceholder('➕ Choisir un salon vocal existant comme générateur…')
+    .setChannelTypes(ChannelType.GuildVoice);
+
+  const buttons = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('setup:tv:create').setLabel('➕ Créer le salon générateur').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('setup:tv:name').setLabel('📝 Modèle de nom').setStyle(ButtonStyle.Primary),
+    backButton('home'),
+  );
+
+  return { embeds: [embed], components: [new ActionRowBuilder().addComponents(channelSelect), buttons] };
+}
+
+// ── Page stats ────────────────────────────────────────────────────────────────
+
+function statsView(guild) {
+  const settings = getSettings(guild.id);
+  const counters = settings.statsConfig.counters;
+  const list = counters.length
+    ? counters.map((c) => {
+      const channel = guild.channels.cache.get(c.channelId);
+      return `• ${channel ? `**${channel.name}**` : `🔴 salon supprimé (${c.label})`}`;
+    }).join('\n')
+    : '*Aucun compteur.*';
+
+  const embed = panelEmbed(guild, '📊 Stats du serveur', [
+    `${settings.modules.stats ? '🟢 Module activé' : '🔴 Module désactivé — ajoute un compteur pour l\'activer'}`,
+    '',
+    `**Compteurs (${counters.length}) :**`,
+    list,
+    '',
+    'Les compteurs sont des salons vocaux **verrouillés** (connexion et chat bloqués), actualisés toutes les **10 minutes** (limite Discord sur les renommages).',
+    'Ajoute un compteur 👥 Membres avec le bouton, ou un compteur par rôle avec le sélecteur.',
+  ].join('\n'));
+
+  const roleSelect = new RoleSelectMenuBuilder()
+    .setCustomId('setup:st:addrole')
+    .setPlaceholder('🎭 Ajouter un compteur pour un rôle…')
+    .setMinValues(1)
+    .setMaxValues(1);
+
+  const components = [
+    new ActionRowBuilder().addComponents(roleSelect),
+  ];
+
+  if (counters.length) {
+    const removeSelect = new StringSelectMenuBuilder()
+      .setCustomId('setup:st:remove')
+      .setPlaceholder('🗑️ Supprimer un compteur…')
+      .addOptions(counters.slice(0, 25).map((c) => new StringSelectMenuOptionBuilder()
+        .setValue(c.id)
+        .setLabel((guild.channels.cache.get(c.channelId)?.name ?? c.label).slice(0, 100))));
+    components.push(new ActionRowBuilder().addComponents(removeSelect));
+  }
+
+  components.push(new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('setup:st:members').setLabel('➕ Compteur Membres').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('setup:st:refresh').setLabel('🔄 Actualiser maintenant').setStyle(ButtonStyle.Secondary)
+      .setDisabled(!counters.length),
+    backButton('home'),
+  ));
+
+  return { embeds: [embed], components };
+}
+
 const PAGES = {
   home: hubView,
   general: generalView,
@@ -676,6 +765,8 @@ const PAGES = {
   tksettings: ticketSettingsView,
   custom: customView,
   giveaways: giveawaysView,
+  tempvoc: tempvocView,
+  stats: statsView,
 };
 
 // ── Routeur des interactions du panneau (customId = "setup:...") ────────────
@@ -940,6 +1031,12 @@ async function handleSetupComponent(interaction) {
           if (type) type.openMessage = interaction.fields.getTextInputValue('message').trim();
         });
         return interaction.update(ticketTypeView(guild, typeId));
+      }
+
+      if (args[0] === 'tvname') {
+        const template = interaction.fields.getTextInputValue('template').trim();
+        updateSettings(guild.id, (s) => { s.tempvocConfig.nameTemplate = template; });
+        return interaction.update(tempvocView(guild));
       }
 
       if (args[0] === 'verifmsg') {
@@ -1332,6 +1429,83 @@ async function handleSetupComponent(interaction) {
           s.modules.giveaways = true; // on configure → le module s'active
         });
         return interaction.update(giveawaysView(guild));
+      }
+      break;
+    }
+
+    case 'tv': {
+      const sub = args[0];
+
+      if (sub === 'generator') {
+        updateSettings(guild.id, (s) => {
+          s.tempvocConfig.generatorChannel = interaction.values[0];
+          s.modules.tempvoc = true; // on configure → le module s'active
+        });
+        return interaction.update(tempvocView(guild));
+      }
+
+      if (sub === 'create') {
+        await interaction.deferUpdate();
+        const channel = await guild.channels.create({
+          name: '➕ Crée ton salon',
+          type: ChannelType.GuildVoice,
+        }).catch(() => null);
+        if (!channel) {
+          return interaction.followUp({ content: '❌ Impossible de créer le salon générateur (vérifie mes permissions).', flags: MessageFlags.Ephemeral });
+        }
+        updateSettings(guild.id, (s) => {
+          s.tempvocConfig.generatorChannel = channel.id;
+          s.modules.tempvoc = true;
+        });
+        return interaction.editReply(tempvocView(guild));
+      }
+
+      if (sub === 'name') {
+        const modal = new ModalBuilder()
+          .setCustomId('setup:modal:tvname')
+          .setTitle('Modèle de nom des salons')
+          .addComponents(new ActionRowBuilder().addComponents(
+            new TextInputBuilder().setCustomId('template').setLabel('Nom (variable {pseudo})')
+              .setValue(getSettings(guild.id).tempvocConfig.nameTemplate)
+              .setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(90),
+          ));
+        return interaction.showModal(modal);
+      }
+      break;
+    }
+
+    case 'st': {
+      const sub = args[0];
+      const { createCounter, removeCounter, updateCounters } = require('./stats');
+
+      if (sub === 'members') {
+        await interaction.deferUpdate();
+        const counter = await createCounter(guild, { type: 'members' });
+        if (!counter) {
+          return interaction.followUp({ content: '❌ Impossible de créer le salon compteur (vérifie mes permissions).', flags: MessageFlags.Ephemeral });
+        }
+        return interaction.editReply(statsView(guild));
+      }
+
+      if (sub === 'addrole') {
+        await interaction.deferUpdate();
+        const counter = await createCounter(guild, { type: 'role', roleId: interaction.values[0] });
+        if (!counter) {
+          return interaction.followUp({ content: '❌ Impossible de créer le salon compteur (vérifie mes permissions).', flags: MessageFlags.Ephemeral });
+        }
+        return interaction.editReply(statsView(guild));
+      }
+
+      if (sub === 'remove') {
+        await interaction.deferUpdate();
+        await removeCounter(guild, interaction.values[0]);
+        return interaction.editReply(statsView(guild));
+      }
+
+      if (sub === 'refresh') {
+        await interaction.deferUpdate();
+        await updateCounters(guild).catch(() => {});
+        return interaction.editReply(statsView(guild));
       }
       break;
     }
