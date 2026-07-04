@@ -91,17 +91,18 @@ async function applySanction(message, trigger, config) {
   return null;
 }
 
+// Retourne true si le message a été bloqué par une protection
 async function handleMessage(message) {
-  if (!message.inGuild() || message.author.bot || message.system) return;
-  if (!isModuleEnabled(message.guildId, 'automod')) return;
-  if (!message.member || isBotAdminMember(message.member)) return;
+  if (!message.inGuild() || message.author.bot || message.system) return false;
+  if (!isModuleEnabled(message.guildId, 'automod')) return false;
+  if (!message.member || isBotAdminMember(message.member)) return false;
   // Les tickets sont privés : liens, images et gifs y sont libres
   const { isOpenTicketChannel } = require('./tickets');
-  if (isOpenTicketChannel(message.channelId)) return;
+  if (isOpenTicketChannel(message.channelId)) return false;
 
   const config = getSettings(message.guildId).automodConfig;
   const trigger = detectTrigger(message, config);
-  if (!trigger) return;
+  if (!trigger) return false;
 
   await message.delete().catch(() => {});
 
@@ -132,6 +133,7 @@ async function handleMessage(message) {
     ].filter(Boolean).join('\n'))
     .setTimestamp();
   await sendLog(message.guild, 'mod', embed);
+  return true;
 }
 
 module.exports = { handleMessage };

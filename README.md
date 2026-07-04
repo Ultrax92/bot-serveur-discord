@@ -13,6 +13,7 @@ Bot Serveur Discord . Slash commands, modules activables par serveur, stockage S
 | 🤖 Auto-modération | ✅ Fait | configuré via `/setup` → 🤖 : antispam (seuil réglable), antilink (invitations ou tous liens), antimention, mots interdits — suppression + sanction auto configurable (aucune/warn/mute), admins du bot exemptés |
 | 🛡️ Antiraid | ⬜ À faire | antibot, antitoken, antichannel, antirole, antiwebhook, whitelist, punitions |
 | ✅ Vérification | ✅ Fait | configuré via `/setup` → ✅ : salon + rôle + message, panneau publié avec bouton persistant "Se vérifier", rôle attribué au clic, logs dans le salon vérif |
+| 🧩 Commandes custom | ✅ Fait | `/custom` (ou `/setup` → 🧩) : commandes à préfixe (`+regles`, `!boutique`…) créées via panneau — préfixe + ! . ? -, rôles autorisés, suppression auto du déclencheur, réponse texte ou embed (titre, message, image) avec variables |
 | 🎫 Tickets | ✅ Fait | configuré via `/setup` → 🎫 : types créés/modifiés/supprimés librement (catégorie, rôles mentionnés/accès, message d'ouverture chacun), panneau à sélecteur publié, salons numérotés (0001…), claim/close (bouton + `/close`), `/add` pour ajouter un membre, max par personne, rôle requis, fermeture au départ du membre, transcript complet .txt en MP + logs-tickets, automod inactif dans les tickets |
 | 🎉 Giveaways | ⬜ À faire | création avec bouton, end, reroll, choose |
 | 🔊 Vocaux temporaires | ⬜ À faire | salon générateur, panneau de contrôle |

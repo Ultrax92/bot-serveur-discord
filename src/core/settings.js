@@ -11,6 +11,7 @@ const MODULES = {
   tempvoc: { label: 'Vocaux temporaires', emoji: '🔊', description: 'salons vocaux créés à la demande' },
   rolemenu: { label: 'Rolemenu / Embeds', emoji: '🎭', description: 'menus de rôles interactifs et générateur d\'embeds' },
   verification: { label: 'Vérification', emoji: '✅', description: 'bouton de vérification à l\'arrivée qui donne un rôle' },
+  custom: { label: 'Commandes custom', emoji: '🧩', description: 'commandes à préfixe (+regles, !boutique…) créées via /custom' },
   utility: { label: 'Utilitaire', emoji: '🧰', description: 'serverinfo, userinfo, avatars…' },
   backups: { label: 'Backups', emoji: '💾', description: 'sauvegarde et restauration du serveur' },
 };
@@ -28,6 +29,7 @@ const DEFAULT_SETTINGS = {
     tempvoc: false,
     rolemenu: false,
     verification: false,
+    custom: false,
     utility: true,
     backups: false,
   },
@@ -42,6 +44,8 @@ const DEFAULT_SETTINGS = {
     role: null,      // rôle attribué au clic
     message: 'Bienvenue sur **{serveur}** ! Clique sur le bouton ci-dessous pour te vérifier et accéder au serveur.',
   },
+  // Commandes custom : { id, prefix, name, allowedRoles: [], deleteTrigger, response: { embed, title, content, image } }
+  customCommands: [],
   ticketsConfig: {
     panelChannel: null,      // salon où le panneau (embed + sélecteur) est publié
     panelMessage: 'Utilise le menu ci-dessous pour ouvrir un ticket dans la catégorie que tu souhaites.',

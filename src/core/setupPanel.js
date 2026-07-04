@@ -79,6 +79,7 @@ function hubView(guild) {
     `✅ **Vérification** — salon ${settings.verifConfig.channel ? '🟢' : '🔴'} | rôle ${settings.verifConfig.role ? '🟢' : '🔴'}`,
     `🤖 **Auto-modération** — ${['antispam', 'antilink', 'antimention', 'badwords'].filter((k) => settings.automodConfig[k].enabled).length}/4 protections actives`,
     `🎫 **Tickets** — salon ${settings.ticketsConfig.panelChannel ? '🟢' : '🔴'} | ${settings.ticketsConfig.types.length} type(s)`,
+    `🧩 **Commandes custom** — ${settings.customCommands.length} commande(s)`,
     '',
     'Choisis une section dans le menu pour voir et modifier ses réglages.',
   ].join('\n'));
@@ -103,6 +104,8 @@ function hubView(guild) {
         .setDescription('Antispam, antilink, antimention, mots interdits'),
       new StringSelectMenuOptionBuilder().setValue('tickets').setLabel('Tickets').setEmoji('🎫')
         .setDescription('Panneau à sélecteur, types de tickets, transcript'),
+      new StringSelectMenuOptionBuilder().setValue('custom').setLabel('Commandes custom').setEmoji('🧩')
+        .setDescription('Commandes à préfixe avec réponse personnalisée'),
     );
 
   const buttons = new ActionRowBuilder().addComponents(
@@ -531,6 +534,86 @@ function ticketTypeView(guild, typeId) {
   };
 }
 
+// ── Pages commandes custom ────────────────────────────────────────────────────
+
+function customView(guild) {
+  const settings = getSettings(guild.id);
+  const commands = settings.customCommands;
+  const list = commands.length
+    ? commands.map((c) => `• \`${c.prefix}${c.name}\` — ${c.response.embed ? 'embed' : 'texte'}${c.deleteTrigger ? ' · 🗑️ auto' : ''}${c.allowedRoles.length ? ` · ${c.allowedRoles.length} rôle(s)` : ' · tout le monde'}`).join('\n')
+    : '*Aucune commande — crée la première dans le menu ci-dessous.*';
+
+  const embed = panelEmbed(guild, '🧩 Commandes custom', [
+    `${settings.modules.custom ? '🟢 Module activé' : '🔴 Module désactivé — active-le dans 🧩 Modules pour que les commandes répondent'}`,
+    '',
+    `**Commandes (${commands.length}) :**`,
+    list,
+    '',
+    'Variables utilisables dans les réponses : `{membre}` `{pseudo}` `{salon}` `{serveur}`',
+  ].join('\n'));
+
+  const select = new StringSelectMenuBuilder()
+    .setCustomId('setup:cc:pick')
+    .setPlaceholder('🧩 Gérer une commande…')
+    .addOptions([
+      ...commands.slice(0, 24).map((c) => new StringSelectMenuOptionBuilder()
+        .setValue(c.id)
+        .setLabel(`${c.prefix}${c.name}`.slice(0, 100))
+        .setDescription((c.response.content || '').slice(0, 100) || 'Configurer cette commande')),
+      new StringSelectMenuOptionBuilder().setValue('__new').setLabel('➕ Créer une nouvelle commande').setDescription('Préfixe, nom, rôles, réponse personnalisée'),
+    ]);
+
+  return {
+    embeds: [embed],
+    components: [
+      new ActionRowBuilder().addComponents(select),
+      new ActionRowBuilder().addComponents(backButton('home')),
+    ],
+  };
+}
+
+function customEditView(guild, commandId) {
+  const command = getSettings(guild.id).customCommands.find((c) => c.id === commandId);
+  if (!command) return customView(guild);
+
+  const roles = command.allowedRoles.map((id) => `<@&${id}>`).join(' ') || '*tout le monde*';
+  const embed = panelEmbed(guild, `🧩 Commande \`${command.prefix}${command.name}\``, [
+    `🎭 **Rôles autorisés** — ${roles}`,
+    `🗑️ **Suppression auto du message déclencheur** — ${command.deleteTrigger ? '🟢' : '🔴'}`,
+    `📦 **Format de la réponse** — ${command.response.embed ? 'embed' : 'texte simple'}${command.response.title ? ` (titre : ${command.response.title})` : ''}${command.response.image ? ' + image' : ''}`,
+    `💬 **Réponse :**`,
+    `> ${(command.response.content || '*vide — configure-la avec 💬*').slice(0, 300)}`,
+  ].join('\n'));
+
+  const roleSelect = new RoleSelectMenuBuilder()
+    .setCustomId(`setup:cc:roles:${command.id}`)
+    .setPlaceholder('🎭 Rôles autorisés à utiliser la commande (vide = tout le monde)…')
+    .setMinValues(0)
+    .setMaxValues(10);
+  if (command.allowedRoles.length) roleSelect.setDefaultRoles(command.allowedRoles.slice(0, 10));
+
+  const buttons = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId(`setup:cc:name:${command.id}`).setLabel('📝 Préfixe & nom').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId(`setup:cc:resp:${command.id}`).setLabel('💬 Réponse').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId(`setup:cc:del:${command.id}`).setLabel('🗑️ Supprimer').setStyle(ButtonStyle.Danger),
+    backButton('custom'),
+  );
+
+  const toggles = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId(`setup:cc:deltrig:${command.id}`)
+      .setLabel(command.deleteTrigger ? '🗑️ Suppression auto : ON' : '🗑️ Suppression auto : OFF')
+      .setStyle(command.deleteTrigger ? ButtonStyle.Success : ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId(`setup:cc:embed:${command.id}`)
+      .setLabel(command.response.embed ? '📦 Réponse : embed' : '📦 Réponse : texte')
+      .setStyle(ButtonStyle.Primary),
+  );
+
+  return {
+    embeds: [embed],
+    components: [new ActionRowBuilder().addComponents(roleSelect), toggles, buttons],
+  };
+}
+
 const PAGES = {
   home: hubView,
   general: generalView,
@@ -542,6 +625,7 @@ const PAGES = {
   automod: automodView,
   tickets: ticketsView,
   tksettings: ticketSettingsView,
+  custom: customView,
 };
 
 // ── Routeur des interactions du panneau (customId = "setup:...") ────────────
@@ -729,6 +813,44 @@ async function handleSetupComponent(interaction) {
         }
         updateSettings(guild.id, (s) => { s.automodConfig.muteDuration = formatDuration(duration).replaceAll(' ', ''); });
         return interaction.update(automodView(guild));
+      }
+
+      if (args[0] === 'ccname') {
+        const commandId = args[1];
+        const prefix = interaction.fields.getTextInputValue('prefix').trim();
+        const name = interaction.fields.getTextInputValue('name').trim().toLowerCase().replaceAll(/\s+/g, '');
+        if (!['+', '!', '.', '?', '-'].includes(prefix)) {
+          return interaction.reply({ content: '❌ Préfixe invalide : utilise `+`, `!`, `.`, `?` ou `-`.', flags: MessageFlags.Ephemeral });
+        }
+        if (name.length < 2) {
+          return interaction.reply({ content: '❌ Nom trop court (2 caractères minimum, sans espace).', flags: MessageFlags.Ephemeral });
+        }
+        const duplicate = getSettings(guild.id).customCommands.find((c) => c.id !== commandId && c.prefix === prefix && c.name === name);
+        if (duplicate) {
+          return interaction.reply({ content: `❌ La commande \`${prefix}${name}\` existe déjà.`, flags: MessageFlags.Ephemeral });
+        }
+        updateSettings(guild.id, (s) => {
+          const c = s.customCommands.find((cc) => cc.id === commandId);
+          if (c) { c.prefix = prefix; c.name = name; }
+        });
+        return interaction.update(customEditView(guild, commandId));
+      }
+
+      if (args[0] === 'ccresp') {
+        const commandId = args[1];
+        const image = interaction.fields.getTextInputValue('image').trim();
+        if (image && !/^https?:\/\/\S+$/.test(image)) {
+          return interaction.reply({ content: '❌ L\'URL de l\'image est invalide (elle doit commencer par http/https).', flags: MessageFlags.Ephemeral });
+        }
+        updateSettings(guild.id, (s) => {
+          const c = s.customCommands.find((cc) => cc.id === commandId);
+          if (c) {
+            c.response.title = interaction.fields.getTextInputValue('title').trim();
+            c.response.content = interaction.fields.getTextInputValue('content').trim();
+            c.response.image = image || null;
+          }
+        });
+        return interaction.update(customEditView(guild, commandId));
       }
 
       if (args[0] === 'tkmax') {
@@ -1048,6 +1170,91 @@ async function handleSetupComponent(interaction) {
       break;
     }
 
+    case 'cc': {
+      const sub = args[0];
+
+      if (sub === 'pick') {
+        let commandId = interaction.values[0];
+        if (commandId === '__new') {
+          commandId = `c${Date.now().toString(36)}`;
+          updateSettings(guild.id, (s) => {
+            s.customCommands.push({
+              id: commandId, prefix: '+', name: `commande${s.customCommands.length + 1}`,
+              allowedRoles: [], deleteTrigger: true,
+              response: { embed: true, title: '', content: '', image: null },
+            });
+          });
+        }
+        return interaction.update(customEditView(guild, commandId));
+      }
+
+      const commandId = args[1];
+      const findCommand = (s) => s.customCommands.find((c) => c.id === commandId);
+
+      if (sub === 'roles') {
+        updateSettings(guild.id, (s) => { const c = findCommand(s); if (c) c.allowedRoles = interaction.values; });
+        return interaction.update(customEditView(guild, commandId));
+      }
+
+      if (sub === 'deltrig') {
+        updateSettings(guild.id, (s) => { const c = findCommand(s); if (c) c.deleteTrigger = !c.deleteTrigger; });
+        return interaction.update(customEditView(guild, commandId));
+      }
+
+      if (sub === 'embed') {
+        updateSettings(guild.id, (s) => { const c = findCommand(s); if (c) c.response.embed = !c.response.embed; });
+        return interaction.update(customEditView(guild, commandId));
+      }
+
+      if (sub === 'del') {
+        updateSettings(guild.id, (s) => { s.customCommands = s.customCommands.filter((c) => c.id !== commandId); });
+        return interaction.update(customView(guild));
+      }
+
+      if (sub === 'name') {
+        const command = getSettings(guild.id).customCommands.find((c) => c.id === commandId);
+        if (!command) return interaction.update(customView(guild));
+        const modal = new ModalBuilder()
+          .setCustomId(`setup:modal:ccname:${commandId}`)
+          .setTitle('Préfixe et nom de la commande')
+          .addComponents(
+            new ActionRowBuilder().addComponents(
+              new TextInputBuilder().setCustomId('prefix').setLabel('Préfixe : + ! . ? ou -')
+                .setValue(command.prefix).setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(1),
+            ),
+            new ActionRowBuilder().addComponents(
+              new TextInputBuilder().setCustomId('name').setLabel('Nom (sans espace, ex: regles)')
+                .setValue(command.name).setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(30),
+            ),
+          );
+        return interaction.showModal(modal);
+      }
+
+      if (sub === 'resp') {
+        const command = getSettings(guild.id).customCommands.find((c) => c.id === commandId);
+        if (!command) return interaction.update(customView(guild));
+        const modal = new ModalBuilder()
+          .setCustomId(`setup:modal:ccresp:${commandId}`)
+          .setTitle('Réponse de la commande')
+          .addComponents(
+            new ActionRowBuilder().addComponents(
+              new TextInputBuilder().setCustomId('title').setLabel('Titre (embed seulement, optionnel)')
+                .setValue(command.response.title ?? '').setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(200),
+            ),
+            new ActionRowBuilder().addComponents(
+              new TextInputBuilder().setCustomId('content').setLabel('Message ({membre} {salon} {serveur}…)')
+                .setValue(command.response.content ?? '').setStyle(TextInputStyle.Paragraph).setRequired(true).setMaxLength(4000),
+            ),
+            new ActionRowBuilder().addComponents(
+              new TextInputBuilder().setCustomId('image').setLabel('URL image (embed seulement, optionnel)')
+                .setValue(command.response.image ?? '').setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(500),
+            ),
+          );
+        return interaction.showModal(modal);
+      }
+      break;
+    }
+
     case 'verif': {
       const sub = args[0];
 
@@ -1172,4 +1379,4 @@ async function handleSetupComponent(interaction) {
   }
 }
 
-module.exports = { hubView, handleSetupComponent, watchPanel };
+module.exports = { hubView, customView, handleSetupComponent, watchPanel };
