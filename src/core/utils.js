@@ -67,4 +67,10 @@ function checkHierarchy(interaction, targetMember, { needsBotAbove = true } = {}
   return null;
 }
 
-module.exports = { parseDuration, formatDuration, baseEmbed, successEmbed, errorEmbed, checkHierarchy };
+// Extrait un ID Discord d'une saisie libre : ID brut, mention <#id>/<@id>, ou lien
+function extractId(input) {
+  const match = String(input ?? '').match(/\d{15,20}/);
+  return match ? match[0] : null;
+}
+
+module.exports = { parseDuration, formatDuration, baseEmbed, successEmbed, errorEmbed, checkHierarchy, extractId };

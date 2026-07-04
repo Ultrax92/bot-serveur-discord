@@ -1,7 +1,7 @@
-const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, ChannelType, MessageFlags } = require('discord.js');
 const { canManageAdmins } = require('../../core/permissions');
 const { logModAction } = require('../../core/logs');
-const { errorEmbed, formatDuration } = require('../../core/utils');
+const { errorEmbed, formatDuration, extractId } = require('../../core/utils');
 
 const sleep = (ms) => new Promise((resolve) => { setTimeout(resolve, ms); });
 
@@ -45,7 +45,14 @@ module.exports = {
   purging,
   data: new SlashCommandBuilder()
     .setName('clean-channel')
-    .setDescription('[Owner] Supprime tous les messages du salon courant')
+    .setDescription('[Owner] Supprime tous les messages d\'un salon (défaut : salon courant)')
+    .addChannelOption((opt) =>
+      opt.setName('salon')
+        .setDescription('Le salon à purger (défaut : salon courant)')
+        .addChannelTypes(ChannelType.GuildText))
+    .addStringOption((opt) =>
+      opt.setName('salon_id')
+        .setDescription('Ou son ID / mention <#…> / lien collé'))
     .addIntegerOption((opt) =>
       opt.setName('limite')
         .setDescription('Nombre max de messages à parcourir (défaut 1000, max 10000)')
@@ -60,7 +67,19 @@ module.exports = {
       });
     }
 
-    const channel = interaction.channel;
+    // Salon cible : salon_id (ID/mention/lien) > salon (sélecteur) > salon courant
+    let channel;
+    const rawId = interaction.options.getString('salon_id');
+    if (rawId) {
+      const id = extractId(rawId);
+      channel = id && await interaction.guild.channels.fetch(id).catch(() => null);
+      if (!channel) {
+        return interaction.reply({ embeds: [errorEmbed(interaction, `Aucun salon trouvé sur ce serveur pour \`${rawId.slice(0, 100)}\`.`)], flags: MessageFlags.Ephemeral });
+      }
+    } else {
+      channel = interaction.options.getChannel('salon') ?? interaction.channel;
+    }
+
     if (!channel?.bulkDelete) {
       return interaction.reply({ embeds: [errorEmbed(interaction, 'Ce type de salon ne peut pas être purgé.')], flags: MessageFlags.Ephemeral });
     }
@@ -76,8 +95,8 @@ module.exports = {
       .setColor(0x9b59b6)
       .setTitle('🧹 Purge lancée en arrière-plan')
       .setDescription([
-        `Nettoyage de jusqu'à **${limit}** messages parcourus.`,
-        'Le résultat sera posté ici à la fin (les messages de plus de 14 jours se suppriment un par un, ça peut prendre plusieurs minutes selon le volume).',
+        `Nettoyage de ${channel} : jusqu'à **${limit}** messages parcourus.`,
+        'Le résultat sera posté dans le salon purgé à la fin (les messages de plus de 14 jours se suppriment un par un, ça peut prendre plusieurs minutes selon le volume).',
       ].join('\n'));
     await interaction.reply({ embeds: [embedStart], flags: MessageFlags.Ephemeral });
 
