@@ -168,8 +168,13 @@ async function handleCustomCommand(message) {
 
   const responseText = formatResponse(command.response.content || '…', message);
   // Discord n'envoie jamais de notification pour une mention DANS un embed :
-  // la mention configurée est donc envoyée au-dessus, dans le contenu du message
-  const mention = command.response.mention ? formatResponse(command.response.mention, message).slice(0, 300) : undefined;
+  // la mention configurée est donc envoyée au-dessus, dans le contenu du message.
+  // Toujours en spoiler ||…|| (plus propre visuellement, le ping passe quand même).
+  let mention;
+  if (command.response.mention) {
+    const raw = formatResponse(command.response.mention, message).slice(0, 300);
+    mention = raw.startsWith('||') && raw.endsWith('||') ? raw : `||${raw}||`;
+  }
   const allowedMentions = { parse: ['everyone', 'roles', 'users'] };
 
   if (command.response.embed) {
