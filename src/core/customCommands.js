@@ -167,6 +167,11 @@ async function handleCustomCommand(message) {
   if (command.deleteTrigger) await message.delete().catch(() => {});
 
   const responseText = formatResponse(command.response.content || '…', message);
+  // Discord n'envoie jamais de notification pour une mention DANS un embed :
+  // la mention configurée est donc envoyée au-dessus, dans le contenu du message
+  const mention = command.response.mention ? formatResponse(command.response.mention, message).slice(0, 300) : undefined;
+  const allowedMentions = { parse: ['everyone', 'roles', 'users'] };
+
   if (command.response.embed) {
     const embed = new EmbedBuilder().setColor(settings.color).setDescription(responseText.slice(0, 4096));
     if (command.response.title) embed.setTitle(formatResponse(command.response.title, message).slice(0, 256));
@@ -180,9 +185,9 @@ async function handleCustomCommand(message) {
     } else if (command.response.image) {
       embed.setImage(command.response.image);
     }
-    await message.channel.send({ embeds: [embed], files }).catch(() => {});
+    await message.channel.send({ content: mention, embeds: [embed], files, allowedMentions }).catch(() => {});
   } else {
-    await message.channel.send({ content: responseText.slice(0, 2000) }).catch(() => {});
+    await message.channel.send({ content: responseText.slice(0, 2000), allowedMentions }).catch(() => {});
   }
 
   const logEmbed = new EmbedBuilder()

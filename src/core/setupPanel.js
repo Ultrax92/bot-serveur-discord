@@ -595,6 +595,7 @@ function customEditView(guild, commandId) {
     '*(les admins du bot peuvent toujours l\'utiliser, teste avec un compte non-admin)*',
     `🗑️ **Suppression auto du message déclencheur** — ${command.deleteTrigger ? '🟢' : '🔴'}`,
     `📦 **Format de la réponse** — ${command.response.embed ? 'embed' : 'texte simple'}${command.response.title ? ` (titre : ${command.response.title})` : ''}`,
+    `📣 **Mention au-dessus de l'embed** — ${command.response.mention ? `\`${command.response.mention}\`` : '*aucune*'}`,
     `🖼️ **Image (embed)** — ${imageStatus}`,
     `💬 **Réponse :**`,
     `> ${(command.response.content || '*vide — configure-la avec 💬*').slice(0, 300)}`,
@@ -984,6 +985,7 @@ async function handleSetupComponent(interaction) {
           if (c) {
             c.response.title = interaction.fields.getTextInputValue('title').trim();
             c.response.content = interaction.fields.getTextInputValue('content').trim();
+            c.response.mention = interaction.fields.getTextInputValue('mention').trim();
           }
         });
         return interaction.update(customEditView(guild, commandId));
@@ -1406,6 +1408,10 @@ async function handleSetupComponent(interaction) {
             new ActionRowBuilder().addComponents(
               new TextInputBuilder().setCustomId('content').setLabel('Message ({membre} {salon} {serveur}…)')
                 .setValue(command.response.content ?? '').setStyle(TextInputStyle.Paragraph).setRequired(true).setMaxLength(4000),
+            ),
+            new ActionRowBuilder().addComponents(
+              new TextInputBuilder().setCustomId('mention').setLabel('Mention au-dessus (ex: @everyone) — ping réel')
+                .setValue(command.response.mention ?? '').setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(100),
             ),
           );
         return interaction.showModal(modal);
