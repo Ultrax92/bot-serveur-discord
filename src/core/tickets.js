@@ -9,7 +9,8 @@ const { isBotAdminMember } = require('./permissions');
 const { sendLog, userAuthor, idLine } = require('./logs');
 
 const countOpenStmt = db.prepare("SELECT COUNT(*) AS c FROM tickets WHERE guild_id = ? AND user_id = ? AND status = 'open'");
-const nextNumberStmt = db.prepare('SELECT COALESCE(MAX(number), 0) + 1 AS n FROM tickets WHERE guild_id = ?');
+// Numérotation de 1 à 9999, puis on repart à 1
+const nextNumberStmt = db.prepare('SELECT (COALESCE(MAX(number), 0) % 9999) + 1 AS n FROM tickets WHERE guild_id = ?');
 const insertStmt = db.prepare(`
   INSERT INTO tickets (guild_id, channel_id, user_id, number, type_id, created_at)
   VALUES (?, ?, ?, ?, ?, ?)
@@ -77,7 +78,7 @@ async function openTicket(interaction) {
   const accessRoles = (type.accessRoles ?? []).filter((id) => guild.roles.cache.has(id));
 
   const channel = await guild.channels.create({
-    name: String(number).padStart(4, '0'),
+    name: String(number),
     type: ChannelType.GuildText,
     parent: category?.id ?? null,
     permissionOverwrites: [
@@ -180,7 +181,7 @@ async function closeTicketChannel(channel, row, closedBy) {
   const type = tc.types.find((t) => t.id === row.type_id);
 
   const transcript = await buildTranscript(channel);
-  const makeFile = () => new AttachmentBuilder(Buffer.from(transcript, 'utf8'), { name: `transcript-ticket-${String(row.number).padStart(4, '0')}.txt` });
+  const makeFile = () => new AttachmentBuilder(Buffer.from(transcript, 'utf8'), { name: `transcript-ticket-${row.number}.txt` });
 
   const logEmbed = new EmbedBuilder()
     .setColor(0xed4245)
