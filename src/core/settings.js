@@ -76,7 +76,18 @@ const DEFAULT_SETTINGS = {
     sanction: 'mute',                                        // none | warn | mute (le message est toujours supprimé)
     muteDuration: '10m',
   },
-  antiraidConfig: {},
+  antiraidConfig: {
+    // mute = derank complet + mute 24h | ban24 = ban 24h (levé auto) | ban = définitif
+    // (un simple derank ne suffit pas : l'auteur pourrait repasser la vérification)
+    sanction: 'mute',
+    whitelist: [],        // IDs jamais touchés par l'antiraid (owner toujours exempté)
+    antibot: { enabled: false },                          // seul le OWNER peut ajouter des bots
+    antichannel: { enabled: false, max: 3, seconds: 30 }, // créations/suppressions de salons en rafale
+    antirole: { enabled: false, max: 3, seconds: 30 },    // créations/suppressions de rôles en rafale
+    antiwebhook: { enabled: false },                      // webhooks créés par un non-whitelisté
+    antiban: { enabled: false, max: 3, seconds: 60 },     // bans en rafale
+    massjoin: { enabled: false, mode: 'alert', max: 50, seconds: 100 }, // vague d'arrivées : alert | kick
+  },
   tempvocConfig: {
     generatorChannel: null,                 // salon vocal "➕ Crée ton salon"
     nameTemplate: '🔊 Salon de {pseudo}',   // nom des salons créés

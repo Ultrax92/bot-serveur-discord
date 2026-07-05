@@ -1,10 +1,13 @@
 const { EmbedBuilder } = require('discord.js');
 const { sendLog, userAuthor, idLine } = require('../core/logs');
 const { recordJoin } = require('../core/invites');
+const { onMemberAdd } = require('../core/antiraid');
 
 module.exports = {
   name: 'guildMemberAdd',
   async execute(member) {
+    await onMemberAdd(member).catch((error) => console.error('Erreur antiraid (memberAdd) :', error));
+
     const inviteInfo = await recordJoin(member).catch((error) => { console.error('Erreur invite tracker :', error); return null; });
 
     const accountAgeDays = Math.floor((Date.now() - member.user.createdTimestamp) / 86_400_000);

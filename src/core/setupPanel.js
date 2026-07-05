@@ -93,6 +93,7 @@ function hubView(guild) {
     `🔊 **Vocaux temporaires** — générateur ${settings.tempvocConfig.generatorChannel ? '🟢' : '🔴'}`,
     `📊 **Stats** — ${settings.statsConfig.counters.length} compteur(s)`,
     `📨 **Invite tracker** — ${settings.modules.invites ? '🟢 actif' : '🔴 inactif'}`,
+    `🛡️ **Antiraid** — ${['antibot', 'antichannel', 'antirole', 'antiwebhook', 'antiban', 'massjoin'].filter((k) => settings.antiraidConfig[k].enabled).length}/6 protections actives`,
     '',
     'Choisis une section dans le menu pour voir et modifier ses réglages.',
   ].join('\n'));
@@ -125,6 +126,8 @@ function hubView(guild) {
         .setDescription('Salon générateur et modèle de nom'),
       new StringSelectMenuOptionBuilder().setValue('stats').setLabel('Stats du serveur').setEmoji('📊')
         .setDescription('Compteurs membres et rôles en vocaux verrouillés'),
+      new StringSelectMenuOptionBuilder().setValue('antiraid').setLabel('Antiraid').setEmoji('🛡️')
+        .setDescription('Antibot, rafales de salons/rôles/bans, webhooks, whitelist'),
     );
 
   const buttons = new ActionRowBuilder().addComponents(
@@ -834,6 +837,72 @@ function statsView(guild) {
   return { embeds: [embed], components };
 }
 
+// ── Page antiraid ─────────────────────────────────────────────────────────────
+
+const AR_SANCTION_LABELS = { mute: 'derank complet + mute 24h', ban24: 'ban 24h', ban: 'ban définitif' };
+const AR_MASSJOIN_LABELS = { alert: 'alerte seule', kick: 'kick ⚠️' };
+
+function antiraidView(guild) {
+  const settings = getSettings(guild.id);
+  const ar = settings.antiraidConfig;
+  const dot = (enabled) => (enabled ? '🟢' : '🔴');
+  const whitelist = ar.whitelist.map((id) => `<@${id}>`).join(' ') || '*personne (owner toujours exempté)*';
+
+  const embed = panelEmbed(guild, '🛡️ Antiraid', [
+    `${settings.modules.antiraid ? '🟢 Module activé' : '🔴 Module désactivé — active une protection pour l\'activer'}`,
+    '',
+    `${dot(ar.antibot.enabled)} 🤖 **Antibot** — **seul le owner** peut ajouter des bots (bot kick + ajouteur puni)`,
+    `${dot(ar.antichannel.enabled)} 📁 **Antichannel** — ${ar.antichannel.max} créations/suppressions de salons en ${ar.antichannel.seconds}s`,
+    `${dot(ar.antirole.enabled)} 🎭 **Antirole** — ${ar.antirole.max} créations/suppressions de rôles en ${ar.antirole.seconds}s`,
+    `${dot(ar.antiwebhook.enabled)} 🪝 **Antiwebhook** — webhook créé par un non-whitelisté : supprimé + punition`,
+    `${dot(ar.antiban.enabled)} 🔨 **Antiban** — ${ar.antiban.max} bans en ${ar.antiban.seconds}s`,
+    `${dot(ar.massjoin.enabled)} 👥 **Vague d'arrivées** — ${ar.massjoin.max} arrivées en ${ar.massjoin.seconds}s → **${AR_MASSJOIN_LABELS[ar.massjoin.mode]}**`,
+    '',
+    `⚖️ **Punition :** ${AR_SANCTION_LABELS[ar.sanction] ?? AR_SANCTION_LABELS.mute} · 📜 tout part dans le salon logs-raid`,
+    '⚠️ *Vagues de boost : le seuil par défaut (50/100s) laisse passer largement tes arrivées groupées, et le mode **alerte** ne touche aucun membre.*',
+  ].join('\n'));
+
+  const toggle = (key, emoji, label) => new ButtonBuilder()
+    .setCustomId(`setup:ar:toggle:${key}`)
+    .setLabel(`${emoji} ${label} : ${ar[key].enabled ? 'ON' : 'OFF'}`)
+    .setStyle(ar[key].enabled ? ButtonStyle.Success : ButtonStyle.Secondary);
+
+  const whitelistSelect = new UserSelectMenuBuilder()
+    .setCustomId('setup:ar:whitelist')
+    .setPlaceholder('🤍 Whitelist : jamais touchés par l\'antiraid…')
+    .setMinValues(0)
+    .setMaxValues(25);
+  if (ar.whitelist.length) whitelistSelect.setDefaultUsers(ar.whitelist.slice(0, 25));
+
+  const embed2 = embed.addFields({ name: '🤍 Whitelist', value: whitelist.slice(0, 1024) });
+
+  return {
+    embeds: [embed2],
+    components: [
+      new ActionRowBuilder().addComponents(
+        toggle('antibot', '🤖', 'Antibot'),
+        toggle('antichannel', '📁', 'Antichannel'),
+        toggle('antirole', '🎭', 'Antirole'),
+      ),
+      new ActionRowBuilder().addComponents(
+        toggle('antiwebhook', '🪝', 'Antiwebhook'),
+        toggle('antiban', '🔨', 'Antiban'),
+        toggle('massjoin', '👥', 'Vague d\'arrivées'),
+      ),
+      new ActionRowBuilder().addComponents(whitelistSelect),
+      new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('setup:ar:sanction')
+          .setLabel(`⚖️ Punition : ${AR_SANCTION_LABELS[ar.sanction] ?? AR_SANCTION_LABELS.mute}`).setStyle(ButtonStyle.Primary),
+        new ButtonBuilder().setCustomId('setup:ar:joinmode')
+          .setLabel(`👥 Mode arrivées : ${AR_MASSJOIN_LABELS[ar.massjoin.mode]}`).setStyle(ButtonStyle.Primary),
+        new ButtonBuilder().setCustomId('setup:ar:limits').setLabel('⚙️ Seuils').setStyle(ButtonStyle.Primary),
+        new ButtonBuilder().setCustomId('setup:ar:wlid').setLabel('🆔 Whitelist par ID').setStyle(ButtonStyle.Primary),
+        backButton('home'),
+      ),
+    ],
+  };
+}
+
 const PAGES = {
   home: hubView,
   general: generalView,
@@ -849,6 +918,7 @@ const PAGES = {
   giveaways: giveawaysView,
   tempvoc: tempvocView,
   stats: statsView,
+  antiraid: antiraidView,
 };
 
 // ── Routeur des interactions du panneau (customId = "setup:...") ────────────
@@ -1156,6 +1226,39 @@ async function handleSetupComponent(interaction) {
         const { applyGeneratorPermissions } = require('./tempvoc');
         await applyGeneratorPermissions(guild);
         return interaction.update(tempvocView(guild));
+      }
+
+      if (args[0] === 'arwlid') {
+        const ids = [...new Set(String(interaction.fields.getTextInputValue('ids')).match(/\d{15,20}/g) ?? [])];
+        updateSettings(guild.id, (s) => { s.antiraidConfig.whitelist = ids; });
+        return interaction.update(antiraidView(guild));
+      }
+
+      if (args[0] === 'arlimits') {
+        const parse = (value) => {
+          const match = String(value).trim().match(/^(\d{1,3})\s*\/\s*(\d{1,4})$/);
+          if (!match) return null;
+          const max = parseInt(match[1], 10);
+          const seconds = parseInt(match[2], 10);
+          if (max < 2 || max > 100 || seconds < 5 || seconds > 3600) return null;
+          return { max, seconds };
+        };
+        const values = {
+          antichannel: parse(interaction.fields.getTextInputValue('antichannel')),
+          antirole: parse(interaction.fields.getTextInputValue('antirole')),
+          antiban: parse(interaction.fields.getTextInputValue('antiban')),
+          massjoin: parse(interaction.fields.getTextInputValue('massjoin')),
+        };
+        if (Object.values(values).some((v) => !v)) {
+          return interaction.reply({ content: '❌ Format invalide. Exemple : `3/30` (3 actions max en 30 secondes). Max 2-100, secondes 5-3600.', flags: MessageFlags.Ephemeral });
+        }
+        updateSettings(guild.id, (s) => {
+          for (const [key, value] of Object.entries(values)) {
+            s.antiraidConfig[key].max = value.max;
+            s.antiraidConfig[key].seconds = value.seconds;
+          }
+        });
+        return interaction.update(antiraidView(guild));
       }
 
       if (args[0] === 'verifroleid') {
@@ -1942,6 +2045,76 @@ async function handleSetupComponent(interaction) {
               .setValue(getSettings(guild.id).statsConfig.categoryName)
               .setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(100),
           ));
+        return interaction.showModal(modal);
+      }
+      break;
+    }
+
+    case 'ar': {
+      const sub = args[0];
+
+      if (sub === 'toggle') {
+        const key = args[1];
+        updateSettings(guild.id, (s) => {
+          s.antiraidConfig[key].enabled = !s.antiraidConfig[key].enabled;
+          if (s.antiraidConfig[key].enabled) s.modules.antiraid = true; // on active → le module s'active
+        });
+        return interaction.update(antiraidView(guild));
+      }
+
+      if (sub === 'sanction') {
+        const cycle = { mute: 'ban24', ban24: 'ban', ban: 'mute' };
+        updateSettings(guild.id, (s) => { s.antiraidConfig.sanction = cycle[s.antiraidConfig.sanction] ?? 'mute'; });
+        return interaction.update(antiraidView(guild));
+      }
+
+      if (sub === 'joinmode') {
+        updateSettings(guild.id, (s) => {
+          s.antiraidConfig.massjoin.mode = s.antiraidConfig.massjoin.mode === 'alert' ? 'kick' : 'alert';
+        });
+        return interaction.update(antiraidView(guild));
+      }
+
+      if (sub === 'whitelist') {
+        updateSettings(guild.id, (s) => { s.antiraidConfig.whitelist = interaction.values; });
+        return interaction.update(antiraidView(guild));
+      }
+
+      if (sub === 'wlid') {
+        const modal = new ModalBuilder()
+          .setCustomId('setup:modal:arwlid')
+          .setTitle('Whitelist antiraid (IDs)')
+          .addComponents(new ActionRowBuilder().addComponents(
+            new TextInputBuilder().setCustomId('ids').setLabel('IDs séparés par espaces (vide = personne)')
+              .setValue(getSettings(guild.id).antiraidConfig.whitelist.join(' '))
+              .setStyle(TextInputStyle.Paragraph).setRequired(false).setMaxLength(1000),
+          ));
+        return interaction.showModal(modal);
+      }
+
+      if (sub === 'limits') {
+        const ar = getSettings(guild.id).antiraidConfig;
+        const modal = new ModalBuilder()
+          .setCustomId('setup:modal:arlimits')
+          .setTitle('Seuils antiraid (max/secondes)')
+          .addComponents(
+            new ActionRowBuilder().addComponents(
+              new TextInputBuilder().setCustomId('antichannel').setLabel('Salons : max/secondes')
+                .setValue(`${ar.antichannel.max}/${ar.antichannel.seconds}`).setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(10),
+            ),
+            new ActionRowBuilder().addComponents(
+              new TextInputBuilder().setCustomId('antirole').setLabel('Rôles : max/secondes')
+                .setValue(`${ar.antirole.max}/${ar.antirole.seconds}`).setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(10),
+            ),
+            new ActionRowBuilder().addComponents(
+              new TextInputBuilder().setCustomId('antiban').setLabel('Bans : max/secondes')
+                .setValue(`${ar.antiban.max}/${ar.antiban.seconds}`).setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(10),
+            ),
+            new ActionRowBuilder().addComponents(
+              new TextInputBuilder().setCustomId('massjoin').setLabel('Arrivées : max/secondes')
+                .setValue(`${ar.massjoin.max}/${ar.massjoin.seconds}`).setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(10),
+            ),
+          );
         return interaction.showModal(modal);
       }
       break;
