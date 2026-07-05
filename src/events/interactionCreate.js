@@ -69,6 +69,19 @@ module.exports = {
       return;
     }
 
+    // Générateur d'embeds (panneau éphémère de /embed, admins uniquement)
+    if ((interaction.isButton() || interaction.isModalSubmit()) && interaction.customId.startsWith('eb:')) {
+      if (!interaction.inGuild() || !isBotAdmin(interaction)) return;
+      try {
+        const { handleEmbedComponent } = require('../core/embedBuilder');
+        await handleEmbedComponent(interaction);
+      } catch (error) {
+        console.error('Erreur sur le générateur d\'embeds :', error);
+        await interaction.reply({ content: 'Une erreur est survenue, réessaie.', flags: MessageFlags.Ephemeral }).catch(() => {});
+      }
+      return;
+    }
+
     // Vocaux temporaires : panneau de contrôle du salon (propriétaire vérifié côté handler)
     if ((interaction.isButton() || interaction.isModalSubmit()) && interaction.customId.startsWith('tv:')) {
       if (!interaction.inGuild()) return;

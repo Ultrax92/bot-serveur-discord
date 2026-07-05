@@ -46,8 +46,16 @@ async function handlePendingImage(message) {
   }
   if (message.channelId !== pending.channelId) return false;
 
-  // Applique la nouvelle image à la cible du flux (commande custom ou panneau tickets)
+  // Applique la nouvelle image à la cible du flux (commande custom, panneau
+  // tickets ou brouillon du générateur d'embeds)
   const applyImage = (imageRef) => {
+    if (pending.kind === 'embed') {
+      const { getSession } = require('./embedBuilder');
+      const session = getSession(message.guildId, message.author.id);
+      if (session.image?.startsWith('file:')) deleteStoredImage(session.image);
+      session.image = imageRef;
+      return;
+    }
     updateSettings(message.guildId, (s) => {
       if (pending.kind === 'ticket') {
         deleteStoredImage(s.ticketsConfig.panelImage);
@@ -63,8 +71,11 @@ async function handlePendingImage(message) {
   };
 
   // Republie le panneau tout en bas du salon (et supprime l'ancien) pour ne pas
-  // avoir à remonter la conversation pour continuer la configuration
+  // avoir à remonter la conversation pour continuer la configuration.
+  // Le panneau /embed est éphémère : impossible de le republier, l'utilisateur
+  // clique 🔄 Aperçu pour rafraîchir.
   const refreshPanel = async () => {
+    if (pending.kind === 'embed') return;
     const { customEditView, ticketsView, watchPanel } = require('./setupPanel');
     const view = pending.kind === 'ticket' ? ticketsView(message.guild) : customEditView(message.guild, pending.commandId);
     const newPanel = await message.channel.send(view).catch(() => null);
@@ -125,14 +136,18 @@ async function handlePendingImage(message) {
   const ext = (attachment.name?.split('.').pop() ?? 'png').toLowerCase().replace(/[^a-z0-9]/g, '') || 'png';
   const filename = pending.kind === 'ticket'
     ? `tkpanel-${message.guildId}-${Date.now()}.${ext}`
-    : `cc-${pending.commandId}-${Date.now()}.${ext}`;
+    : pending.kind === 'embed'
+      ? `eb-${message.guildId}-${message.author.id}-${Date.now()}.${ext}`
+      : `cc-${pending.commandId}-${Date.now()}.${ext}`;
   fs.mkdirSync(imagesDir, { recursive: true });
   fs.writeFileSync(path.join(imagesDir, filename), buffer);
 
   pendingImages.delete(key);
   applyImage(`file:${filename}`);
   await message.delete().catch(() => {});
-  await tempReply(message.channel, '✅ Image enregistrée pour la commande (stockée sur le serveur, elle n\'expirera pas).');
+  await tempReply(message.channel, pending.kind === 'embed'
+    ? '✅ Image enregistrée — clique **🔄 Aperçu** sur ton panneau /embed pour la voir.'
+    : '✅ Image enregistrée (stockée sur le serveur, elle n\'expirera pas).');
   await refreshPanel();
   return true;
 }

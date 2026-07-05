@@ -19,7 +19,8 @@ Bot Serveur Discord . Slash commands, modules activables par serveur, stockage S
 | 🔊 Vocaux temporaires | ✅ Fait | configuré via `/setup` → 🔊 : salon générateur (existant ou créé), rejoindre = salon perso + panneau de contrôle dans le chat du vocal (renommer, verrouiller, limite), supprimé quand vide — remplace ChannelManager |
 | 📨 Invite tracker | ✅ Fait | qui a invité qui dans logs-join, décompte mis à jour dans logs-leave au départ d'un invité, `/invites`, `/leaderboard`, détection comptes récents — remplace Invite Tracker |
 | 📊 Stats serveur | ✅ Fait | configuré via `/setup` → 📊 : compteurs Membres + par rôle en salons vocaux verrouillés (connexion et chat bloqués), actualisés toutes les 10 min — remplace ServerStats |
-| 🎭 Rolemenu/Embeds | ⬜ À faire | menus de rôles, générateur d'embed |
+| 🎨 Générateur d'embeds | ✅ Fait | `/embed [salon] [mp]` : panneau éphémère = aperçu en direct — titre/description/couleur, image (URL ou upload stocké), boutons-liens, import d'un embed existant par lien de message, envoi dans un salon ou en MP |
+| 🎭 Rolemenu | ⬜ En attente | menus de rôles self-service (utilité à confirmer vu la vérification) |
 | 💾 Backups | ⬜ À faire | backup/restore serveur et émojis |
 
 ## Système de permissions
