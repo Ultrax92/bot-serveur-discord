@@ -69,6 +69,19 @@ module.exports = {
       return;
     }
 
+    // Backups des settings (panneau éphémère de /backup, owner uniquement)
+    if ((interaction.isButton() || interaction.isStringSelectMenu()) && interaction.customId.startsWith('bk:')) {
+      if (!interaction.inGuild() || !canManageAdmins(interaction)) return;
+      try {
+        const { handleBackupComponent } = require('../core/backups');
+        await handleBackupComponent(interaction);
+      } catch (error) {
+        console.error('Erreur sur les backups :', error);
+        await interaction.reply({ content: 'Une erreur est survenue, réessaie.', flags: MessageFlags.Ephemeral }).catch(() => {});
+      }
+      return;
+    }
+
     // Générateur d'embeds (panneau éphémère de /embed, admins uniquement)
     if ((interaction.isButton() || interaction.isModalSubmit()) && interaction.customId.startsWith('eb:')) {
       if (!interaction.inGuild() || !isBotAdmin(interaction)) return;

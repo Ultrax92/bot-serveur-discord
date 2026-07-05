@@ -67,6 +67,15 @@ CREATE TABLE IF NOT EXISTS tempvoc_channels (
   owner_id TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS backups (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  guild_id TEXT NOT NULL,
+  kind TEXT NOT NULL DEFAULT 'manuel',   -- manuel | auto | pré-restauration
+  created_at INTEGER NOT NULL,
+  data TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_backups_guild ON backups (guild_id, created_at);
+
 CREATE TABLE IF NOT EXISTS invite_joins (
   guild_id TEXT NOT NULL,
   user_id TEXT NOT NULL,

@@ -7,6 +7,11 @@ module.exports = {
   async execute(message) {
     // Sauvegarde des images pour pouvoir les montrer dans les logs si suppression
     cacheMessageImages(message).catch(() => {});
+    // Fichier de backup en attente (flux du bouton 📤 Importer de /backup)
+    const { handlePendingBackupFile } = require('../core/backups');
+    const backupConsumed = await handlePendingBackupFile(message).catch((error) => { console.error('Erreur import backup :', error); return false; });
+    if (backupConsumed) return;
+
     // Upload d'image en attente pour une commande custom (flux du bouton 🖼️)
     const consumed = await handlePendingImage(message).catch((error) => { console.error('Erreur upload image :', error); return false; });
     if (consumed) return;
