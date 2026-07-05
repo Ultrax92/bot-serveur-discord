@@ -30,13 +30,13 @@ function idLine(userOrId) {
 }
 
 // Envoie un embed dans le salon de log du type donné (silencieux si non configuré)
-async function sendLog(guild, type, embed) {
+async function sendLog(guild, type, embed, files = []) {
   if (!isModuleEnabled(guild.id, 'logs')) return;
   const channelId = getSettings(guild.id).logsChannels[type];
   if (!channelId) return;
   const channel = guild.channels.cache.get(channelId);
   if (!channel) return;
-  await channel.send({ embeds: [embed] }).catch(() => {});
+  await channel.send({ embeds: [embed], files }).catch(() => {});
 }
 
 // Log d'une action de modération effectuée via le bot
