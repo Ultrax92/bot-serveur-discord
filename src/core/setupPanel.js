@@ -759,13 +759,13 @@ function statsView(guild) {
 
   const roleSelect = new RoleSelectMenuBuilder()
     .setCustomId('setup:st:addrole')
-    .setPlaceholder('🎭 Ajouter un compteur pour un rôle…')
+    .setPlaceholder('➕ CRÉER des compteurs : choisis un ou plusieurs rôles…')
     .setMinValues(1)
-    .setMaxValues(1);
+    .setMaxValues(10);
 
   const viewRolesSelect = new RoleSelectMenuBuilder()
     .setCustomId('setup:st:viewroles')
-    .setPlaceholder('👁️ Rôles pouvant voir les compteurs (vide = tout le monde)…')
+    .setPlaceholder('👁️ VISIBILITÉ : qui peut voir la catégorie (pas de création ici)…')
     .setMinValues(0)
     .setMaxValues(10);
   if (settings.statsConfig.accessRoles?.length) viewRolesSelect.setDefaultRoles(settings.statsConfig.accessRoles.slice(0, 10));
@@ -1591,9 +1591,15 @@ async function handleSetupComponent(interaction) {
 
       if (sub === 'addrole') {
         await interaction.deferUpdate();
-        const counter = await createCounter(guild, { type: 'role', roleId: interaction.values[0] });
-        if (!counter) {
-          return interaction.followUp({ content: '❌ Impossible de créer le salon compteur (vérifie mes permissions).', flags: MessageFlags.Ephemeral });
+        const existing = new Set(getSettings(guild.id).statsConfig.counters.map((c) => c.roleId).filter(Boolean));
+        let failed = 0;
+        for (const roleId of interaction.values) {
+          if (existing.has(roleId)) continue; // déjà un compteur pour ce rôle
+          const counter = await createCounter(guild, { type: 'role', roleId });
+          if (!counter) failed++;
+        }
+        if (failed) {
+          await interaction.followUp({ content: `❌ ${failed} compteur(s) n'ont pas pu être créés (vérifie mes permissions).`, flags: MessageFlags.Ephemeral });
         }
         return interaction.editReply(statsView(guild));
       }
