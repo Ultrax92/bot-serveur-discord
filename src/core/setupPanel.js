@@ -141,12 +141,16 @@ function hubView(guild) {
 
 function generalView(guild) {
   const settings = getSettings(guild.id);
+  const { getActivityText } = require('./botStatus');
+  const status = getActivityText();
   const embed = panelEmbed(guild, '⚙️ Général', [
     `🎨 **Couleur des embeds :** ${colorHex(settings)} (c'est la couleur de ce panneau)`,
+    `🎮 **Statut du bot :** ${status ? `\`${status}\`` : '*aucun*'} (affiché sous son nom)`,
   ].join('\n'));
 
   const buttons = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('setup:color').setLabel('🎨 Changer la couleur').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('setup:status').setLabel('🎮 Statut du bot').setStyle(ButtonStyle.Primary),
     backButton('home'),
   );
   return { embeds: [embed], components: [buttons] };
@@ -988,6 +992,19 @@ async function handleSetupComponent(interaction) {
       return interaction.showModal(modal);
     }
 
+    case 'status': {
+      const modal = new ModalBuilder()
+        .setCustomId('setup:modal:status')
+        .setTitle('Statut du bot')
+        .addComponents(new ActionRowBuilder().addComponents(
+          new TextInputBuilder().setCustomId('text').setLabel('Texte du statut (vide = aucun statut)')
+            .setValue(require('./botStatus').getActivityText() ?? '')
+            .setPlaceholder('🐍 MEDUSA SHOP')
+            .setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(100),
+        ));
+      return interaction.showModal(modal);
+    }
+
     case 'mod': {
       if (args[0] === 'dm') {
         updateSettings(guild.id, (s) => { s.moderationConfig.dmOnSanction = !s.moderationConfig.dmOnSanction; });
@@ -1020,6 +1037,12 @@ async function handleSetupComponent(interaction) {
         updateSettings(guild.id, (s) => { s.color = parseInt(hex, 16); });
         return interaction.update(generalView(guild));
       }
+      if (args[0] === 'status') {
+        const text = interaction.fields.getTextInputValue('text').trim();
+        require('./botStatus').setActivityText(interaction.client, text);
+        return interaction.update(generalView(guild));
+      }
+
       if (args[0] === 'muteduration') {
         const input = interaction.fields.getTextInputValue('duration').trim();
         const duration = parseDuration(input);
