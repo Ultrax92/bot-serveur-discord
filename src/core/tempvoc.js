@@ -51,6 +51,9 @@ const EVERYONE_DENY_ALL = [...new Set([
   P.SendMessagesInThreads, P.CreatePublicThreads, P.CreatePrivateThreads, P.ManageThreads,
 ].filter(Boolean))];
 
+// Rôles d'accès : le nécessaire en vert, TOUT le reste explicitement en rouge
+const MEMBER_DENY_COMPLETE = EVERYONE_DENY_ALL.filter((p) => !MEMBER_ALLOW.includes(p));
+
 const insertStmt = db.prepare('INSERT OR REPLACE INTO tempvoc_channels (channel_id, guild_id, owner_id) VALUES (?, ?, ?)');
 const byChannelStmt = db.prepare('SELECT * FROM tempvoc_channels WHERE channel_id = ?');
 const deleteStmt = db.prepare('DELETE FROM tempvoc_channels WHERE channel_id = ?');
@@ -121,11 +124,11 @@ async function handleVoiceState(oldState, newState) {
     if (accessRoles.length) {
       overwrites.push(
         { id: guild.roles.everyone.id, deny: EVERYONE_DENY_ALL },
-        ...accessRoles.map((id) => ({ id, allow: MEMBER_ALLOW, deny: MEMBER_DENY })),
+        ...accessRoles.map((id) => ({ id, allow: MEMBER_ALLOW, deny: MEMBER_DENY_COMPLETE })),
       );
     } else {
-      // Pas de restriction de visibilité : les droits basiques s'appliquent à tous
-      overwrites.push({ id: guild.roles.everyone.id, allow: MEMBER_ALLOW.filter((p) => p !== PermissionFlagsBits.ViewChannel && p !== PermissionFlagsBits.Connect), deny: MEMBER_DENY });
+      // Pas de restriction de visibilité : droits basiques pour tous, le reste en rouge
+      overwrites.push({ id: guild.roles.everyone.id, allow: MEMBER_ALLOW, deny: MEMBER_DENY_COMPLETE });
     }
 
     // Rôle "admin" des vocaux : droits étendus sur chaque salon créé
@@ -162,7 +165,9 @@ async function handleVoiceState(oldState, newState) {
   }
 }
 
-// Au démarrage : supprime les salons temporaires vides ou disparus
+// Au démarrage : supprime les salons temporaires vides ou disparus, et
+// réapplique le verrouillage du générateur (les mises à jour de permissions
+// prennent ainsi effet à chaque redémarrage, sans manipulation)
 async function cleanupTempvoc(client) {
   for (const row of allStmt.all()) {
     const guild = client.guilds.cache.get(row.guild_id);
@@ -174,6 +179,12 @@ async function cleanupTempvoc(client) {
     if (channel.members.filter((m) => !m.user.bot).size === 0) {
       await channel.delete('Salon vocal temporaire vide (nettoyage au démarrage)').catch(() => {});
       deleteStmt.run(row.channel_id);
+    }
+  }
+
+  for (const guild of client.guilds.cache.values()) {
+    if (isModuleEnabled(guild.id, 'tempvoc')) {
+      await applyGeneratorPermissions(guild).catch(() => {});
     }
   }
 }
