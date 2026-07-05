@@ -42,6 +42,11 @@ const MEMBER_DENY = [
   P.UseApplicationCommands, P.UseEmbeddedActivities, P.UseExternalApps,
 ].filter(Boolean);
 
+// @everyone : TOUT refusé explicitement quand des rôles d'accès sont configurés
+// (un deny partiel laisserait des permissions en héritage, exploitables par les
+// clients modifiés type Vencord qui affichent les salons cachés)
+const EVERYONE_DENY_ALL = [...new Set([...MEMBER_ALLOW, ...MEMBER_DENY])];
+
 const insertStmt = db.prepare('INSERT OR REPLACE INTO tempvoc_channels (channel_id, guild_id, owner_id) VALUES (?, ?, ?)');
 const byChannelStmt = db.prepare('SELECT * FROM tempvoc_channels WHERE channel_id = ?');
 const deleteStmt = db.prepare('DELETE FROM tempvoc_channels WHERE channel_id = ?');
@@ -73,8 +78,9 @@ async function applyGeneratorPermissions(guild) {
   if (!channel) return false;
 
   const accessRoles = (config.accessRoles ?? []).filter((id) => guild.roles.cache.has(id));
-  const everyoneDeny = [PermissionFlagsBits.SendMessages, PermissionFlagsBits.Speak, PermissionFlagsBits.Stream];
-  if (accessRoles.length) everyoneDeny.push(PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect);
+  const everyoneDeny = accessRoles.length
+    ? EVERYONE_DENY_ALL // tout refusé explicitement, les rôles d'accès ré-autorisent le minimum
+    : [PermissionFlagsBits.SendMessages, PermissionFlagsBits.Speak, PermissionFlagsBits.Stream];
 
   const ok = await channel.permissionOverwrites.set([
     { id: guild.roles.everyone.id, deny: everyoneDeny },
@@ -110,7 +116,7 @@ async function handleVoiceState(oldState, newState) {
     ];
     if (accessRoles.length) {
       overwrites.push(
-        { id: guild.roles.everyone.id, deny: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect] },
+        { id: guild.roles.everyone.id, deny: EVERYONE_DENY_ALL },
         ...accessRoles.map((id) => ({ id, allow: MEMBER_ALLOW, deny: MEMBER_DENY })),
       );
     } else {
