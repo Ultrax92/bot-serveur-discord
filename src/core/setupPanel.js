@@ -687,6 +687,7 @@ function tempvocView(guild) {
     `➕ **Salon générateur** — ${generator ? `${generator.name}` : '🔴 non configuré'}`,
     `📝 **Modèle de nom** — \`${tv.nameTemplate}\` (variable \`{pseudo}\`)`,
     `🎭 **Qui voit et rejoint le générateur** — ${accessRoles}`,
+    `🛡️ **Rôle admin des vocaux créés** — ${tv.adminRole ? `<@&${tv.adminRole}>` : '*aucun*'}`,
     '',
     'Le générateur est **verrouillé automatiquement** : chat, parole et stream bloqués pour tous (c\'est un salon de passage). Les salons créés héritent de la visibilité des rôles d\'accès.',
     '',
@@ -705,6 +706,13 @@ function tempvocView(guild) {
     .setMaxValues(10);
   if (tv.accessRoles?.length) roleSelect.setDefaultRoles(tv.accessRoles.slice(0, 10));
 
+  const adminSelect = new RoleSelectMenuBuilder()
+    .setCustomId('setup:tv:adminrole')
+    .setPlaceholder('🛡️ Rôle admin des vocaux créés (droits étendus, vide = aucun)…')
+    .setMinValues(0)
+    .setMaxValues(1);
+  if (tv.adminRole) adminSelect.setDefaultRoles([tv.adminRole]);
+
   const buttons = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('setup:tv:create').setLabel('➕ Créer le salon générateur').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId('setup:tv:byid').setLabel('🆔 Par ID ou lien').setStyle(ButtonStyle.Primary),
@@ -717,6 +725,7 @@ function tempvocView(guild) {
     components: [
       new ActionRowBuilder().addComponents(channelSelect),
       new ActionRowBuilder().addComponents(roleSelect),
+      new ActionRowBuilder().addComponents(adminSelect),
       buttons,
     ],
   };
@@ -1497,6 +1506,11 @@ async function handleSetupComponent(interaction) {
         updateSettings(guild.id, (s) => { s.tempvocConfig.accessRoles = interaction.values; });
         await applyGeneratorPermissions(guild);
         return interaction.editReply(tempvocView(guild));
+      }
+
+      if (sub === 'adminrole') {
+        updateSettings(guild.id, (s) => { s.tempvocConfig.adminRole = interaction.values[0] ?? null; });
+        return interaction.update(tempvocView(guild));
       }
 
       if (sub === 'create') {

@@ -7,6 +7,24 @@ const db = require('./db');
 const { getSettings, isModuleEnabled } = require('./settings');
 const { isBotAdmin } = require('./permissions');
 
+// Droits du rôle "admin" des vocaux temporaires (relevés de la config ChannelManager
+// de l'utilisateur) : quasi tout, SAUF gérer le salon/permissions/webhooks et les
+// commandes d'application. Les flags absents de la version de discord.js sont ignorés.
+const P = PermissionFlagsBits;
+const ADMIN_ALLOW = [
+  P.ViewChannel, P.CreateInstantInvite, P.Connect, P.Speak, P.Stream,
+  P.UseSoundboard, P.UseExternalSounds, P.UseVAD, P.PrioritySpeaker,
+  P.MuteMembers, P.DeafenMembers, P.MoveMembers,
+  P.SendMessages, P.EmbedLinks, P.AttachFiles, P.AddReactions,
+  P.UseExternalEmojis, P.UseExternalStickers, P.MentionEveryone,
+  P.ManageMessages, P.ReadMessageHistory, P.SendTTSMessages, P.SendVoiceMessages,
+  P.SendPolls, P.CreateEvents, P.ManageEvents, P.UseEmbeddedActivities,
+].filter(Boolean);
+const ADMIN_DENY = [
+  P.ManageChannels, P.ManageRoles, P.ManageWebhooks,
+  P.UseApplicationCommands, P.UseExternalApps,
+].filter(Boolean);
+
 const insertStmt = db.prepare('INSERT OR REPLACE INTO tempvoc_channels (channel_id, guild_id, owner_id) VALUES (?, ?, ?)');
 const byChannelStmt = db.prepare('SELECT * FROM tempvoc_channels WHERE channel_id = ?');
 const deleteStmt = db.prepare('DELETE FROM tempvoc_channels WHERE channel_id = ?');
@@ -81,6 +99,11 @@ async function handleVoiceState(oldState, newState) {
           allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect, PermissionFlagsBits.Speak],
         })),
       );
+    }
+
+    // Rôle "admin" des vocaux : droits étendus sur chaque salon créé
+    if (config.adminRole && guild.roles.cache.has(config.adminRole)) {
+      overwrites.push({ id: config.adminRole, allow: ADMIN_ALLOW, deny: ADMIN_DENY });
     }
 
     const channel = await guild.channels.create({

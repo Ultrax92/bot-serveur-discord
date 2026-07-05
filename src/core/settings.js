@@ -76,6 +76,7 @@ const DEFAULT_SETTINGS = {
     generatorChannel: null,                 // salon vocal "➕ Crée ton salon"
     nameTemplate: '🔊 Salon de {pseudo}',   // nom des salons créés
     accessRoles: [],                        // rôles voyant/rejoignant le générateur et les salons créés (vide = tous)
+    adminRole: null,                        // rôle "admin" des salons créés (ex: modérateurs), droits étendus
   },
   statsConfig: {
     counters: [],  // { id, type: 'members'|'role', roleId, channelId, label }
