@@ -268,7 +268,11 @@ function getTicketByChannel(channelId) {
   return byChannelStmt.get(channelId);
 }
 
+function setClaim(channelId, userId) {
+  claimStmt.run(userId, channelId);
+}
+
 module.exports = {
   buildTicketPanel, handleTicketComponent, closeTicketsForMember,
-  closeTicket, canManageTicket, isOpenTicketChannel, getTicketByChannel,
+  closeTicket, closeTicketChannel, canManageTicket, isOpenTicketChannel, getTicketByChannel, setClaim,
 };
