@@ -87,6 +87,7 @@ function builderView(guild, userId) {
   const row2 = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('eb:send').setLabel('📤 Envoyer').setStyle(ButtonStyle.Success)
       .setDisabled(!session.title && !session.description && !session.image),
+    new ButtonBuilder().setCustomId('eb:target').setLabel('🎯 Destination').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId('eb:refresh').setLabel('🔄 Aperçu').setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId('eb:reset').setLabel('🧹 Réinitialiser').setStyle(ButtonStyle.Danger),
   );
@@ -169,6 +170,30 @@ async function handleEmbedComponent(interaction) {
         new ActionRowBuilder().addComponents(
           new TextInputBuilder().setCustomId('url').setLabel('Lien (https://…)')
             .setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(500),
+        ),
+      );
+    return interaction.showModal(modal);
+  }
+
+  if (action === 'target') {
+    const modal = new ModalBuilder()
+      .setCustomId('eb:modal:target')
+      .setTitle('Destination (remplis UN seul champ)')
+      .addComponents(
+        new ActionRowBuilder().addComponents(
+          new TextInputBuilder().setCustomId('channel').setLabel('Salon : ID, mention <#…> ou lien')
+            .setValue(session.target.channelId ?? '')
+            .setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(100),
+        ),
+        new ActionRowBuilder().addComponents(
+          new TextInputBuilder().setCustomId('user').setLabel('MP à un membre : ID ou mention')
+            .setValue(session.target.userId ?? '')
+            .setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(100),
+        ),
+        new ActionRowBuilder().addComponents(
+          new TextInputBuilder().setCustomId('role').setLabel('MP à tout un rôle : ID ou mention')
+            .setValue(session.target.roleId ?? '')
+            .setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(100),
         ),
       );
     return interaction.showModal(modal);
@@ -295,6 +320,33 @@ async function handleEmbedComponent(interaction) {
         return interaction.reply({ content: '❌ Lien invalide (il doit commencer par http/https).', flags: MessageFlags.Ephemeral });
       }
       session.buttons.push({ label: interaction.fields.getTextInputValue('label').trim(), url });
+      return interaction.update(builderView(guild, interaction.user.id));
+    }
+
+    if (kind === 'target') {
+      const pick = (value) => {
+        const matches = String(value ?? '').match(/\d{15,20}/g);
+        return matches ? matches[matches.length - 1] : null;
+      };
+      const channelId = pick(interaction.fields.getTextInputValue('channel'));
+      const userId = pick(interaction.fields.getTextInputValue('user'));
+      const roleId = pick(interaction.fields.getTextInputValue('role'));
+
+      if (roleId && !guild.roles.cache.has(roleId)) {
+        return interaction.reply({ content: '❌ Rôle introuvable sur ce serveur.', flags: MessageFlags.Ephemeral });
+      }
+      if (userId && !await guild.members.fetch(userId).catch(() => null)) {
+        return interaction.reply({ content: '❌ Membre introuvable sur ce serveur.', flags: MessageFlags.Ephemeral });
+      }
+      if (channelId) {
+        const channel = await guild.channels.fetch(channelId).catch(() => null);
+        if (!channel || !channel.isTextBased() || channel.isVoiceBased() || channel.isThread()) {
+          return interaction.reply({ content: '❌ Salon textuel introuvable sur ce serveur.', flags: MessageFlags.Ephemeral });
+        }
+      }
+
+      // Priorité : rôle > membre > salon ; tout vide = salon courant
+      session.target = roleId ? { roleId } : userId ? { userId } : channelId ? { channelId } : {};
       return interaction.update(builderView(guild, interaction.user.id));
     }
 
