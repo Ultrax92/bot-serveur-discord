@@ -1,3 +1,5 @@
+const fs = require('node:fs');
+const path = require('node:path');
 const {
   EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle,
   StringSelectMenuBuilder, StringSelectMenuOptionBuilder,
@@ -5,6 +7,8 @@ const {
 } = require('discord.js');
 const db = require('./db');
 const { getSettings, saveSettings, updateSettings, isModuleEnabled } = require('./settings');
+
+const imagesDir = path.join(__dirname, '..', '..', 'data', 'images');
 
 const insertStmt = db.prepare('INSERT INTO backups (guild_id, kind, created_at, data) VALUES (?, ?, ?, ?)');
 const listStmt = db.prepare('SELECT id, kind, created_at, LENGTH(data) AS size FROM backups WHERE guild_id = ? ORDER BY created_at DESC LIMIT 10');
@@ -19,13 +23,45 @@ const pruneStmt = db.prepare(`
 // Fichiers d'import en attente : "guildId:userId" → { channelId, expires, staged }
 const pendingImports = new Map();
 
+// Les images stockées sur le VPS (commandes custom, panneau tickets) sont
+// incluses dans le backup en base64 pour une restauration complète
+function collectImageFiles(settings) {
+  const refs = [];
+  if (settings.ticketsConfig?.panelImage?.startsWith('file:')) refs.push(settings.ticketsConfig.panelImage.slice(5));
+  for (const command of settings.customCommands ?? []) {
+    if (command.response?.image?.startsWith('file:')) refs.push(command.response.image.slice(5));
+  }
+  const files = {};
+  for (const name of refs) {
+    const filePath = path.join(imagesDir, name);
+    if (fs.existsSync(filePath)) files[name] = fs.readFileSync(filePath).toString('base64');
+  }
+  return files;
+}
+
+function restoreImageFiles(files) {
+  if (!files || typeof files !== 'object') return 0;
+  fs.mkdirSync(imagesDir, { recursive: true });
+  let restored = 0;
+  for (const [name, base64] of Object.entries(files)) {
+    if (!/^[a-zA-Z0-9._-]+$/.test(name)) continue; // pas de chemins traversants
+    try {
+      fs.writeFileSync(path.join(imagesDir, name), Buffer.from(base64, 'base64'));
+      restored++;
+    } catch { /* image ignorée */ }
+  }
+  return restored;
+}
+
 function serialize(guildId) {
+  const settings = getSettings(guildId);
   return JSON.stringify({
     bot: 'bot-serveur-discord',
     version: 1,
     guildId,
     createdAt: Date.now(),
-    settings: getSettings(guildId),
+    settings,
+    files: collectImageFiles(settings),
   }, null, 2);
 }
 
@@ -58,7 +94,7 @@ function backupPanel(guild, userId) {
         : '*Aucun backup pour l\'instant.*',
       staged ? `\n📦 **Import prêt à appliquer** : backup du <t:${Math.floor(staged.createdAt / 1000)}:f>${staged.guildId !== guild.id ? ' ⚠️ *provenant d\'un autre serveur*' : ''} → clique ♻️` : '',
       '',
-      '⚠️ *Les images stockées sur le VPS (commandes custom, panneau tickets) ne sont pas incluses dans le fichier.*',
+      '✅ *Les images (commandes custom, panneau tickets) sont incluses dans le backup et restaurées à l\'import.*',
     ].filter(Boolean).join('\n'));
 
   const buttons = new ActionRowBuilder().addComponents(
@@ -139,10 +175,13 @@ async function handleBackupComponent(interaction) {
     await interaction.update(backupPanel(guild, interaction.user.id));
     const row = getStmt.get(id, guild.id);
     return interaction.followUp({
-      content: `✅ Backup \`#${id}\` créé ! Le veux-tu en local ? Le voici :`,
+      content: `✅ Backup \`#${id}\` créé et stocké sur le serveur ! Le veux-tu en local ? Le voici :`,
       files: [backupFile(guild.id, row.data, row.created_at)],
       flags: MessageFlags.Ephemeral,
-    });
+    }).catch(() => interaction.followUp({
+      content: `✅ Backup \`#${id}\` créé et stocké sur le serveur — mais **trop volumineux pour être envoyé sur Discord** (images lourdes). Allège tes images ou récupère \`data/bot.sqlite\` depuis le VPS.`,
+      flags: MessageFlags.Ephemeral,
+    }).catch(() => {}));
   }
 
   if (action === 'import') {
@@ -162,7 +201,10 @@ async function handleBackupComponent(interaction) {
       content: `📥 Backup \`#${row.id}\` — garde ce fichier en lieu sûr :`,
       files: [backupFile(guild.id, row.data, row.created_at)],
       flags: MessageFlags.Ephemeral,
-    });
+    }).catch(() => interaction.reply({
+      content: `❌ Backup \`#${row.id}\` **trop volumineux pour Discord** (images lourdes). Récupère \`data/bot.sqlite\` depuis le VPS, ou allège tes images et recrée un backup.`,
+      flags: MessageFlags.Ephemeral,
+    }).catch(() => {}));
   }
 
   if (action === 'restore') return interaction.update(confirmView(guild, arg, `le backup \`#${arg}\``));
@@ -174,21 +216,25 @@ async function handleBackupComponent(interaction) {
   }
 
   if (action === 'confirm') {
-    let settings;
+    let payload;
     if (arg === 'staged') {
-      settings = pendingImports.get(key)?.staged?.settings;
+      payload = pendingImports.get(key)?.staged;
       pendingImports.delete(key);
     } else {
       const row = getStmt.get(arg, guild.id);
-      settings = row && JSON.parse(row.data).settings;
+      payload = row && JSON.parse(row.data);
     }
-    if (!settings) {
+    if (!payload?.settings) {
       return interaction.update(backupPanel(guild, interaction.user.id));
     }
     createBackup(guild.id, 'pré-restauration');
-    saveSettings(guild.id, settings);
+    saveSettings(guild.id, payload.settings);
+    const restored = restoreImageFiles(payload.files);
     await interaction.update(backupPanel(guild, interaction.user.id));
-    return interaction.followUp({ content: '♻️ **Configuration restaurée !** Vérifie tes réglages dans `/setup` (un backup pré-restauration a été créé au cas où).', flags: MessageFlags.Ephemeral });
+    return interaction.followUp({
+      content: `♻️ **Configuration restaurée !**${restored ? ` ${restored} image(s) restaurée(s) sur le serveur.` : ''} Vérifie tes réglages dans \`/setup\` (un backup pré-restauration a été créé au cas où).`,
+      flags: MessageFlags.Ephemeral,
+    });
   }
 
   if (action === 'delete') {
@@ -217,9 +263,9 @@ async function handlePendingBackupFile(message) {
     if (sent) setTimeout(() => sent.delete().catch(() => {}), 8000);
   };
 
-  if (attachment.size > 1024 * 1024) {
+  if (attachment.size > 25 * 1024 * 1024) {
     await message.delete().catch(() => {});
-    await notice('❌ Fichier trop gros pour être un backup de settings.');
+    await notice('❌ Fichier trop gros pour être un backup valide.');
     return true;
   }
 
