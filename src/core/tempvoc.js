@@ -25,6 +25,23 @@ const ADMIN_DENY = [
   P.UseApplicationCommands, P.UseExternalApps,
 ].filter(Boolean);
 
+// Droits des rôles d'accès (ex: membres) sur les vocaux créés, relevés de la
+// config ChannelManager : voix et chat basiques, rien de plus.
+const MEMBER_ALLOW = [
+  P.ViewChannel, P.CreateInstantInvite, P.Connect, P.Speak, P.Stream,
+  P.UseVAD, P.PrioritySpeaker,
+  P.SendMessages, P.AddReactions, P.ReadMessageHistory,
+].filter(Boolean);
+const MEMBER_DENY = [
+  P.ManageChannels, P.ManageRoles, P.ManageWebhooks,
+  P.UseSoundboard, P.UseExternalSounds,
+  P.MuteMembers, P.DeafenMembers, P.MoveMembers,
+  P.EmbedLinks, P.AttachFiles, P.UseExternalEmojis, P.UseExternalStickers,
+  P.MentionEveryone, P.ManageMessages, P.SendTTSMessages, P.SendVoiceMessages,
+  P.SendPolls, P.CreateEvents, P.ManageEvents,
+  P.UseApplicationCommands, P.UseEmbeddedActivities, P.UseExternalApps,
+].filter(Boolean);
+
 const insertStmt = db.prepare('INSERT OR REPLACE INTO tempvoc_channels (channel_id, guild_id, owner_id) VALUES (?, ?, ?)');
 const byChannelStmt = db.prepare('SELECT * FROM tempvoc_channels WHERE channel_id = ?');
 const deleteStmt = db.prepare('DELETE FROM tempvoc_channels WHERE channel_id = ?');
@@ -94,11 +111,11 @@ async function handleVoiceState(oldState, newState) {
     if (accessRoles.length) {
       overwrites.push(
         { id: guild.roles.everyone.id, deny: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect] },
-        ...accessRoles.map((id) => ({
-          id,
-          allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect, PermissionFlagsBits.Speak],
-        })),
+        ...accessRoles.map((id) => ({ id, allow: MEMBER_ALLOW, deny: MEMBER_DENY })),
       );
+    } else {
+      // Pas de restriction de visibilité : les droits basiques s'appliquent à tous
+      overwrites.push({ id: guild.roles.everyone.id, allow: MEMBER_ALLOW.filter((p) => p !== PermissionFlagsBits.ViewChannel && p !== PermissionFlagsBits.Connect), deny: MEMBER_DENY });
     }
 
     // Rôle "admin" des vocaux : droits étendus sur chaque salon créé
