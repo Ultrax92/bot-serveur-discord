@@ -413,10 +413,15 @@ function ticketsView(guild) {
     ? tc.types.map((t) => `• ${t.emoji ? `${t.emoji} ` : ''}**${t.label}** → ${t.categoryId ? `<#${t.categoryId}>` : '🔴 pas de catégorie'}`).join('\n')
     : '*Aucun type — crée ton premier type dans le menu ci-dessous.*';
 
+  const imageStatus = !tc.panelImage ? '🔴 aucune'
+    : tc.panelImage.startsWith('file:') ? '🟢 image uploadée (stockée sur le serveur)'
+      : `🔗 ${tc.panelImage.slice(0, 60)}`;
   const embed = panelEmbed(guild, '🎫 Tickets', [
     `${settings.modules.tickets ? '🟢 Module activé' : '🔴 Module désactivé — active-le dans 🧩 Modules'}`,
     '',
     `📢 **Salon du panneau** — ${channel ? `${channel}` : '🔴 non configuré'}`,
+    `📝 **Titre de l'embed** — ${tc.panelTitle ? `**${tc.panelTitle}**` : '*aucun*'}`,
+    `🖼️ **Image du panneau** — ${imageStatus}`,
     `🎭 **Rôle requis pour ouvrir** — ${role ? `${role}` : 'aucun (tout le monde)'}`,
     `⚙️ **Réglages** — max ${tc.maxPerUser}/personne | fermeture au départ ${tc.closeOnLeave ? '🟢' : '🔴'} | transcript MP ${tc.transcriptDM ? '🟢' : '🔴'}`,
     '',
@@ -450,11 +455,16 @@ function ticketsView(guild) {
     ]);
 
   const buttons = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('setup:tk:panelmsg').setLabel('📝 Message du panneau').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('setup:tk:panelmsg').setLabel('📝 Titre & message').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('setup:tk:img').setLabel('🖼️ Image').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId('setup:tk:settings').setLabel('⚙️ Réglages').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId('setup:tk:publish').setLabel('📤 Publier le panneau').setStyle(ButtonStyle.Success)
       .setDisabled(!channel || tc.types.length === 0),
     backButton('home'),
+  );
+
+  const channelButtons = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('setup:tk:chanid').setLabel('🆔 Salon par ID ou lien').setStyle(ButtonStyle.Primary),
   );
 
   return {
@@ -463,6 +473,7 @@ function ticketsView(guild) {
       new ActionRowBuilder().addComponents(channelSelect),
       new ActionRowBuilder().addComponents(roleSelect),
       new ActionRowBuilder().addComponents(typeSelect),
+      channelButtons,
       buttons,
     ],
   };
@@ -1044,14 +1055,25 @@ async function handleSetupComponent(interaction) {
       }
 
       if (args[0] === 'tkpanel') {
-        const message = interaction.fields.getTextInputValue('message').trim();
-        const image = interaction.fields.getTextInputValue('image').trim();
-        if (image && !/^https?:\/\/\S+$/.test(image)) {
-          return interaction.reply({ content: '❌ L\'URL de l\'image est invalide (elle doit commencer par http/https).', flags: MessageFlags.Ephemeral });
+        updateSettings(guild.id, (s) => {
+          s.ticketsConfig.panelTitle = interaction.fields.getTextInputValue('title').trim();
+          s.ticketsConfig.panelMessage = interaction.fields.getTextInputValue('message').trim();
+        });
+        return interaction.update(ticketsView(guild));
+      }
+
+      if (args[0] === 'tkchanid') {
+        const id = extractId(interaction.fields.getTextInputValue('id'));
+        if (!id) {
+          return interaction.reply({ content: '❌ ID invalide. Colle un ID de salon, une mention `<#…>` ou un lien de salon.', flags: MessageFlags.Ephemeral });
+        }
+        const channel = await guild.channels.fetch(id).catch(() => null);
+        if (!channel || !channel.isTextBased() || channel.isThread() || channel.isVoiceBased()) {
+          return interaction.reply({ content: `❌ Aucun salon textuel trouvé sur ce serveur avec l'ID \`${id}\`.`, flags: MessageFlags.Ephemeral });
         }
         updateSettings(guild.id, (s) => {
-          s.ticketsConfig.panelMessage = message;
-          s.ticketsConfig.panelImage = image || null;
+          s.ticketsConfig.panelChannel = channel.id;
+          s.modules.tickets = true;
         });
         return interaction.update(ticketsView(guild));
       }
@@ -1295,20 +1317,40 @@ async function handleSetupComponent(interaction) {
         const tc = getSettings(guild.id).ticketsConfig;
         const modal = new ModalBuilder()
           .setCustomId('setup:modal:tkpanel')
-          .setTitle('Message du panneau de tickets')
+          .setTitle('Titre et message du panneau')
           .addComponents(
+            new ActionRowBuilder().addComponents(
+              new TextInputBuilder().setCustomId('title').setLabel('Titre de l\'embed (optionnel)')
+                .setValue(tc.panelTitle ?? '')
+                .setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(200),
+            ),
             new ActionRowBuilder().addComponents(
               new TextInputBuilder().setCustomId('message').setLabel('Message de l\'embed')
                 .setValue(tc.panelMessage.slice(0, 4000))
                 .setStyle(TextInputStyle.Paragraph).setRequired(true).setMaxLength(4000),
             ),
-            new ActionRowBuilder().addComponents(
-              new TextInputBuilder().setCustomId('image').setLabel('URL de l\'image (optionnel)')
-                .setValue(tc.panelImage ?? '')
-                .setPlaceholder('https://…/banniere.png')
-                .setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(500),
-            ),
           );
+        return interaction.showModal(modal);
+      }
+
+      if (sub === 'img') {
+        const { requestImageUpload } = require('./customCommands');
+        requestImageUpload(interaction, { kind: 'ticket' });
+        return interaction.reply({
+          content: '🖼️ **Envoie maintenant l\'image du panneau dans ce salon** (en pièce jointe — stockée sur le serveur, elle n\'expirera jamais).\nTu peux aussi coller une URL externe (imgur…), ou taper `supprimer` pour retirer l\'image actuelle. ⏱️ 2 minutes.',
+          flags: MessageFlags.Ephemeral,
+        });
+      }
+
+      if (sub === 'chanid') {
+        const modal = new ModalBuilder()
+          .setCustomId('setup:modal:tkchanid')
+          .setTitle('Salon du panneau de tickets')
+          .addComponents(new ActionRowBuilder().addComponents(
+            new TextInputBuilder().setCustomId('id').setLabel('ID, mention <#…> ou lien du salon')
+              .setPlaceholder('1234567890123456789')
+              .setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(100),
+          ));
         return interaction.showModal(modal);
       }
 
@@ -1487,7 +1529,7 @@ async function handleSetupComponent(interaction) {
 
       if (sub === 'img') {
         const { requestImageUpload } = require('./customCommands');
-        requestImageUpload(interaction, commandId);
+        requestImageUpload(interaction, { kind: 'cc', commandId });
         return interaction.reply({
           content: '🖼️ **Envoie maintenant l\'image dans ce salon** (en pièce jointe — je la stocke sur le serveur, elle n\'expirera jamais).\nTu peux aussi coller une URL externe (imgur…), ou taper `supprimer` pour retirer l\'image actuelle. ⏱️ 2 minutes.',
           flags: MessageFlags.Ephemeral,
@@ -1770,4 +1812,4 @@ async function handleSetupComponent(interaction) {
   }
 }
 
-module.exports = { hubView, customView, customEditView, handleSetupComponent, watchPanel };
+module.exports = { hubView, customView, customEditView, ticketsView, handleSetupComponent, watchPanel };

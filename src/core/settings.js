@@ -55,8 +55,9 @@ const DEFAULT_SETTINGS = {
   },
   ticketsConfig: {
     panelChannel: null,      // salon où le panneau (embed + sélecteur) est publié
+    panelTitle: '',          // titre de l'embed du panneau (optionnel)
     panelMessage: 'Utilise le menu ci-dessous pour ouvrir un ticket dans la catégorie que tu souhaites.',
-    panelImage: null,        // URL d'image affichée dans l'embed du panneau
+    panelImage: null,        // image du panneau : 'file:...' (uploadée) ou URL externe
     requiredRole: null,      // rôle requis pour ouvrir un ticket (ex: rôle vérifié)
     maxPerUser: 1,
     closeOnLeave: true,      // ferme les tickets d'un membre qui quitte le serveur

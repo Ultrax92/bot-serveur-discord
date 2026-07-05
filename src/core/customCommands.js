@@ -9,11 +9,13 @@ const { sendLog, userAuthor, idLine } = require('./logs');
 // liens de pièces jointes Discord expirent au bout de quelques jours
 const imagesDir = path.join(__dirname, '..', '..', 'data', 'images');
 
-const pendingImages = new Map(); // "guildId:userId" → { commandId, channelId, expires, panelMessage }
+const pendingImages = new Map(); // "guildId:userId" → { kind, commandId?, channelId, expires, panelMessage }
 
-function requestImageUpload(interaction, commandId) {
+// `target` : { kind: 'cc', commandId } pour une commande custom,
+//            { kind: 'ticket' } pour l'image du panneau de tickets
+function requestImageUpload(interaction, target) {
   pendingImages.set(`${interaction.guildId}:${interaction.user.id}`, {
-    commandId,
+    ...target,
     channelId: interaction.channelId,
     expires: Date.now() + 120_000,
     panelMessage: interaction.message,
@@ -44,11 +46,27 @@ async function handlePendingImage(message) {
   }
   if (message.channelId !== pending.channelId) return false;
 
+  // Applique la nouvelle image à la cible du flux (commande custom ou panneau tickets)
+  const applyImage = (imageRef) => {
+    updateSettings(message.guildId, (s) => {
+      if (pending.kind === 'ticket') {
+        deleteStoredImage(s.ticketsConfig.panelImage);
+        s.ticketsConfig.panelImage = imageRef;
+      } else {
+        const c = s.customCommands.find((cc) => cc.id === pending.commandId);
+        if (c) {
+          deleteStoredImage(c.response.image);
+          c.response.image = imageRef;
+        }
+      }
+    });
+  };
+
   // Republie le panneau tout en bas du salon (et supprime l'ancien) pour ne pas
   // avoir à remonter la conversation pour continuer la configuration
   const refreshPanel = async () => {
-    const { customEditView, watchPanel } = require('./setupPanel');
-    const view = customEditView(message.guild, pending.commandId);
+    const { customEditView, ticketsView, watchPanel } = require('./setupPanel');
+    const view = pending.kind === 'ticket' ? ticketsView(message.guild) : customEditView(message.guild, pending.commandId);
     const newPanel = await message.channel.send(view).catch(() => null);
     if (newPanel) {
       watchPanel(newPanel);
@@ -60,15 +78,9 @@ async function handlePendingImage(message) {
 
   if (message.content.trim().toLowerCase() === 'supprimer') {
     pendingImages.delete(key);
-    updateSettings(message.guildId, (s) => {
-      const c = s.customCommands.find((cc) => cc.id === pending.commandId);
-      if (c) {
-        deleteStoredImage(c.response.image);
-        c.response.image = null;
-      }
-    });
+    applyImage(null);
     await message.delete().catch(() => {});
-    await tempReply(message.channel, '✅ Image retirée de la commande.');
+    await tempReply(message.channel, '✅ Image retirée.');
     await refreshPanel();
     return true;
   }
@@ -82,15 +94,9 @@ async function handlePendingImage(message) {
       return true;
     }
     pendingImages.delete(key);
-    updateSettings(message.guildId, (s) => {
-      const c = s.customCommands.find((cc) => cc.id === pending.commandId);
-      if (c) {
-        deleteStoredImage(c.response.image);
-        c.response.image = trimmed;
-      }
-    });
+    applyImage(trimmed);
     await message.delete().catch(() => {});
-    await tempReply(message.channel, '✅ URL d\'image enregistrée pour la commande.');
+    await tempReply(message.channel, '✅ URL d\'image enregistrée.');
     await refreshPanel();
     return true;
   }
@@ -117,18 +123,14 @@ async function handlePendingImage(message) {
   }
   const buffer = Buffer.from(await response.arrayBuffer());
   const ext = (attachment.name?.split('.').pop() ?? 'png').toLowerCase().replace(/[^a-z0-9]/g, '') || 'png';
-  const filename = `cc-${pending.commandId}-${Date.now()}.${ext}`;
+  const filename = pending.kind === 'ticket'
+    ? `tkpanel-${message.guildId}-${Date.now()}.${ext}`
+    : `cc-${pending.commandId}-${Date.now()}.${ext}`;
   fs.mkdirSync(imagesDir, { recursive: true });
   fs.writeFileSync(path.join(imagesDir, filename), buffer);
 
   pendingImages.delete(key);
-  updateSettings(message.guildId, (s) => {
-    const c = s.customCommands.find((cc) => cc.id === pending.commandId);
-    if (c) {
-      deleteStoredImage(c.response.image);
-      c.response.image = `file:${filename}`;
-    }
-  });
+  applyImage(`file:${filename}`);
   await message.delete().catch(() => {});
   await tempReply(message.channel, '✅ Image enregistrée pour la commande (stockée sur le serveur, elle n\'expirera pas).');
   await refreshPanel();

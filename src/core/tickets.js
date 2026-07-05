@@ -1,9 +1,13 @@
+const fs = require('node:fs');
+const path = require('node:path');
 const {
   EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle,
   StringSelectMenuBuilder, StringSelectMenuOptionBuilder,
   ChannelType, PermissionFlagsBits, MessageFlags, AttachmentBuilder,
 } = require('discord.js');
 const db = require('./db');
+
+const imagesDir = path.join(__dirname, '..', '..', 'data', 'images');
 const { getSettings, isModuleEnabled } = require('./settings');
 const { isBotAdminMember } = require('./permissions');
 const { sendLog, userAuthor, idLine } = require('./logs');
@@ -28,8 +32,19 @@ function buildTicketPanel(guild, publisher = null) {
   const embed = new EmbedBuilder()
     .setColor(settings.color)
     .setDescription(tc.panelMessage.slice(0, 4096));
-  if (tc.panelImage) embed.setImage(tc.panelImage);
+  if (tc.panelTitle) embed.setTitle(tc.panelTitle.slice(0, 256));
   if (publisher) embed.setFooter({ text: publisher.username, iconURL: publisher.displayAvatarURL() });
+
+  const files = [];
+  if (tc.panelImage?.startsWith('file:')) {
+    const filePath = path.join(imagesDir, tc.panelImage.slice(5));
+    if (fs.existsSync(filePath)) {
+      files.push(new AttachmentBuilder(filePath));
+      embed.setImage(`attachment://${path.basename(filePath)}`);
+    }
+  } else if (tc.panelImage) {
+    embed.setImage(tc.panelImage);
+  }
 
   const select = new StringSelectMenuBuilder()
     .setCustomId('ticket:open')
@@ -42,7 +57,7 @@ function buildTicketPanel(guild, publisher = null) {
       return option;
     }));
 
-  return { embeds: [embed], components: [new ActionRowBuilder().addComponents(select)] };
+  return { embeds: [embed], components: [new ActionRowBuilder().addComponents(select)], files };
 }
 
 // Le membre peut-il gérer ce ticket (claim/close des autres) ?
