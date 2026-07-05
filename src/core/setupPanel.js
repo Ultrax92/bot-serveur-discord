@@ -744,15 +744,17 @@ function statsView(guild) {
     : '*Aucun compteur.*';
 
   const category = settings.statsConfig.categoryId && guild.channels.cache.get(settings.statsConfig.categoryId);
+  const viewRoles = (settings.statsConfig.accessRoles ?? []).map((id) => `<@&${id}>`).join(' ') || '*tout le monde*';
   const embed = panelEmbed(guild, '📊 Stats du serveur', [
     `${settings.modules.stats ? '🟢 Module activé' : '🔴 Module désactivé — ajoute un compteur pour l\'activer'}`,
     '',
     `📁 **Catégorie** — ${category ? `**${category.name}**` : `\`${settings.statsConfig.categoryName}\` (créée avec le premier compteur)`}`,
+    `👁️ **Qui voit les compteurs** — ${viewRoles}`,
     `**Compteurs (${counters.length}) :**`,
     list,
     '',
-    'Les compteurs sont créés dans la catégorie, en vocaux **totalement verrouillés** (tout refusé à everyone sauf voir), actualisés toutes les **10 minutes** (limite Discord sur les renommages).',
-    'Les compteurs par rôle utilisent le **nom du rôle tel quel**, sans emoji ajouté.',
+    'Avec des rôles configurés : everyone est **totalement refusé** (voir compris) et les rôles n\'ont que "Voir le salon". Les salons sont **synchronisés avec la catégorie**.',
+    'Mise à jour **automatique tous les jours à 4h** (+ au démarrage du bot). Compteurs par rôle : **nom du rôle tel quel**, sans emoji ajouté.',
   ].join('\n'));
 
   const roleSelect = new RoleSelectMenuBuilder()
@@ -761,8 +763,16 @@ function statsView(guild) {
     .setMinValues(1)
     .setMaxValues(1);
 
+  const viewRolesSelect = new RoleSelectMenuBuilder()
+    .setCustomId('setup:st:viewroles')
+    .setPlaceholder('👁️ Rôles pouvant voir les compteurs (vide = tout le monde)…')
+    .setMinValues(0)
+    .setMaxValues(10);
+  if (settings.statsConfig.accessRoles?.length) viewRolesSelect.setDefaultRoles(settings.statsConfig.accessRoles.slice(0, 10));
+
   const components = [
     new ActionRowBuilder().addComponents(roleSelect),
+    new ActionRowBuilder().addComponents(viewRolesSelect),
   ];
 
   if (counters.length) {
@@ -1597,6 +1607,14 @@ async function handleSetupComponent(interaction) {
       if (sub === 'refresh') {
         await interaction.deferUpdate();
         await updateCounters(guild).catch(() => {});
+        return interaction.editReply(statsView(guild));
+      }
+
+      if (sub === 'viewroles') {
+        await interaction.deferUpdate();
+        updateSettings(guild.id, (s) => { s.statsConfig.accessRoles = interaction.values; });
+        const { applyStatsPermissions } = require('./stats');
+        await applyStatsPermissions(guild);
         return interaction.editReply(statsView(guild));
       }
 

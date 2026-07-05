@@ -15,6 +15,33 @@ const STATS_DENY = [
   P.CreateEvents, P.ManageEvents,
 ].filter(Boolean);
 
+// Overwrites de la catégorie : sans rôles d'accès, visible par tous (mais
+// inutilisable) ; avec rôles d'accès, everyone est TOTALEMENT refusé (voir
+// compris) et les rôles n'ont que "Voir le salon"
+function buildStatsOverwrites(guild) {
+  const config = getSettings(guild.id).statsConfig;
+  const accessRoles = (config.accessRoles ?? []).filter((id) => guild.roles.cache.has(id));
+  if (!accessRoles.length) {
+    return [{ id: guild.roles.everyone.id, deny: STATS_DENY }];
+  }
+  return [
+    { id: guild.roles.everyone.id, deny: [P.ViewChannel, ...STATS_DENY] },
+    ...accessRoles.map((id) => ({ id, allow: [P.ViewChannel], deny: STATS_DENY })),
+  ];
+}
+
+// Réapplique les permissions sur la catégorie et resynchronise tous les compteurs
+async function applyStatsPermissions(guild) {
+  const config = getSettings(guild.id).statsConfig;
+  const category = config.categoryId && guild.channels.cache.get(config.categoryId);
+  if (!category) return;
+  await category.permissionOverwrites.set(buildStatsOverwrites(guild), 'Configuration des stats').catch(() => {});
+  for (const counter of config.counters) {
+    const channel = guild.channels.cache.get(counter.channelId);
+    if (channel?.parentId === category.id) await channel.lockPermissions().catch(() => {});
+  }
+}
+
 function countFor(guild, counter) {
   if (counter.type === 'members') return guild.memberCount;
   if (counter.type === 'role') {
@@ -32,7 +59,7 @@ async function ensureStatsCategory(guild) {
       name: config.categoryName.slice(0, 100),
       type: ChannelType.GuildCategory,
       position: 0,
-      permissionOverwrites: [{ id: guild.roles.everyone.id, deny: STATS_DENY }],
+      permissionOverwrites: buildStatsOverwrites(guild),
     }).catch(() => null);
     if (category) updateSettings(guild.id, (s) => { s.statsConfig.categoryId = category.id; });
   }
@@ -63,9 +90,12 @@ async function createCounter(guild, { type, roleId = null }) {
     name: label.replace('{n}', count).slice(0, 100),
     type: ChannelType.GuildVoice,
     parent: category?.id ?? null,
-    permissionOverwrites: [{ id: guild.roles.everyone.id, deny: STATS_DENY }],
   }).catch(() => null);
   if (!channel) return null;
+
+  // Salon synchronisé avec la catégorie (héritage des permissions)
+  if (category) await channel.lockPermissions().catch(() => {});
+  else await channel.permissionOverwrites.set(buildStatsOverwrites(guild)).catch(() => {});
 
   counter.channelId = channel.id;
   updateSettings(guild.id, (s) => {
@@ -98,7 +128,7 @@ async function updateCounters(guild) {
   }
 }
 
-// Discord limite les renommages de salons à 2 par 10 min : on actualise toutes les 10 min
+// Mise à jour automatique : une fois au démarrage du bot, puis tous les jours à 4h
 function startStatsWorker(client) {
   const tick = async () => {
     for (const guild of client.guilds.cache.values()) {
@@ -106,8 +136,20 @@ function startStatsWorker(client) {
       await updateCounters(guild).catch((error) => console.error('Erreur stats :', error));
     }
   };
-  setTimeout(tick, 30_000);          // première mise à jour peu après le démarrage
-  setInterval(tick, 10 * 60_000);
+
+  setTimeout(tick, 30_000); // fraîcheur après un redémarrage/une config
+
+  const scheduleNext4h = () => {
+    const now = new Date();
+    const next = new Date(now);
+    next.setHours(4, 0, 0, 0);
+    if (next <= now) next.setDate(next.getDate() + 1);
+    setTimeout(async () => {
+      await tick();
+      scheduleNext4h();
+    }, next.getTime() - now.getTime());
+  };
+  scheduleNext4h();
 }
 
-module.exports = { createCounter, removeCounter, updateCounters, renameStatsCategory, startStatsWorker };
+module.exports = { createCounter, removeCounter, updateCounters, renameStatsCategory, applyStatsPermissions, startStatsWorker };

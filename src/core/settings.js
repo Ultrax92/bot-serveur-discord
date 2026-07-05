@@ -81,7 +81,8 @@ const DEFAULT_SETTINGS = {
   statsConfig: {
     categoryName: '「 📊 𝐒𝐄𝐑𝐕𝐄𝐑 𝐒𝐓𝐀𝐓𝐒 📊 」',
     categoryId: null,
-    counters: [],  // { id, type: 'members'|'role', roleId, channelId, label }
+    accessRoles: [],  // rôles voyant les compteurs (vide = visibles par tous) ; everyone est sinon totalement refusé
+    counters: [],     // { id, type: 'members'|'role', roleId, channelId, label }
   },
   color: 0x5865f2,    // couleur des embeds (modifiable via /config)
 };
