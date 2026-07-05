@@ -76,9 +76,9 @@ async function renameStatsCategory(guild, name) {
 
 // Crée le salon vocal compteur dans la catégorie de stats
 async function createCounter(guild, { type, roleId = null }) {
-  // Nom du rôle tel quel sur le serveur, sans emoji ajouté
+  // Aucun emoji ajouté : nom du rôle tel quel, ou simplement "Membres"
   const label = type === 'members'
-    ? '👥 Membres : {n}'
+    ? 'Membres : {n}'
     : `${guild.roles.cache.get(roleId)?.name ?? 'Rôle'} : {n}`;
 
   await guild.members.fetch().catch(() => {});
