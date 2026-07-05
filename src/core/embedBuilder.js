@@ -68,11 +68,13 @@ function builderView(guild, userId) {
     embed.setDescription('*Embed vide — commence par **📝 Contenu**. Cet aperçu se met à jour à chaque modification.*');
   }
 
-  const target = session.target.userId
-    ? `📬 en MP à <@${session.target.userId}>`
-    : session.target.channelId
-      ? `dans <#${session.target.channelId}>`
-      : 'ici (salon courant)';
+  const target = session.target.roleId
+    ? `📬 en MP à **tous les membres** de <@&${session.target.roleId}> (confirmation avant envoi)`
+    : session.target.userId
+      ? `📬 en MP à <@${session.target.userId}>`
+      : session.target.channelId
+        ? `dans <#${session.target.channelId}>`
+        : 'ici (salon courant)';
 
   const row1 = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('eb:content').setLabel('📝 Contenu').setStyle(ButtonStyle.Primary),
@@ -187,6 +189,28 @@ async function handleEmbedComponent(interaction) {
   if (action === 'send') {
     const { embed, files, components } = buildFinalEmbed(guild, session, interaction.user);
 
+    // Envoi de masse à un rôle : confirmation obligatoire avec le nombre exact
+    if (session.target.roleId) {
+      await guild.members.fetch().catch(() => {});
+      const recipients = guild.members.cache.filter((m) => !m.user.bot && m.roles.cache.has(session.target.roleId));
+      if (!recipients.size) {
+        return interaction.reply({ content: '❌ Aucun membre (non-bot) n\'a ce rôle.', flags: MessageFlags.Ephemeral });
+      }
+      const confirm = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('eb:confirmsend').setLabel(`✅ Confirmer l'envoi à ${recipients.size} membre(s)`).setStyle(ButtonStyle.Danger),
+        new ButtonBuilder().setCustomId('eb:refresh').setLabel('❌ Annuler').setStyle(ButtonStyle.Secondary),
+      );
+      return interaction.update({
+        content: [
+          `⚠️ **Tu vas envoyer cet embed en MP à ${recipients.size} membre(s)** du rôle <@&${session.target.roleId}>.`,
+          `Envoi espacé (~1,2s/MP, soit ~${Math.ceil(recipients.size * 1.2 / 60)} min). Les MP de masse peuvent être limités par Discord : réserve ça aux petits rôles ou aux occasions importantes.`,
+        ].join('\n'),
+        embeds: [embed],
+        files,
+        components: [confirm],
+      });
+    }
+
     if (session.target.userId) {
       const user = await guild.client.users.fetch(session.target.userId).catch(() => null);
       const sent = user && await user.send({ embeds: [embed], files, components }).then(() => true).catch(() => false);
@@ -206,6 +230,36 @@ async function handleEmbedComponent(interaction) {
       content: sent ? `✅ Embed publié dans ${channel}.` : '❌ Impossible de publier (salon introuvable ou permissions).',
       embeds: [], components: [], files: [],
     });
+  }
+
+  if (action === 'confirmsend') {
+    const roleId = session.target.roleId;
+    if (!roleId) return interaction.update(builderView(guild, interaction.user.id));
+    const { embed, files, components } = buildFinalEmbed(guild, session, interaction.user);
+    await guild.members.fetch().catch(() => {});
+    const recipients = [...guild.members.cache.filter((m) => !m.user.bot && m.roles.cache.has(roleId)).values()];
+    resetSession(guild.id, interaction.user.id);
+
+    await interaction.update({
+      content: `🚀 Envoi en cours à **${recipients.length}** membre(s)… je te fais un rapport à la fin (ici si possible, sinon en MP).`,
+      embeds: [], components: [], files: [],
+    });
+
+    // Envoi en arrière-plan, espacé pour respecter les limites Discord
+    (async () => {
+      let sent = 0;
+      let failed = 0;
+      for (const member of recipients) {
+        const ok = await member.send({ embeds: [embed], files, components }).then(() => true).catch(() => false);
+        if (ok) sent++;
+        else failed++;
+        await new Promise((resolve) => { setTimeout(resolve, 1200); });
+      }
+      const report = `📬 **Envoi terminé** : ${sent} MP envoyé(s), ${failed} échec(s) (MP fermés).`;
+      const updated = await interaction.editReply({ content: report }).then(() => true).catch(() => false);
+      if (!updated) await interaction.user.send(report).catch(() => {});
+    })().catch((error) => console.error('Erreur envoi MP de masse :', error));
+    return;
   }
 
   // ── Formulaires ──
