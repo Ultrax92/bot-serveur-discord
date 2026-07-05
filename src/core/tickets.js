@@ -124,7 +124,7 @@ async function openTicket(interaction) {
     .setColor(getSettings(guild.id).color)
     .setAuthor(userAuthor(interaction.user))
     .setDescription([
-      `🎫 **Ticket ${type.emoji ? `${type.emoji} ` : ''}${type.label}** — n°${number}`,
+      `🎫 **Ticket ${type.emoji ? `${type.emoji} ` : ''}${type.label}**`,
       '',
       type.openMessage || 'Merci de nous avoir contactés, précise ce que tu souhaites.',
     ].join('\n'))

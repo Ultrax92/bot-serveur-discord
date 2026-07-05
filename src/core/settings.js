@@ -1,39 +1,38 @@
 const db = require('./db');
 
 // Modules activables par serveur. `core` est toujours actif (config, help).
+// Ordre logique de mise en place : logs → accueil/sécurité → systèmes → outils
 const MODULES = {
+  logs: { label: 'Logs', emoji: '📜', description: 'logs de modération, messages, vocal, rôles, boosts' },
+  verification: { label: 'Vérification', emoji: '✅', description: 'bouton de vérification à l\'arrivée qui donne un rôle' },
   moderation: { label: 'Modération', emoji: '🔨', description: 'warn, mute, kick, ban, clear, sanctions…' },
   automod: { label: 'Auto-modération', emoji: '🤖', description: 'antispam, antilink, mots interdits, antimassmention' },
-  logs: { label: 'Logs', emoji: '📜', description: 'logs de modération, messages, vocal, rôles, boosts' },
-  antiraid: { label: 'Antiraid', emoji: '🛡️', description: 'antibot, antitoken, antichannel, antiwebhook, whitelist' },
+  antiraid: { label: 'Antiraid', emoji: '🛡️', description: 'antibot, rafales de salons/rôles/bans, whitelist' },
   tickets: { label: 'Tickets', emoji: '🎫', description: 'système de tickets avec panneau, claim et transcript' },
-  giveaways: { label: 'Giveaways', emoji: '🎉', description: 'giveaways avec bouton, reroll, tirage au sort' },
   tempvoc: { label: 'Vocaux temporaires', emoji: '🔊', description: 'salons vocaux créés à la demande' },
-  rolemenu: { label: 'Rolemenu / Embeds', emoji: '🎭', description: 'menus de rôles interactifs et générateur d\'embeds' },
-  verification: { label: 'Vérification', emoji: '✅', description: 'bouton de vérification à l\'arrivée qui donne un rôle' },
-  custom: { label: 'Commandes custom', emoji: '🧩', description: 'commandes à préfixe (+regles, !boutique…) créées via /custom' },
-  invites: { label: 'Invite tracker', emoji: '📨', description: 'qui a invité qui, compteurs d\'invitations, /invites et /leaderboard' },
   stats: { label: 'Stats du serveur', emoji: '📊', description: 'compteurs membres/rôles en salons vocaux verrouillés' },
-  utility: { label: 'Utilitaire', emoji: '🧰', description: 'serverinfo, userinfo, avatars…' },
-  backups: { label: 'Backups', emoji: '💾', description: 'sauvegarde et restauration du serveur' },
+  invites: { label: 'Invite tracker', emoji: '📨', description: 'qui a invité qui, compteurs d\'invitations, /invites et /leaderboard' },
+  giveaways: { label: 'Giveaways', emoji: '🎉', description: 'giveaways avec bouton, reroll, tirage au sort' },
+  custom: { label: 'Commandes custom', emoji: '🧩', description: 'commandes à préfixe (+regles, !boutique…) créées via /custom' },
+  utility: { label: 'Utilitaire', emoji: '🧰', description: 'serverinfo, userinfo, /embed…' },
+  backups: { label: 'Backups', emoji: '💾', description: 'sauvegarde auto des settings + export/import via /backup' },
 };
 
 const DEFAULT_SETTINGS = {
   // IDs des utilisateurs ayant accès à toutes les commandes du bot (gérés via /get-admin et /del-admin)
   admins: [],
   modules: {
+    logs: false,
+    verification: false,
     moderation: true,
     automod: false,
-    logs: false,
     antiraid: false,
     tickets: false,
-    giveaways: false,
     tempvoc: false,
-    rolemenu: false,
-    verification: false,
-    custom: false,
-    invites: false,
     stats: false,
+    invites: false,
+    giveaways: false,
+    custom: false,
     utility: true,
     backups: false,
   },

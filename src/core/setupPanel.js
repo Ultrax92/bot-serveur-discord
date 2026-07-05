@@ -78,56 +78,64 @@ function hubView(guild) {
     settings.logsChannels[t] && guild.channels.cache.get(settings.logsChannels[t])).length;
 
   const embed = panelEmbed(guild, `🛠️ Setup de ${guild.name}`, [
-    'Bienvenue dans le panneau de configuration ! Chaque section montre les réglages actuels et permet de les modifier.',
+    'Bienvenue dans le panneau de configuration ! Les sections suivent l\'ordre logique de mise en place du bot.',
     '',
-    `⚙️ **Général** — couleur des embeds : ${colorHex(settings)}`,
+    '__**1️⃣ La base**__',
+    `⚙️ **Général** — couleur ${colorHex(settings)} | statut du bot`,
     `👑 **Admins du bot** — ${settings.admins.length} admin(s)`,
     `🧩 **Modules** — ${enabledCount}/${Object.keys(MODULES).length} activés`,
-    `🔨 **Modération** — MP sanction ${settings.moderationConfig.dmOnSanction ? '🟢' : '🔴'} | ${settings.moderationConfig.defaultMuteDuration}`,
     `📜 **Salons de logs** — ${logsCount}/${Object.keys(LOG_TYPES).length} configurés`,
+    '',
+    '__**2️⃣ Accueil & sécurité**__',
     `✅ **Vérification** — salon ${settings.verifConfig.channel ? '🟢' : '🔴'} | rôle ${settings.verifConfig.role ? '🟢' : '🔴'}`,
+    `🔨 **Modération** — MP sanction ${settings.moderationConfig.dmOnSanction ? '🟢' : '🔴'} | mute ${settings.moderationConfig.defaultMuteDuration}`,
     `🤖 **Auto-modération** — ${['antispam', 'antilink', 'antimention', 'badwords'].filter((k) => settings.automodConfig[k].enabled).length}/4 protections actives`,
-    `🎫 **Tickets** — salon ${settings.ticketsConfig.panelChannel ? '🟢' : '🔴'} | ${settings.ticketsConfig.types.length} type(s)`,
-    `🧩 **Commandes custom** — ${settings.customCommands.length} commande(s)`,
-    `🎉 **Giveaways** — ${require('./giveaways').activeGiveaways(guild.id).length} en cours | rôle requis ${settings.giveawaysConfig.requiredRole ? '🟢' : '🔴 aucun'}`,
-    `🔊 **Vocaux temporaires** — générateur ${settings.tempvocConfig.generatorChannel ? '🟢' : '🔴'}`,
-    `📊 **Stats** — ${settings.statsConfig.counters.length} compteur(s)`,
-    `📨 **Invite tracker** — ${settings.modules.invites ? '🟢 actif' : '🔴 inactif'}`,
     `🛡️ **Antiraid** — ${['antibot', 'antichannel', 'antirole', 'antiwebhook', 'antiban', 'massjoin'].filter((k) => settings.antiraidConfig[k].enabled).length}/6 protections actives`,
     '',
-    'Choisis une section dans le menu pour voir et modifier ses réglages.',
+    '__**3️⃣ Les systèmes du serveur**__',
+    `🎫 **Tickets** — salon ${settings.ticketsConfig.panelChannel ? '🟢' : '🔴'} | ${settings.ticketsConfig.types.length} type(s)`,
+    `🔊 **Vocaux temporaires** — générateur ${settings.tempvocConfig.generatorChannel ? '🟢' : '🔴'}`,
+    `📊 **Stats** — ${settings.statsConfig.counters.length} compteur(s)`,
+    `📨 **Invite tracker** — ${settings.modules.invites ? '🟢 actif' : '🔴 inactif (à activer dans 🧩 Modules)'}`,
+    `🎉 **Giveaways** — ${require('./giveaways').activeGiveaways(guild.id).length} en cours | rôle requis ${settings.giveawaysConfig.requiredRole ? '🟢' : '🔴 aucun'}`,
+    `🧩 **Commandes custom** — ${settings.customCommands.length} commande(s)`,
+    '',
+    'Choisis une section dans le menu · outils : `/embed` `/backup` `/update`',
   ].join('\n'));
 
   const nav = new StringSelectMenuBuilder()
     .setCustomId('setup:nav')
     .setPlaceholder('📂 Choisis une section à configurer…')
     .addOptions(
-      new StringSelectMenuOptionBuilder().setValue('general').setLabel('Général').setEmoji('⚙️')
-        .setDescription('Couleur des embeds du bot'),
-      new StringSelectMenuOptionBuilder().setValue('admins').setLabel('Admins du bot').setEmoji('👑')
+      // 1️⃣ La base
+      new StringSelectMenuOptionBuilder().setValue('general').setLabel('1. Général').setEmoji('⚙️')
+        .setDescription('Couleur des embeds, statut du bot'),
+      new StringSelectMenuOptionBuilder().setValue('admins').setLabel('2. Admins du bot').setEmoji('👑')
         .setDescription('Qui a accès aux commandes du bot'),
-      new StringSelectMenuOptionBuilder().setValue('modules').setLabel('Modules').setEmoji('🧩')
+      new StringSelectMenuOptionBuilder().setValue('modules').setLabel('3. Modules').setEmoji('🧩')
         .setDescription('Activer ou désactiver les fonctionnalités'),
-      new StringSelectMenuOptionBuilder().setValue('moderation').setLabel('Modération').setEmoji('🔨')
-        .setDescription('MP aux sanctionnés, durée de mute par défaut'),
-      new StringSelectMenuOptionBuilder().setValue('logs').setLabel('Salons de logs').setEmoji('📜')
+      new StringSelectMenuOptionBuilder().setValue('logs').setLabel('4. Salons de logs').setEmoji('📜')
         .setDescription('Un salon existant ou créé pour chaque type de log'),
-      new StringSelectMenuOptionBuilder().setValue('verification').setLabel('Vérification').setEmoji('✅')
+      // 2️⃣ Accueil & sécurité
+      new StringSelectMenuOptionBuilder().setValue('verification').setLabel('5. Vérification').setEmoji('✅')
         .setDescription('Bouton de vérification qui donne un rôle'),
-      new StringSelectMenuOptionBuilder().setValue('automod').setLabel('Auto-modération').setEmoji('🤖')
+      new StringSelectMenuOptionBuilder().setValue('moderation').setLabel('6. Modération').setEmoji('🔨')
+        .setDescription('MP aux sanctionnés, durée de mute par défaut'),
+      new StringSelectMenuOptionBuilder().setValue('automod').setLabel('7. Auto-modération').setEmoji('🤖')
         .setDescription('Antispam, antilink, antimention, mots interdits'),
-      new StringSelectMenuOptionBuilder().setValue('tickets').setLabel('Tickets').setEmoji('🎫')
+      new StringSelectMenuOptionBuilder().setValue('antiraid').setLabel('8. Antiraid').setEmoji('🛡️')
+        .setDescription('Antibot, rafales de salons/rôles/bans, whitelist'),
+      // 3️⃣ Les systèmes du serveur
+      new StringSelectMenuOptionBuilder().setValue('tickets').setLabel('9. Tickets').setEmoji('🎫')
         .setDescription('Panneau à sélecteur, types de tickets, transcript'),
-      new StringSelectMenuOptionBuilder().setValue('custom').setLabel('Commandes custom').setEmoji('🧩')
-        .setDescription('Commandes à préfixe avec réponse personnalisée'),
-      new StringSelectMenuOptionBuilder().setValue('giveaways').setLabel('Giveaways').setEmoji('🎉')
-        .setDescription('Rôle requis pour participer, giveaways en cours'),
-      new StringSelectMenuOptionBuilder().setValue('tempvoc').setLabel('Vocaux temporaires').setEmoji('🔊')
-        .setDescription('Salon générateur et modèle de nom'),
-      new StringSelectMenuOptionBuilder().setValue('stats').setLabel('Stats du serveur').setEmoji('📊')
+      new StringSelectMenuOptionBuilder().setValue('tempvoc').setLabel('10. Vocaux temporaires').setEmoji('🔊')
+        .setDescription('Salon générateur, rôles d\'accès et admin'),
+      new StringSelectMenuOptionBuilder().setValue('stats').setLabel('11. Stats du serveur').setEmoji('📊')
         .setDescription('Compteurs membres et rôles en vocaux verrouillés'),
-      new StringSelectMenuOptionBuilder().setValue('antiraid').setLabel('Antiraid').setEmoji('🛡️')
-        .setDescription('Antibot, rafales de salons/rôles/bans, webhooks, whitelist'),
+      new StringSelectMenuOptionBuilder().setValue('giveaways').setLabel('12. Giveaways').setEmoji('🎉')
+        .setDescription('Rôle requis pour participer, giveaways en cours'),
+      new StringSelectMenuOptionBuilder().setValue('custom').setLabel('13. Commandes custom').setEmoji('🧩')
+        .setDescription('Commandes à préfixe avec réponse personnalisée'),
     );
 
   const buttons = new ActionRowBuilder().addComponents(
