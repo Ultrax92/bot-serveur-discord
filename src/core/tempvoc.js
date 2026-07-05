@@ -30,6 +30,27 @@ function controlPanel(member) {
   return { embeds: [embed], components: [buttons] };
 }
 
+// Verrouille le salon générateur : chat/parole/stream bloqués pour tous (c'est un
+// salon de passage), et visibilité restreinte aux rôles d'accès s'il y en a
+async function applyGeneratorPermissions(guild) {
+  const config = getSettings(guild.id).tempvocConfig;
+  const channel = config.generatorChannel && guild.channels.cache.get(config.generatorChannel);
+  if (!channel) return false;
+
+  const accessRoles = (config.accessRoles ?? []).filter((id) => guild.roles.cache.has(id));
+  const everyoneDeny = [PermissionFlagsBits.SendMessages, PermissionFlagsBits.Speak, PermissionFlagsBits.Stream];
+  if (accessRoles.length) everyoneDeny.push(PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect);
+
+  const ok = await channel.permissionOverwrites.set([
+    { id: guild.roles.everyone.id, deny: everyoneDeny },
+    ...accessRoles.map((id) => ({
+      id,
+      allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect],
+    })),
+  ], 'Configuration des vocaux temporaires').then(() => true).catch(() => false);
+  return ok;
+}
+
 // Création à la connexion au générateur + suppression des salons vides
 async function handleVoiceState(oldState, newState) {
   const guild = newState.guild ?? oldState.guild;
@@ -44,16 +65,29 @@ async function handleVoiceState(oldState, newState) {
       .replaceAll('{pseudo}', member.displayName ?? member.user.username)
       .slice(0, 100);
 
+    // Les salons créés héritent de la visibilité restreinte du générateur
+    const accessRoles = (config.accessRoles ?? []).filter((id) => guild.roles.cache.has(id));
+    const overwrites = [
+      {
+        id: member.id,
+        allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect, PermissionFlagsBits.Speak, PermissionFlagsBits.MoveMembers],
+      },
+    ];
+    if (accessRoles.length) {
+      overwrites.push(
+        { id: guild.roles.everyone.id, deny: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect] },
+        ...accessRoles.map((id) => ({
+          id,
+          allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect, PermissionFlagsBits.Speak],
+        })),
+      );
+    }
+
     const channel = await guild.channels.create({
       name,
       type: ChannelType.GuildVoice,
       parent: newState.channel.parentId ?? null,
-      permissionOverwrites: [
-        {
-          id: member.id,
-          allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect, PermissionFlagsBits.Speak, PermissionFlagsBits.MoveMembers],
-        },
-      ],
+      permissionOverwrites: overwrites,
     }).catch(() => null);
     if (!channel) return;
 
@@ -159,4 +193,4 @@ async function handleTempvocComponent(interaction) {
   }
 }
 
-module.exports = { handleVoiceState, handleTempvocComponent, cleanupTempvoc };
+module.exports = { handleVoiceState, handleTempvocComponent, cleanupTempvoc, applyGeneratorPermissions };

@@ -75,6 +75,7 @@ const DEFAULT_SETTINGS = {
   tempvocConfig: {
     generatorChannel: null,                 // salon vocal "➕ Crée ton salon"
     nameTemplate: '🔊 Salon de {pseudo}',   // nom des salons créés
+    accessRoles: [],                        // rôles voyant/rejoignant le générateur et les salons créés (vide = tous)
   },
   statsConfig: {
     counters: [],  // { id, type: 'members'|'role', roleId, channelId, label }

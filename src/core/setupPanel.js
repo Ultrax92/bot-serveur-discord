@@ -679,12 +679,16 @@ function tempvocView(guild) {
   const settings = getSettings(guild.id);
   const tv = settings.tempvocConfig;
   const generator = tv.generatorChannel && guild.channels.cache.get(tv.generatorChannel);
+  const accessRoles = (tv.accessRoles ?? []).map((id) => `<@&${id}>`).join(' ') || '*tout le monde*';
 
   const embed = panelEmbed(guild, '🔊 Vocaux temporaires', [
     `${settings.modules.tempvoc ? '🟢 Module activé' : '🔴 Module désactivé — configure le générateur ci-dessous pour l\'activer'}`,
     '',
     `➕ **Salon générateur** — ${generator ? `${generator.name}` : '🔴 non configuré'}`,
     `📝 **Modèle de nom** — \`${tv.nameTemplate}\` (variable \`{pseudo}\`)`,
+    `🎭 **Qui voit et rejoint le générateur** — ${accessRoles}`,
+    '',
+    'Le générateur est **verrouillé automatiquement** : chat, parole et stream bloqués pour tous (c\'est un salon de passage). Les salons créés héritent de la visibilité des rôles d\'accès.',
     '',
     '**Fonctionnement :** un membre rejoint le générateur → son salon perso est créé et il y est déplacé, avec un panneau de contrôle dans le chat du vocal (✏️ renommer, 🔒 verrouiller, 👥 limite). Le salon est supprimé dès qu\'il est vide.',
   ].join('\n'));
@@ -694,6 +698,13 @@ function tempvocView(guild) {
     .setPlaceholder('➕ Choisir un salon vocal existant comme générateur…')
     .setChannelTypes(ChannelType.GuildVoice);
 
+  const roleSelect = new RoleSelectMenuBuilder()
+    .setCustomId('setup:tv:roles')
+    .setPlaceholder('🎭 Rôles pouvant voir/rejoindre le générateur (vide = tout le monde)…')
+    .setMinValues(0)
+    .setMaxValues(10);
+  if (tv.accessRoles?.length) roleSelect.setDefaultRoles(tv.accessRoles.slice(0, 10));
+
   const buttons = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('setup:tv:create').setLabel('➕ Créer le salon générateur').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId('setup:tv:byid').setLabel('🆔 Par ID ou lien').setStyle(ButtonStyle.Primary),
@@ -701,7 +712,14 @@ function tempvocView(guild) {
     backButton('home'),
   );
 
-  return { embeds: [embed], components: [new ActionRowBuilder().addComponents(channelSelect), buttons] };
+  return {
+    embeds: [embed],
+    components: [
+      new ActionRowBuilder().addComponents(channelSelect),
+      new ActionRowBuilder().addComponents(roleSelect),
+      buttons,
+    ],
+  };
 }
 
 // ── Page stats ────────────────────────────────────────────────────────────────
@@ -1057,6 +1075,8 @@ async function handleSetupComponent(interaction) {
           s.tempvocConfig.generatorChannel = channel.id;
           s.modules.tempvoc = true;
         });
+        const { applyGeneratorPermissions } = require('./tempvoc');
+        await applyGeneratorPermissions(guild);
         return interaction.update(tempvocView(guild));
       }
 
@@ -1460,13 +1480,23 @@ async function handleSetupComponent(interaction) {
 
     case 'tv': {
       const sub = args[0];
+      const { applyGeneratorPermissions } = require('./tempvoc');
 
       if (sub === 'generator') {
+        await interaction.deferUpdate();
         updateSettings(guild.id, (s) => {
           s.tempvocConfig.generatorChannel = interaction.values[0];
           s.modules.tempvoc = true; // on configure → le module s'active
         });
-        return interaction.update(tempvocView(guild));
+        await applyGeneratorPermissions(guild);
+        return interaction.editReply(tempvocView(guild));
+      }
+
+      if (sub === 'roles') {
+        await interaction.deferUpdate();
+        updateSettings(guild.id, (s) => { s.tempvocConfig.accessRoles = interaction.values; });
+        await applyGeneratorPermissions(guild);
+        return interaction.editReply(tempvocView(guild));
       }
 
       if (sub === 'create') {
@@ -1482,6 +1512,7 @@ async function handleSetupComponent(interaction) {
           s.tempvocConfig.generatorChannel = channel.id;
           s.modules.tempvoc = true;
         });
+        await applyGeneratorPermissions(guild);
         return interaction.editReply(tempvocView(guild));
       }
 
