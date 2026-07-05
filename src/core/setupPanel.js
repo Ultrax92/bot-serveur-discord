@@ -34,6 +34,13 @@ function extractId(input) {
   return matches ? matches[matches.length - 1] : null;
 }
 
+// Extrait TOUS les IDs de rôles valides d'une saisie libre (IDs, mentions <@&…>,
+// séparés par espaces/virgules) — pour les champs multi-rôles par ID
+function parseRoleIds(guild, input) {
+  const ids = String(input ?? '').match(/\d{15,20}/g) ?? [];
+  return [...new Set(ids)].filter((id) => guild.roles.cache.has(id));
+}
+
 // ── Fermeture automatique des panneaux inactifs ───────────────────────────────
 
 const PANEL_TIMEOUT_MS = 120_000; // 2 minutes sans interaction → le panneau se ferme
@@ -328,6 +335,7 @@ function verificationView(guild) {
       .setDisabled(!channel || !role),
     new ButtonBuilder().setCustomId('setup:verif:msg').setLabel('📝 Message').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId('setup:verif:chanid').setLabel('🆔 Salon par ID').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('setup:verif:roleid').setLabel('🆔 Rôle par ID').setStyle(ButtonStyle.Primary),
     backButton('home'),
   );
 
@@ -465,6 +473,7 @@ function ticketsView(guild) {
 
   const channelButtons = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('setup:tk:chanid').setLabel('🆔 Salon par ID ou lien').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('setup:tk:reqroleid').setLabel('🆔 Rôle requis par ID').setStyle(ButtonStyle.Primary),
   );
 
   return {
@@ -546,12 +555,23 @@ function ticketTypeView(guild, typeId) {
     backButton('tickets'),
   );
 
+  const index = tc.types.findIndex((t) => t.id === type.id);
+  const idButtons = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId(`setup:tk:catid:${type.id}`).setLabel('🆔 Catégorie par ID').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId(`setup:tk:rolesid:${type.id}`).setLabel('🆔 Rôles par ID').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId(`setup:tk:up:${type.id}`).setLabel('⬆️ Monter dans le panneau').setStyle(ButtonStyle.Secondary)
+      .setDisabled(index <= 0),
+    new ButtonBuilder().setCustomId(`setup:tk:down:${type.id}`).setLabel('⬇️ Descendre').setStyle(ButtonStyle.Secondary)
+      .setDisabled(index === tc.types.length - 1),
+  );
+
   return {
     embeds: [embed],
     components: [
       new ActionRowBuilder().addComponents(categorySelect),
       new ActionRowBuilder().addComponents(mentionSelect),
       new ActionRowBuilder().addComponents(accessSelect),
+      idButtons,
       buttons,
     ],
   };
@@ -638,6 +658,8 @@ function customEditView(guild, commandId) {
     new ButtonBuilder().setCustomId(`setup:cc:img:${command.id}`)
       .setLabel('🖼️ Image').setStyle(ButtonStyle.Primary)
       .setDisabled(!command.response.embed),
+    new ButtonBuilder().setCustomId(`setup:cc:rolesid:${command.id}`)
+      .setLabel('🆔 Rôles par ID').setStyle(ButtonStyle.Primary),
   );
 
   return {
@@ -679,7 +701,10 @@ function giveawaysView(guild) {
     embeds: [embed],
     components: [
       new ActionRowBuilder().addComponents(roleSelect),
-      new ActionRowBuilder().addComponents(backButton('home')),
+      new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('setup:gv:roleid').setLabel('🆔 Rôle par ID').setStyle(ButtonStyle.Primary),
+        backButton('home'),
+      ),
     ],
   };
 }
@@ -726,7 +751,8 @@ function tempvocView(guild) {
 
   const buttons = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('setup:tv:create').setLabel('➕ Créer le salon générateur').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId('setup:tv:byid').setLabel('🆔 Par ID ou lien').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('setup:tv:byid').setLabel('🆔 Salon par ID').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('setup:tv:rolesid').setLabel('🆔 Rôles par ID').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId('setup:tv:name').setLabel('📝 Modèle de nom').setStyle(ButtonStyle.Primary),
     backButton('home'),
   );
@@ -798,8 +824,9 @@ function statsView(guild) {
 
   components.push(new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('setup:st:members').setLabel('➕ Compteur Membres').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('setup:st:rolesid').setLabel('🆔 Rôles par ID').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId('setup:st:catname').setLabel('📁 Nom de la catégorie').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId('setup:st:refresh').setLabel('🔄 Actualiser maintenant').setStyle(ButtonStyle.Secondary)
+    new ButtonBuilder().setCustomId('setup:st:refresh').setLabel('🔄 Actualiser').setStyle(ButtonStyle.Secondary)
       .setDisabled(!counters.length),
     backButton('home'),
   ));
@@ -1131,6 +1158,112 @@ async function handleSetupComponent(interaction) {
         return interaction.update(tempvocView(guild));
       }
 
+      if (args[0] === 'verifroleid') {
+        const id = extractId(interaction.fields.getTextInputValue('id'));
+        const role = id && guild.roles.cache.get(id);
+        if (!role) {
+          return interaction.reply({ content: `❌ Aucun rôle trouvé sur ce serveur avec cet ID.`, flags: MessageFlags.Ephemeral });
+        }
+        if (role.managed || role.position >= guild.members.me.roles.highest.position) {
+          return interaction.reply({ content: '❌ Je ne peux pas attribuer ce rôle (intégration ou au-dessus de mon rôle).', flags: MessageFlags.Ephemeral });
+        }
+        updateSettings(guild.id, (s) => {
+          s.verifConfig.role = role.id;
+          s.modules.verification = true;
+        });
+        return interaction.update(verificationView(guild));
+      }
+
+      if (args[0] === 'gvroleid') {
+        const raw = interaction.fields.getTextInputValue('id').trim();
+        const id = raw ? extractId(raw) : null;
+        if (raw && (!id || !guild.roles.cache.has(id))) {
+          return interaction.reply({ content: '❌ Aucun rôle trouvé sur ce serveur avec cet ID.', flags: MessageFlags.Ephemeral });
+        }
+        updateSettings(guild.id, (s) => {
+          s.giveawaysConfig.requiredRole = id ?? null;
+          s.modules.giveaways = true;
+        });
+        return interaction.update(giveawaysView(guild));
+      }
+
+      if (args[0] === 'tvrolesid') {
+        const access = parseRoleIds(guild, interaction.fields.getTextInputValue('access'));
+        const adminRaw = interaction.fields.getTextInputValue('admin').trim();
+        const adminId = adminRaw ? extractId(adminRaw) : null;
+        if (adminRaw && (!adminId || !guild.roles.cache.has(adminId))) {
+          return interaction.reply({ content: '❌ Le rôle admin est introuvable sur ce serveur.', flags: MessageFlags.Ephemeral });
+        }
+        updateSettings(guild.id, (s) => {
+          s.tempvocConfig.accessRoles = access;
+          s.tempvocConfig.adminRole = adminId ?? null;
+        });
+        const { applyGeneratorPermissions } = require('./tempvoc');
+        await applyGeneratorPermissions(guild);
+        return interaction.update(tempvocView(guild));
+      }
+
+      if (args[0] === 'strolesid') {
+        const toCreate = parseRoleIds(guild, interaction.fields.getTextInputValue('create'));
+        const view = parseRoleIds(guild, interaction.fields.getTextInputValue('view'));
+        updateSettings(guild.id, (s) => { s.statsConfig.accessRoles = view; });
+        const { createCounter, applyStatsPermissions } = require('./stats');
+        const existing = new Set(getSettings(guild.id).statsConfig.counters.map((c) => c.roleId).filter(Boolean));
+        for (const roleId of toCreate) {
+          if (!existing.has(roleId)) await createCounter(guild, { type: 'role', roleId });
+        }
+        await applyStatsPermissions(guild);
+        return interaction.update(statsView(guild));
+      }
+
+      if (args[0] === 'ccrolesid') {
+        const commandId = args[1];
+        const roles = parseRoleIds(guild, interaction.fields.getTextInputValue('roles'));
+        updateSettings(guild.id, (s) => {
+          const c = s.customCommands.find((cc) => cc.id === commandId);
+          if (c) c.allowedRoles = roles;
+        });
+        return interaction.update(customEditView(guild, commandId));
+      }
+
+      if (args[0] === 'tkreqroleid') {
+        const raw = interaction.fields.getTextInputValue('id').trim();
+        const id = raw ? extractId(raw) : null;
+        if (raw && (!id || !guild.roles.cache.has(id))) {
+          return interaction.reply({ content: '❌ Aucun rôle trouvé sur ce serveur avec cet ID.', flags: MessageFlags.Ephemeral });
+        }
+        updateSettings(guild.id, (s) => { s.ticketsConfig.requiredRole = id ?? null; });
+        return interaction.update(ticketsView(guild));
+      }
+
+      if (args[0] === 'tkcatid') {
+        const typeId = args[1];
+        const id = extractId(interaction.fields.getTextInputValue('id'));
+        const category = id && await guild.channels.fetch(id).catch(() => null);
+        if (!category || category.type !== ChannelType.GuildCategory) {
+          return interaction.reply({ content: '❌ Aucune **catégorie** trouvée sur ce serveur avec cet ID (attention : il faut l\'ID de la catégorie, pas d\'un salon).', flags: MessageFlags.Ephemeral });
+        }
+        updateSettings(guild.id, (s) => {
+          const type = s.ticketsConfig.types.find((t) => t.id === typeId);
+          if (type) type.categoryId = category.id;
+        });
+        return interaction.update(ticketTypeView(guild, typeId));
+      }
+
+      if (args[0] === 'tkrolesid') {
+        const typeId = args[1];
+        const mentions = parseRoleIds(guild, interaction.fields.getTextInputValue('mentions'));
+        const access = parseRoleIds(guild, interaction.fields.getTextInputValue('access'));
+        updateSettings(guild.id, (s) => {
+          const type = s.ticketsConfig.types.find((t) => t.id === typeId);
+          if (type) {
+            type.mentionRoles = mentions;
+            type.accessRoles = access;
+          }
+        });
+        return interaction.update(ticketTypeView(guild, typeId));
+      }
+
       if (args[0] === 'verifmsg') {
         const template = interaction.fields.getTextInputValue('template').trim();
         updateSettings(guild.id, (s) => { s.verifConfig.message = template; });
@@ -1369,8 +1502,65 @@ async function handleSetupComponent(interaction) {
         return interaction.message.edit(ticketsView(guild)).catch(() => {});
       }
 
-      // Sous-commandes liées à un type : cat / mention / access / label / openmsg / del
+      if (sub === 'reqroleid') {
+        const modal = new ModalBuilder()
+          .setCustomId('setup:modal:tkreqroleid')
+          .setTitle('Rôle requis pour ouvrir un ticket')
+          .addComponents(new ActionRowBuilder().addComponents(
+            new TextInputBuilder().setCustomId('id').setLabel('ID ou mention du rôle (vide = tout le monde)')
+              .setValue(getSettings(guild.id).ticketsConfig.requiredRole ?? '')
+              .setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(100),
+          ));
+        return interaction.showModal(modal);
+      }
+
+      // Sous-commandes liées à un type : cat / mention / access / label / openmsg / del / catid / rolesid / up / down
       const typeId = args[1];
+
+      if (sub === 'up' || sub === 'down') {
+        updateSettings(guild.id, (s) => {
+          const types = s.ticketsConfig.types;
+          const index = types.findIndex((t) => t.id === typeId);
+          const target = sub === 'up' ? index - 1 : index + 1;
+          if (index !== -1 && target >= 0 && target < types.length) {
+            [types[index], types[target]] = [types[target], types[index]];
+          }
+        });
+        return interaction.update(ticketTypeView(guild, typeId));
+      }
+
+      if (sub === 'catid') {
+        const modal = new ModalBuilder()
+          .setCustomId(`setup:modal:tkcatid:${typeId}`)
+          .setTitle('Catégorie des tickets de ce type')
+          .addComponents(new ActionRowBuilder().addComponents(
+            new TextInputBuilder().setCustomId('id').setLabel('ID ou lien de la catégorie')
+              .setPlaceholder('1234567890123456789')
+              .setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(100),
+          ));
+        return interaction.showModal(modal);
+      }
+
+      if (sub === 'rolesid' && typeId) {
+        const type = getSettings(guild.id).ticketsConfig.types.find((t) => t.id === typeId);
+        if (!type) return interaction.update(ticketsView(guild));
+        const modal = new ModalBuilder()
+          .setCustomId(`setup:modal:tkrolesid:${typeId}`)
+          .setTitle('Rôles du type (IDs ou mentions)')
+          .addComponents(
+            new ActionRowBuilder().addComponents(
+              new TextInputBuilder().setCustomId('mentions').setLabel('Rôles mentionnés (IDs séparés par espaces)')
+                .setValue((type.mentionRoles ?? []).join(' '))
+                .setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(400),
+            ),
+            new ActionRowBuilder().addComponents(
+              new TextInputBuilder().setCustomId('access').setLabel('Rôles ayant accès (IDs séparés par espaces)')
+                .setValue((type.accessRoles ?? []).join(' '))
+                .setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(400),
+            ),
+          );
+        return interaction.showModal(modal);
+      }
 
       if (sub === 'cat') {
         updateSettings(guild.id, (s) => {
@@ -1527,6 +1717,20 @@ async function handleSetupComponent(interaction) {
         return interaction.showModal(modal);
       }
 
+      if (sub === 'rolesid') {
+        const command = getSettings(guild.id).customCommands.find((c) => c.id === commandId);
+        if (!command) return interaction.update(customView(guild));
+        const modal = new ModalBuilder()
+          .setCustomId(`setup:modal:ccrolesid:${commandId}`)
+          .setTitle('Rôles autorisés (IDs ou mentions)')
+          .addComponents(new ActionRowBuilder().addComponents(
+            new TextInputBuilder().setCustomId('roles').setLabel('IDs séparés par espaces (vide = tout le monde)')
+              .setValue(command.allowedRoles.join(' '))
+              .setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(400),
+          ));
+        return interaction.showModal(modal);
+      }
+
       if (sub === 'img') {
         const { requestImageUpload } = require('./customCommands');
         requestImageUpload(interaction, { kind: 'cc', commandId });
@@ -1545,6 +1749,18 @@ async function handleSetupComponent(interaction) {
           s.modules.giveaways = true; // on configure → le module s'active
         });
         return interaction.update(giveawaysView(guild));
+      }
+
+      if (args[0] === 'roleid') {
+        const modal = new ModalBuilder()
+          .setCustomId('setup:modal:gvroleid')
+          .setTitle('Rôle requis pour participer')
+          .addComponents(new ActionRowBuilder().addComponents(
+            new TextInputBuilder().setCustomId('id').setLabel('ID ou mention du rôle (vide = tout le monde)')
+              .setValue(getSettings(guild.id).giveawaysConfig.requiredRole ?? '')
+              .setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(100),
+          ));
+        return interaction.showModal(modal);
       }
       break;
     }
@@ -1615,6 +1831,26 @@ async function handleSetupComponent(interaction) {
           ));
         return interaction.showModal(modal);
       }
+
+      if (sub === 'rolesid') {
+        const tv = getSettings(guild.id).tempvocConfig;
+        const modal = new ModalBuilder()
+          .setCustomId('setup:modal:tvrolesid')
+          .setTitle('Rôles des vocaux (IDs ou mentions)')
+          .addComponents(
+            new ActionRowBuilder().addComponents(
+              new TextInputBuilder().setCustomId('access').setLabel('Rôles d\'accès (IDs, vide = tout le monde)')
+                .setValue((tv.accessRoles ?? []).join(' '))
+                .setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(400),
+            ),
+            new ActionRowBuilder().addComponents(
+              new TextInputBuilder().setCustomId('admin').setLabel('Rôle admin (ID, vide = aucun)')
+                .setValue(tv.adminRole ?? '')
+                .setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(100),
+            ),
+          );
+        return interaction.showModal(modal);
+      }
       break;
     }
 
@@ -1666,6 +1902,26 @@ async function handleSetupComponent(interaction) {
         const { applyStatsPermissions } = require('./stats');
         await applyStatsPermissions(guild);
         return interaction.editReply(statsView(guild));
+      }
+
+      if (sub === 'rolesid') {
+        const st = getSettings(guild.id).statsConfig;
+        const modal = new ModalBuilder()
+          .setCustomId('setup:modal:strolesid')
+          .setTitle('Rôles des stats (IDs ou mentions)')
+          .addComponents(
+            new ActionRowBuilder().addComponents(
+              new TextInputBuilder().setCustomId('create').setLabel('Créer des compteurs pour ces rôles (IDs)')
+                .setPlaceholder('123… 456… (vide = aucun nouveau compteur)')
+                .setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(400),
+            ),
+            new ActionRowBuilder().addComponents(
+              new TextInputBuilder().setCustomId('view').setLabel('Rôles voyant les compteurs (IDs, vide = tous)')
+                .setValue((st.accessRoles ?? []).join(' '))
+                .setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(400),
+            ),
+          );
+        return interaction.showModal(modal);
       }
 
       if (sub === 'catname') {
@@ -1751,6 +2007,18 @@ async function handleSetupComponent(interaction) {
               .setStyle(TextInputStyle.Short)
               .setRequired(true)
               .setMaxLength(100),
+          ));
+        return interaction.showModal(modal);
+      }
+
+      if (sub === 'roleid') {
+        const modal = new ModalBuilder()
+          .setCustomId('setup:modal:verifroleid')
+          .setTitle('Rôle donné à la vérification')
+          .addComponents(new ActionRowBuilder().addComponents(
+            new TextInputBuilder().setCustomId('id').setLabel('ID ou mention du rôle')
+              .setValue(getSettings(guild.id).verifConfig.role ?? '')
+              .setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(100),
           ));
         return interaction.showModal(modal);
       }
