@@ -79,6 +79,8 @@ const DEFAULT_SETTINGS = {
     adminRole: null,                        // rôle "admin" des salons créés (ex: modérateurs), droits étendus
   },
   statsConfig: {
+    categoryName: '「 📊 𝐒𝐄𝐑𝐕𝐄𝐑 𝐒𝐓𝐀𝐓𝐒 📊 」',
+    categoryId: null,
     counters: [],  // { id, type: 'members'|'role', roleId, channelId, label }
   },
   color: 0x5865f2,    // couleur des embeds (modifiable via /config)

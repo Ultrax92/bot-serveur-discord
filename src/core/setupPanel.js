@@ -743,14 +743,16 @@ function statsView(guild) {
     }).join('\n')
     : '*Aucun compteur.*';
 
+  const category = settings.statsConfig.categoryId && guild.channels.cache.get(settings.statsConfig.categoryId);
   const embed = panelEmbed(guild, '📊 Stats du serveur', [
     `${settings.modules.stats ? '🟢 Module activé' : '🔴 Module désactivé — ajoute un compteur pour l\'activer'}`,
     '',
+    `📁 **Catégorie** — ${category ? `**${category.name}**` : `\`${settings.statsConfig.categoryName}\` (créée avec le premier compteur)`}`,
     `**Compteurs (${counters.length}) :**`,
     list,
     '',
-    'Les compteurs sont des salons vocaux **verrouillés** (connexion et chat bloqués), actualisés toutes les **10 minutes** (limite Discord sur les renommages).',
-    'Ajoute un compteur 👥 Membres avec le bouton, ou un compteur par rôle avec le sélecteur.',
+    'Les compteurs sont créés dans la catégorie, en vocaux **totalement verrouillés** (tout refusé à everyone sauf voir), actualisés toutes les **10 minutes** (limite Discord sur les renommages).',
+    'Les compteurs par rôle utilisent le **nom du rôle tel quel**, sans emoji ajouté.',
   ].join('\n'));
 
   const roleSelect = new RoleSelectMenuBuilder()
@@ -775,6 +777,7 @@ function statsView(guild) {
 
   components.push(new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('setup:st:members').setLabel('➕ Compteur Membres').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('setup:st:catname').setLabel('📁 Nom de la catégorie').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId('setup:st:refresh').setLabel('🔄 Actualiser maintenant').setStyle(ButtonStyle.Secondary)
       .setDisabled(!counters.length),
     backButton('home'),
@@ -1063,6 +1066,13 @@ async function handleSetupComponent(interaction) {
           if (type) type.openMessage = interaction.fields.getTextInputValue('message').trim();
         });
         return interaction.update(ticketTypeView(guild, typeId));
+      }
+
+      if (args[0] === 'stcatname') {
+        const name = interaction.fields.getTextInputValue('name').trim();
+        const { renameStatsCategory } = require('./stats');
+        await renameStatsCategory(guild, name);
+        return interaction.update(statsView(guild));
       }
 
       if (args[0] === 'tvname') {
@@ -1588,6 +1598,18 @@ async function handleSetupComponent(interaction) {
         await interaction.deferUpdate();
         await updateCounters(guild).catch(() => {});
         return interaction.editReply(statsView(guild));
+      }
+
+      if (sub === 'catname') {
+        const modal = new ModalBuilder()
+          .setCustomId('setup:modal:stcatname')
+          .setTitle('Nom de la catégorie de stats')
+          .addComponents(new ActionRowBuilder().addComponents(
+            new TextInputBuilder().setCustomId('name').setLabel('Nom de la catégorie')
+              .setValue(getSettings(guild.id).statsConfig.categoryName)
+              .setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(100),
+          ));
+        return interaction.showModal(modal);
       }
       break;
     }
