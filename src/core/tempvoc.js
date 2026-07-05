@@ -19,6 +19,7 @@ const ADMIN_ALLOW = [
   P.UseExternalEmojis, P.UseExternalStickers, P.MentionEveryone,
   P.ManageMessages, P.ReadMessageHistory, P.SendTTSMessages, P.SendVoiceMessages,
   P.SendPolls, P.CreateEvents, P.ManageEvents, P.UseEmbeddedActivities,
+  P.PinMessages, P.BypassSlowmode, P.SetVoiceChannelStatus, P.RequestToSpeak,
 ].filter(Boolean);
 const ADMIN_DENY = [
   P.ManageChannels, P.ManageRoles, P.ManageWebhooks,
@@ -89,13 +90,19 @@ async function applyGeneratorPermissions(guild) {
     ? EVERYONE_DENY_ALL // tout refusé explicitement, les rôles d'accès ré-autorisent le minimum
     : [PermissionFlagsBits.SendMessages, PermissionFlagsBits.Speak, PermissionFlagsBits.Stream];
 
-  const ok = await channel.permissionOverwrites.set([
+  const overwrites = [
     { id: guild.roles.everyone.id, deny: everyoneDeny },
     ...accessRoles.map((id) => ({
       id,
       allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect],
     })),
-  ], 'Configuration des vocaux temporaires').then(() => true).catch(() => false);
+  ];
+  // Le rôle admin voit et rejoint toujours le générateur, même sans rôle d'accès
+  if (config.adminRole && guild.roles.cache.has(config.adminRole)) {
+    overwrites.push({ id: config.adminRole, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect] });
+  }
+
+  const ok = await channel.permissionOverwrites.set(overwrites, 'Configuration des vocaux temporaires').then(() => true).catch(() => false);
   return ok;
 }
 
