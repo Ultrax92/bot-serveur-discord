@@ -53,15 +53,62 @@ function restoreImageFiles(files) {
   return restored;
 }
 
+// Données vivantes du serveur, pour restaurer un bot À L'IDENTIQUE :
+// casier des sanctions, tickets (dont la numérotation), compteurs
+// d'invitations, giveaways en cours, vocaux temporaires suivis
+const TABLE_COLUMNS = {
+  sanctions: ['id', 'guild_id', 'user_id', 'moderator_id', 'type', 'reason', 'created_at', 'expires_at', 'active'],
+  tickets: ['id', 'guild_id', 'channel_id', 'user_id', 'number', 'type_id', 'status', 'claimed_by', 'created_at'],
+  invite_joins: ['guild_id', 'user_id', 'inviter_id', 'code', 'fake', 'has_left', 'joined_at'],
+  giveaways: ['id', 'guild_id', 'channel_id', 'message_id', 'prize', 'winners', 'host_id', 'required_role', 'ends_at', 'ended', 'participants'],
+  tempvoc_channels: ['channel_id', 'guild_id', 'owner_id'],
+};
+
+function collectDatabase(guildId) {
+  const database = {};
+  for (const [table, columns] of Object.entries(TABLE_COLUMNS)) {
+    database[table] = db.prepare(`SELECT ${columns.join(', ')} FROM ${table} WHERE guild_id = ?`).all(guildId);
+  }
+  return database;
+}
+
+function restoreDatabase(guildId, database) {
+  if (!database || typeof database !== 'object') return 0;
+  let restored = 0;
+  for (const [table, columns] of Object.entries(TABLE_COLUMNS)) {
+    const rows = database[table];
+    if (!Array.isArray(rows)) continue;
+    db.prepare(`DELETE FROM ${table} WHERE guild_id = ?`).run(guildId);
+    const insertWithId = db.prepare(`INSERT INTO ${table} (${columns.join(', ')}) VALUES (${columns.map((c) => `@${c}`).join(', ')})`);
+    const columnsNoId = columns.filter((c) => c !== 'id');
+    const insertNoId = db.prepare(`INSERT INTO ${table} (${columnsNoId.join(', ')}) VALUES (${columnsNoId.map((c) => `@${c}`).join(', ')})`);
+    for (const row of rows) {
+      const values = {};
+      for (const column of columns) values[column] = row[column] ?? null;
+      try {
+        insertWithId.run(values);
+        restored++;
+      } catch {
+        // Conflit d'id (autre serveur) : réinsère avec un nouvel id
+        try { insertNoId.run(values); restored++; } catch { /* ligne ignorée */ }
+      }
+    }
+  }
+  return restored;
+}
+
 function serialize(guildId) {
   const settings = getSettings(guildId);
+  const { getActivityText } = require('./botStatus');
   return JSON.stringify({
     bot: 'bot-serveur-discord',
-    version: 1,
+    version: 2,
     guildId,
     createdAt: Date.now(),
     settings,
     files: collectImageFiles(settings),
+    database: collectDatabase(guildId),
+    botActivity: getActivityText(),
   }, null, 2);
 }
 
@@ -84,9 +131,9 @@ function backupPanel(guild, userId) {
 
   const embed = new EmbedBuilder()
     .setColor(getSettings(guild.id).color)
-    .setTitle('💾 Backups des settings')
+    .setTitle('💾 Backups du bot')
     .setDescription([
-      'Sauvegarde/restauration de **toute la configuration du bot** pour ce serveur (modules, logs, tickets, automod, antiraid, commandes custom…).',
+      'Sauvegarde/restauration **complète et à l\'identique** : toute la configuration (modules, logs, tickets et leurs types, automod, antiraid, commandes custom…), les **images**, et les **données** (casier des sanctions, numérotation des tickets, compteurs d\'invitations, giveaways, statut du bot).',
       '',
       `**Backups en base (${rows.length}/15${isModuleEnabled(guild.id, 'backups') ? ', auto quotidien 🟢' : ', auto quotidien 🔴 — active le module 💾'}) :**`,
       rows.length
@@ -94,7 +141,7 @@ function backupPanel(guild, userId) {
         : '*Aucun backup pour l\'instant.*',
       staged ? `\n📦 **Import prêt à appliquer** : backup du <t:${Math.floor(staged.createdAt / 1000)}:f>${staged.guildId !== guild.id ? ' ⚠️ *provenant d\'un autre serveur*' : ''} → clique ♻️` : '',
       '',
-      '✅ *Les images (commandes custom, panneau tickets) sont incluses dans le backup et restaurées à l\'import.*',
+      '✅ *Backup complet : config + images + données — l\'import restaure le bot à l\'identique.*',
     ].filter(Boolean).join('\n'));
 
   const buttons = new ActionRowBuilder().addComponents(
@@ -229,10 +276,18 @@ async function handleBackupComponent(interaction) {
     }
     createBackup(guild.id, 'pré-restauration');
     saveSettings(guild.id, payload.settings);
-    const restored = restoreImageFiles(payload.files);
+    const images = restoreImageFiles(payload.files);
+    const rows = restoreDatabase(guild.id, payload.database);
+    if (typeof payload.botActivity === 'string') {
+      require('./botStatus').setActivityText(interaction.client, payload.botActivity);
+    }
     await interaction.update(backupPanel(guild, interaction.user.id));
     return interaction.followUp({
-      content: `♻️ **Configuration restaurée !**${restored ? ` ${restored} image(s) restaurée(s) sur le serveur.` : ''} Vérifie tes réglages dans \`/setup\` (un backup pré-restauration a été créé au cas où).`,
+      content: [
+        '♻️ **Bot restauré à l\'identique !**',
+        `• Configuration complète appliquée${images ? ` • ${images} image(s)` : ''}${rows ? ` • ${rows} donnée(s) : sanctions, tickets, invitations, giveaways` : ''}`,
+        'Vérifie dans `/setup` (un backup pré-restauration a été créé au cas où).',
+      ].join('\n'),
       flags: MessageFlags.Ephemeral,
     });
   }
@@ -275,7 +330,7 @@ async function handlePendingBackupFile(message) {
   try { parsed = JSON.parse(text); } catch { /* invalide */ }
 
   await message.delete().catch(() => {});
-  if (!parsed || parsed.bot !== 'bot-serveur-discord' || parsed.version !== 1 || typeof parsed.settings?.modules !== 'object') {
+  if (!parsed || parsed.bot !== 'bot-serveur-discord' || ![1, 2].includes(parsed.version) || typeof parsed.settings?.modules !== 'object') {
     await notice('❌ Ce fichier n\'est pas un backup valide de ce bot.');
     return true;
   }

@@ -11,6 +11,7 @@ function getActivityText() {
 }
 
 function applyActivity(client) {
+  if (!client?.user) return;
   const text = getActivityText();
   if (text) client.user.setActivity({ name: text, type: ActivityType.Custom });
   else client.user.setActivity(null);
