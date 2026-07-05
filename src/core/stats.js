@@ -12,12 +12,14 @@ const STATS_DENY = [
   P.Connect, P.Speak, P.Stream, P.UseVAD, P.PrioritySpeaker,
   P.MuteMembers, P.DeafenMembers, P.MoveMembers,
   P.UseSoundboard, P.UseExternalSounds,
+  P.SetVoiceChannelStatus, P.RequestToSpeak,
   // Chat
   P.SendMessages, P.SendMessagesInThreads, P.AddReactions, P.EmbedLinks, P.AttachFiles,
   P.SendTTSMessages, P.SendVoiceMessages, P.SendPolls,
   P.MentionEveryone, P.ManageMessages, P.ReadMessageHistory,
   P.UseExternalEmojis, P.UseExternalStickers,
   P.CreatePublicThreads, P.CreatePrivateThreads, P.ManageThreads,
+  P.PinMessages, P.BypassSlowmode,
   // Divers
   P.CreateInstantInvite, P.UseApplicationCommands, P.UseEmbeddedActivities, P.UseExternalApps,
   P.CreateEvents, P.ManageEvents,
