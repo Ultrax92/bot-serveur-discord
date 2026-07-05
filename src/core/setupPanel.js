@@ -694,6 +694,7 @@ function tempvocView(guild) {
 
   const buttons = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('setup:tv:create').setLabel('➕ Créer le salon générateur').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('setup:tv:byid').setLabel('🆔 Par ID ou lien').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId('setup:tv:name').setLabel('📝 Modèle de nom').setStyle(ButtonStyle.Primary),
     backButton('home'),
   );
@@ -1038,6 +1039,22 @@ async function handleSetupComponent(interaction) {
       if (args[0] === 'tvname') {
         const template = interaction.fields.getTextInputValue('template').trim();
         updateSettings(guild.id, (s) => { s.tempvocConfig.nameTemplate = template; });
+        return interaction.update(tempvocView(guild));
+      }
+
+      if (args[0] === 'tvchan') {
+        const id = extractId(interaction.fields.getTextInputValue('id'));
+        if (!id) {
+          return interaction.reply({ content: '❌ ID invalide. Colle un ID de salon vocal ou son lien.', flags: MessageFlags.Ephemeral });
+        }
+        const channel = await guild.channels.fetch(id).catch(() => null);
+        if (!channel || !channel.isVoiceBased()) {
+          return interaction.reply({ content: `❌ Aucun salon **vocal** trouvé sur ce serveur avec l'ID \`${id}\`.`, flags: MessageFlags.Ephemeral });
+        }
+        updateSettings(guild.id, (s) => {
+          s.tempvocConfig.generatorChannel = channel.id;
+          s.modules.tempvoc = true;
+        });
         return interaction.update(tempvocView(guild));
       }
 
@@ -1474,6 +1491,18 @@ async function handleSetupComponent(interaction) {
             new TextInputBuilder().setCustomId('template').setLabel('Nom (variable {pseudo})')
               .setValue(getSettings(guild.id).tempvocConfig.nameTemplate)
               .setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(90),
+          ));
+        return interaction.showModal(modal);
+      }
+
+      if (sub === 'byid') {
+        const modal = new ModalBuilder()
+          .setCustomId('setup:modal:tvchan')
+          .setTitle('Salon générateur')
+          .addComponents(new ActionRowBuilder().addComponents(
+            new TextInputBuilder().setCustomId('id').setLabel('ID ou lien du salon vocal')
+              .setPlaceholder('1234567890123456789')
+              .setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(100),
           ));
         return interaction.showModal(modal);
       }
