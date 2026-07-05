@@ -45,7 +45,11 @@ const MEMBER_DENY = [
 // @everyone : TOUT refusé explicitement quand des rôles d'accès sont configurés
 // (un deny partiel laisserait des permissions en héritage, exploitables par les
 // clients modifiés type Vencord qui affichent les salons cachés)
-const EVERYONE_DENY_ALL = [...new Set([...MEMBER_ALLOW, ...MEMBER_DENY])];
+const EVERYONE_DENY_ALL = [...new Set([
+  ...MEMBER_ALLOW, ...MEMBER_DENY,
+  P.PinMessages, P.BypassSlowmode, P.SetVoiceChannelStatus, P.RequestToSpeak,
+  P.SendMessagesInThreads, P.CreatePublicThreads, P.CreatePrivateThreads, P.ManageThreads,
+].filter(Boolean))];
 
 const insertStmt = db.prepare('INSERT OR REPLACE INTO tempvoc_channels (channel_id, guild_id, owner_id) VALUES (?, ?, ?)');
 const byChannelStmt = db.prepare('SELECT * FROM tempvoc_channels WHERE channel_id = ?');
