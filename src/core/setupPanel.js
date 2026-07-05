@@ -26,10 +26,12 @@ function colorHex(settings) {
   return `#${settings.color.toString(16).padStart(6, '0').toUpperCase()}`;
 }
 
-// Extrait un ID Discord d'une saisie libre : ID brut, mention <#id>/<@id>, ou lien de salon
+// Extrait un ID Discord d'une saisie libre : ID brut, mention <#id>/<@id>, ou lien.
+// Prend le DERNIER id : dans un lien discord.com/channels/serveur/salon, c'est
+// le salon qui nous intéresse, pas le serveur.
 function extractId(input) {
-  const match = input.match(/\d{15,20}/);
-  return match ? match[0] : null;
+  const matches = String(input ?? '').match(/\d{15,20}/g);
+  return matches ? matches[matches.length - 1] : null;
 }
 
 // ── Fermeture automatique des panneaux inactifs ───────────────────────────────
