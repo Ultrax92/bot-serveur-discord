@@ -47,6 +47,8 @@ const DEFAULT_SETTINGS = {
     channel: null,   // salon où le panneau de vérification est publié
     role: null,      // rôle attribué au clic
     message: 'Bienvenue sur **{serveur}** ! Clique sur le bouton ci-dessous pour te vérifier et accéder au serveur.',
+    lastPanelChannel: null, // dernier panneau publié, supprimé à la republication
+    lastPanelMessage: null,
   },
   // Commandes custom : { id, prefix, name, allowedRoles: [], deleteTrigger, response: { embed, title, content, image } }
   customCommands: [],
@@ -62,6 +64,8 @@ const DEFAULT_SETTINGS = {
     maxPerUser: 1,
     closeOnLeave: true,      // ferme les tickets d'un membre qui quitte le serveur
     transcriptDM: true,      // envoie le transcript en MP à l'ouvreur à la fermeture
+    lastPanelChannel: null,  // dernier panneau publié, supprimé à la republication
+    lastPanelMessage: null,
     types: [],               // { id, emoji, label, description, categoryId, mentionRoles, accessRoles, openMessage }
   },
   automodConfig: {

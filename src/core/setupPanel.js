@@ -1497,8 +1497,17 @@ async function handleSetupComponent(interaction) {
         if (!sent) {
           return interaction.reply({ content: `❌ Impossible de publier dans ${channel} (vérifie mes permissions).`, flags: MessageFlags.Ephemeral });
         }
-        updateSettings(guild.id, (s) => { s.modules.tickets = true; });
-        await interaction.reply({ content: `📤 Panneau de tickets publié dans ${channel} (module 🎫 activé au passage).`, flags: MessageFlags.Ephemeral });
+        // Supprime l'ancien panneau publié, puis mémorise le nouveau
+        if (tc.lastPanelChannel && tc.lastPanelMessage) {
+          const oldChannel = guild.channels.cache.get(tc.lastPanelChannel);
+          await oldChannel?.messages.delete(tc.lastPanelMessage).catch(() => {});
+        }
+        updateSettings(guild.id, (s) => {
+          s.modules.tickets = true;
+          s.ticketsConfig.lastPanelChannel = channel.id;
+          s.ticketsConfig.lastPanelMessage = sent.id;
+        });
+        await interaction.reply({ content: `📤 Panneau de tickets publié dans ${channel}${tc.lastPanelMessage ? ' (ancien panneau supprimé)' : ''}.`, flags: MessageFlags.Ephemeral });
         return interaction.message.edit(ticketsView(guild)).catch(() => {});
       }
 
@@ -1974,8 +1983,17 @@ async function handleSetupComponent(interaction) {
         if (!sent) {
           return interaction.reply({ content: `❌ Impossible de publier dans ${channel} (vérifie mes permissions).`, flags: MessageFlags.Ephemeral });
         }
-        updateSettings(guild.id, (s) => { s.modules.verification = true; });
-        await interaction.reply({ content: `📤 Panneau de vérification publié dans ${channel} (module ✅ activé au passage).`, flags: MessageFlags.Ephemeral });
+        // Supprime l'ancien panneau publié, puis mémorise le nouveau
+        if (vc.lastPanelChannel && vc.lastPanelMessage) {
+          const oldChannel = guild.channels.cache.get(vc.lastPanelChannel);
+          await oldChannel?.messages.delete(vc.lastPanelMessage).catch(() => {});
+        }
+        updateSettings(guild.id, (s) => {
+          s.modules.verification = true;
+          s.verifConfig.lastPanelChannel = channel.id;
+          s.verifConfig.lastPanelMessage = sent.id;
+        });
+        await interaction.reply({ content: `📤 Panneau de vérification publié dans ${channel}${vc.lastPanelMessage ? ' (ancien panneau supprimé)' : ''}.`, flags: MessageFlags.Ephemeral });
         return interaction.message.edit(verificationView(guild)).catch(() => {});
       }
 
