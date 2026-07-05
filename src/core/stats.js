@@ -138,11 +138,13 @@ async function updateCounters(guild) {
   }
 }
 
-// Mise à jour automatique : une fois au démarrage du bot, puis tous les jours à 4h
+// Mise à jour automatique : une fois au démarrage du bot, puis tous les jours à 4h.
+// Les permissions sont réappliquées à chaque passage (les évolutions se propagent seules).
 function startStatsWorker(client) {
   const tick = async () => {
     for (const guild of client.guilds.cache.values()) {
       if (!isModuleEnabled(guild.id, 'stats')) continue;
+      await applyStatsPermissions(guild).catch(() => {});
       await updateCounters(guild).catch((error) => console.error('Erreur stats :', error));
     }
   };
