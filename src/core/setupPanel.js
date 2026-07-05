@@ -1612,6 +1612,8 @@ async function handleSetupComponent(interaction) {
 
       if (sub === 'refresh') {
         await interaction.deferUpdate();
+        const { applyStatsPermissions } = require('./stats');
+        await applyStatsPermissions(guild).catch(() => {}); // réapplique aussi les permissions
         await updateCounters(guild).catch(() => {});
         return interaction.editReply(statsView(guild));
       }

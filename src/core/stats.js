@@ -6,12 +6,20 @@ const { getSettings, updateSettings, isModuleEnabled } = require('./settings');
 // aucune permission en héritage exploitable)
 const P = PermissionFlagsBits;
 const STATS_DENY = [
-  P.Connect, P.Speak, P.Stream, P.CreateInstantInvite,
-  P.SendMessages, P.AddReactions, P.EmbedLinks, P.AttachFiles,
-  P.UseSoundboard, P.UseExternalSounds, P.UseVAD, P.PrioritySpeaker,
+  // Gestion
+  P.ManageChannels, P.ManageRoles, P.ManageWebhooks,
+  // Vocal
+  P.Connect, P.Speak, P.Stream, P.UseVAD, P.PrioritySpeaker,
+  P.MuteMembers, P.DeafenMembers, P.MoveMembers,
+  P.UseSoundboard, P.UseExternalSounds,
+  // Chat
+  P.SendMessages, P.SendMessagesInThreads, P.AddReactions, P.EmbedLinks, P.AttachFiles,
   P.SendTTSMessages, P.SendVoiceMessages, P.SendPolls,
-  P.MentionEveryone, P.UseExternalEmojis, P.UseExternalStickers,
-  P.UseApplicationCommands, P.UseEmbeddedActivities, P.UseExternalApps,
+  P.MentionEveryone, P.ManageMessages, P.ReadMessageHistory,
+  P.UseExternalEmojis, P.UseExternalStickers,
+  P.CreatePublicThreads, P.CreatePrivateThreads, P.ManageThreads,
+  // Divers
+  P.CreateInstantInvite, P.UseApplicationCommands, P.UseEmbeddedActivities, P.UseExternalApps,
   P.CreateEvents, P.ManageEvents,
 ].filter(Boolean);
 
