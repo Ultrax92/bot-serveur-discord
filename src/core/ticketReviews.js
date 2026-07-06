@@ -4,7 +4,7 @@ const {
 } = require('discord.js');
 const db = require('./db');
 const { getSettings } = require('./settings');
-const { isBotAdminMember } = require('./permissions');
+const { isBotAdminMember, isOwner } = require('./permissions');
 const { userAuthor, idLine } = require('./logs');
 
 // Délai laissé au client pour noter, avant l'avis 5⭐ automatique
@@ -31,7 +31,8 @@ const insertStmt = db.prepare(`
 const getStmt = db.prepare('SELECT * FROM ticket_reviews WHERE id = ?');
 const dueStmt = db.prepare("SELECT * FROM ticket_reviews WHERE status = 'pending' AND deadline IS NOT NULL AND deadline <= ?");
 const setDmMessageStmt = db.prepare('UPDATE ticket_reviews SET dm_channel_id = ?, dm_message_id = ? WHERE id = ?');
-const setStarsStmt = db.prepare("UPDATE ticket_reviews SET stars = ?, status = 'awaiting', review_message_id = ? WHERE id = ?");
+const setStarsStmt = db.prepare("UPDATE ticket_reviews SET stars = ?, status = 'awaiting' WHERE id = ?");
+const setValidationMsgStmt = db.prepare('UPDATE ticket_reviews SET review_channel_id = ?, review_message_id = ? WHERE id = ?');
 const setCommentStmt = db.prepare('UPDATE ticket_reviews SET comment = ? WHERE id = ?');
 const setStatusStmt = db.prepare('UPDATE ticket_reviews SET status = ? WHERE id = ?');
 const publishAutoStmt = db.prepare("UPDATE ticket_reviews SET status = 'published', stars = 5, comment = ?, auto = 1 WHERE id = ?");
@@ -166,24 +167,31 @@ function validationView(guild, review) {
   return { embeds: [embed], components: [buttons] };
 }
 
-// Envoie l'avis dans le salon de validation, ou le publie directement si aucun n'est configuré
+// Envoie l'avis pour validation : salon staff configuré, sinon MP au owner —
+// un humain valide toujours avant publication
 async function submitForValidation(client, review) {
   const guild = client.guilds.cache.get(review.guild_id);
-  if (!guild) return { published: false };
+  if (!guild) return null;
   const tc = getSettings(guild.id).ticketsConfig;
-  const channel = tc.reviewChannel && guild.channels.cache.get(tc.reviewChannel);
-  if (channel) {
-    const user = await client.users.fetch(review.user_id).catch(() => null);
-    const view = validationView(guild, review);
-    if (user) view.embeds[0].setAuthor(userAuthor(user));
-    const sent = await channel.send(view).catch(() => null);
-    if (sent) return { messageId: sent.id, published: false };
+  const user = await client.users.fetch(review.user_id).catch(() => null);
+  const view = validationView(guild, review);
+  if (user) view.embeds[0].setAuthor(userAuthor(user));
+
+  const staffChannel = tc.reviewChannel && guild.channels.cache.get(tc.reviewChannel);
+  let sent = staffChannel ? await staffChannel.send(view).catch(() => null) : null;
+  if (!sent && process.env.OWNER_ID) {
+    const owner = await client.users.fetch(process.env.OWNER_ID).catch(() => null);
+    sent = owner && await owner.send({
+      content: `🛃 **Avis à valider** — aucun salon de validation configuré sur **${guild.name}** :`,
+      ...view,
+    }).catch(() => null);
   }
-  // Pas de salon de validation : publication directe
-  setStatusStmt.run('published', review.id);
-  const published = await publishReview(client, getStmt.get(review.id));
-  if (!published) setStatusStmt.run('awaiting', review.id);
-  return { published };
+  if (!sent) {
+    console.error(`[reviews] Avis #${review.id} : demande de validation impossible à envoyer (salon staff et MP owner indisponibles).`);
+    return null;
+  }
+  setValidationMsgStmt.run(sent.channelId, sent.id, review.id);
+  return sent;
 }
 
 async function handleReviewComponent(interaction) {
@@ -200,19 +208,17 @@ async function handleReviewComponent(interaction) {
       return interaction.reply({ content: '⏱️ Trop tard : un avis a déjà été enregistré pour ce ticket.', flags: MessageFlags.Ephemeral });
     }
     const stars = Math.min(5, Math.max(1, parseInt(extra, 10) || 5));
-    setStarsStmt.run(stars, null, reviewId);
-
-    const result = await submitForValidation(interaction.client, getStmt.get(reviewId));
-    if (result.messageId) setStarsStmt.run(stars, result.messageId, reviewId);
+    setStarsStmt.run(stars, reviewId);
+    await submitForValidation(interaction.client, getStmt.get(reviewId));
 
     const embed = new EmbedBuilder()
       .setColor(getSettings(review.guild_id).color)
       .setTitle('✅ Merci pour ta note !')
       .setDescription([
         `**Note enregistrée :** ${starsLine(stars)} — ${ticketLabel(review)}`,
-        result.published ? '' : 'Tu peux encore ajouter un commentaire tant que ton avis n\'est pas publié.',
-      ].filter(Boolean).join('\n'));
-    const components = result.published ? [] : [new ActionRowBuilder().addComponents(
+        'Tu peux encore ajouter un commentaire tant que ton avis n\'est pas publié.',
+      ].join('\n'));
+    const components = [new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId(`rv:comment:${reviewId}`).setLabel('💬 Ajouter un commentaire').setStyle(ButtonStyle.Primary),
     )];
     return interaction.update({ embeds: [embed], components });
@@ -244,23 +250,25 @@ async function handleReviewComponent(interaction) {
     const comment = interaction.fields.getTextInputValue('text').trim().slice(0, 1000);
     setCommentStmt.run(comment, reviewId);
 
-    // Met à jour l'embed en attente dans le salon de validation
+    // Met à jour l'embed en attente (salon de validation ou MP du owner)
     const guild = interaction.client.guilds.cache.get(review.guild_id);
-    const tc = guild && getSettings(guild.id).ticketsConfig;
-    const channel = tc?.reviewChannel && guild.channels.cache.get(tc.reviewChannel);
-    if (channel && review.review_message_id) {
+    if (guild && review.review_channel_id && review.review_message_id) {
       const updated = getStmt.get(reviewId);
       const user = await interaction.client.users.fetch(review.user_id).catch(() => null);
       const view = validationView(guild, updated);
       if (user) view.embeds[0].setAuthor(userAuthor(user));
-      await channel.messages.edit(review.review_message_id, view).catch(() => {});
+      const channel = await interaction.client.channels.fetch(review.review_channel_id).catch(() => null);
+      await channel?.messages.edit(review.review_message_id, view).catch(() => {});
     }
     return interaction.reply({ content: '💬 Commentaire ajouté à ton avis, merci !', flags: MessageFlags.Ephemeral });
   }
 
-  // Validation staff (dans le salon de validation)
+  // Validation : staff dans le salon configuré, ou owner dans ses MP
   if (action === 'approve' || action === 'reject') {
-    if (!interaction.inGuild() || !canModerateReview(interaction.member, review)) {
+    const allowed = interaction.inGuild()
+      ? canModerateReview(interaction.member, review)
+      : isOwner(interaction.user.id);
+    if (!allowed) {
       return interaction.reply({ content: 'Seul le staff peut valider ou rejeter un avis.', flags: MessageFlags.Ephemeral });
     }
     if (review.status !== 'awaiting') {

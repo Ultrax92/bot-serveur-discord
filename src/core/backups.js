@@ -62,7 +62,7 @@ const TABLE_COLUMNS = {
   invite_joins: ['guild_id', 'user_id', 'inviter_id', 'code', 'fake', 'has_left', 'joined_at'],
   giveaways: ['id', 'guild_id', 'channel_id', 'message_id', 'prize', 'winners', 'host_id', 'required_role', 'ends_at', 'ended', 'participants'],
   tempvoc_channels: ['channel_id', 'guild_id', 'owner_id'],
-  ticket_reviews: ['id', 'guild_id', 'user_id', 'ticket_number', 'type_id', 'type_label', 'status', 'stars', 'comment', 'auto', 'dm_channel_id', 'dm_message_id', 'review_message_id', 'deadline', 'created_at'],
+  ticket_reviews: ['id', 'guild_id', 'user_id', 'ticket_number', 'type_id', 'type_label', 'status', 'stars', 'comment', 'auto', 'dm_channel_id', 'dm_message_id', 'review_channel_id', 'review_message_id', 'deadline', 'created_at'],
 };
 
 function collectDatabase(guildId) {

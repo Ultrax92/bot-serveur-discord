@@ -538,10 +538,10 @@ function ticketReviewsView(guild) {
     `${feedback ? '🟢 **Notation active**' : '🔴 **Notation inactive** — configure le salon des avis pour l\'activer'}`,
     '',
     `⭐ **Salon des avis publiés** — ${feedback ? `${feedback}` : '🔴 non configuré'}`,
-    `🛃 **Salon staff de validation** — ${review ? `${review}` : '⚠️ aucun : les avis sont publiés directement, sans validation'}`,
+    `🛃 **Salon staff de validation** — ${review ? `${review}` : '📬 aucun : les avis arrivent en MP au owner pour validation'}`,
     `🎁 **Rôle donné au client** à la publication — ${role ? `${role}` : '*aucun*'}`,
     '',
-    '**Fonctionnement :** à la fermeture d\'un ticket, l\'ouvreur reçoit en MP une demande de note (1 à 5 ⭐, commentaire facultatif). L\'avis passe par le salon de validation (✅ publier / ❌ rejeter) avant d\'être publié.',
+    '**Fonctionnement :** à la fermeture d\'un ticket, l\'ouvreur reçoit en MP une demande de note (1 à 5 ⭐, commentaire facultatif). L\'avis est toujours validé (✅ publier / ❌ rejeter) avant publication : dans le salon de validation, ou en MP au owner si aucun n\'est configuré.',
     '*Sans réponse sous 7 jours, ou si le membre est parti, un avis 5⭐ générique est publié automatiquement.*',
   ].join('\n'));
 
@@ -553,7 +553,7 @@ function ticketReviewsView(guild) {
 
   const reviewSelect = new ChannelSelectMenuBuilder()
     .setCustomId('setup:tk:rvchan')
-    .setPlaceholder('🛃 Salon staff de validation (vide = publication directe)…')
+    .setPlaceholder('🛃 Salon staff de validation (vide = MP au owner)…')
     .setChannelTypes(ChannelType.GuildText)
     .setMinValues(0)
     .setMaxValues(1);
@@ -1688,7 +1688,7 @@ async function handleSetupComponent(interaction) {
           .setTitle(sub === 'fbchanid' ? 'Salon des avis publiés' : 'Salon staff de validation')
           .addComponents(new ActionRowBuilder().addComponents(
             new TextInputBuilder().setCustomId('id')
-              .setLabel(sub === 'fbchanid' ? 'ID, mention <#…> ou lien du salon' : 'ID ou lien (vide = publication directe)')
+              .setLabel(sub === 'fbchanid' ? 'ID, mention <#…> ou lien du salon' : 'ID ou lien (vide = validation en MP au owner)')
               .setPlaceholder('1234567890123456789')
               .setStyle(TextInputStyle.Short).setRequired(sub === 'fbchanid').setMaxLength(100),
           ));

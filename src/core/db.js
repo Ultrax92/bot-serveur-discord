@@ -54,7 +54,8 @@ CREATE TABLE IF NOT EXISTS ticket_reviews (
   auto INTEGER NOT NULL DEFAULT 0,         -- 1 = avis 5⭐ générique publié automatiquement
   dm_channel_id TEXT,                      -- message MP de notation, pour l'éditer ensuite
   dm_message_id TEXT,
-  review_message_id TEXT,                  -- message dans le salon de validation
+  review_channel_id TEXT,                  -- message de validation : salon staff ou MP du owner
+  review_message_id TEXT,
   deadline INTEGER,                        -- pending : date de l'avis auto (J+7)
   created_at INTEGER NOT NULL
 );
@@ -107,5 +108,8 @@ CREATE TABLE IF NOT EXISTS invite_joins (
 );
 CREATE INDEX IF NOT EXISTS idx_invite_joins_inviter ON invite_joins (guild_id, inviter_id);
 `);
+
+// Colonnes ajoutées après coup (ALTER silencieux si la colonne existe déjà)
+try { db.exec('ALTER TABLE ticket_reviews ADD COLUMN review_channel_id TEXT'); } catch { /* déjà présente */ }
 
 module.exports = db;
