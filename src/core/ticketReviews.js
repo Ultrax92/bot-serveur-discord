@@ -1,6 +1,6 @@
 const {
   EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle,
-  ModalBuilder, TextInputBuilder, TextInputStyle, MessageFlags,
+  ModalBuilder, TextInputBuilder, TextInputStyle, MessageFlags, AttachmentBuilder,
 } = require('discord.js');
 const db = require('./db');
 const { getSettings } = require('./settings');
@@ -25,8 +25,8 @@ const AUTO_REVIEW_TEXTS = [
 ];
 
 const insertStmt = db.prepare(`
-  INSERT INTO ticket_reviews (guild_id, user_id, ticket_number, type_id, type_label, status, stars, comment, auto, deadline, created_at)
-  VALUES (@guild_id, @user_id, @ticket_number, @type_id, @type_label, @status, @stars, @comment, @auto, @deadline, @created_at)
+  INSERT INTO ticket_reviews (guild_id, user_id, ticket_number, type_id, type_label, status, stars, comment, auto, deadline, transcript, created_at)
+  VALUES (@guild_id, @user_id, @ticket_number, @type_id, @type_label, @status, @stars, @comment, @auto, @deadline, @transcript, @created_at)
 `);
 const getStmt = db.prepare('SELECT * FROM ticket_reviews WHERE id = ?');
 const dueStmt = db.prepare("SELECT * FROM ticket_reviews WHERE status = 'pending' AND deadline IS NOT NULL AND deadline <= ?");
@@ -36,6 +36,8 @@ const setValidationMsgStmt = db.prepare('UPDATE ticket_reviews SET review_channe
 const setCommentStmt = db.prepare('UPDATE ticket_reviews SET comment = ? WHERE id = ?');
 const setStatusStmt = db.prepare('UPDATE ticket_reviews SET status = ? WHERE id = ?');
 const publishAutoStmt = db.prepare("UPDATE ticket_reviews SET status = 'published', stars = 5, comment = ?, auto = 1 WHERE id = ?");
+// Une fois l'avis traité, le transcript ne sert plus : purgé pour garder la base et les backups légers
+const clearTranscriptStmt = db.prepare('UPDATE ticket_reviews SET transcript = NULL WHERE id = ?');
 
 // La notation est active dès qu'un salon de feedback est configuré
 function reviewsEnabled(guildId) {
@@ -88,13 +90,14 @@ async function publishAutoReview(client, reviewId) {
   const review = getStmt.get(reviewId);
   const ok = await publishReview(client, review);
   if (!ok) setStatusStmt.run('pending', reviewId); // salon indisponible : on retentera au prochain passage
+  else clearTranscriptStmt.run(reviewId);
   return ok;
 }
 
 // ── Création à la fermeture d'un ticket ───────────────────────────────────────
 
 // closedBy === null → membre parti : avis 5⭐ auto immédiat, sans MP
-async function requestReview(guild, ticketRow, closedBy) {
+async function requestReview(guild, ticketRow, closedBy, transcript = null) {
   if (!reviewsEnabled(guild.id)) return;
   const tc = getSettings(guild.id).ticketsConfig;
   const type = tc.types.find((t) => t.id === ticketRow.type_id);
@@ -110,6 +113,7 @@ async function requestReview(guild, ticketRow, closedBy) {
     comment: null,
     auto: 0,
     deadline: Date.now() + REVIEW_DEADLINE_MS,
+    transcript: transcript || null,
     created_at: Date.now(),
   });
   const reviewId = info.lastInsertRowid;
@@ -176,6 +180,12 @@ async function submitForValidation(client, review) {
   const user = await client.users.fetch(review.user_id).catch(() => null);
   const view = validationView(guild, review);
   if (user) view.embeds[0].setAuthor(userAuthor(user));
+
+  // Transcript du ticket joint en .txt, pour juger l'avis en connaissance de cause
+  // (sauf transcript anormalement lourd, qui ferait échouer l'envoi)
+  if (review.transcript && Buffer.byteLength(review.transcript, 'utf8') < 9 * 1024 * 1024) {
+    view.files = [new AttachmentBuilder(Buffer.from(review.transcript, 'utf8'), { name: `transcript-ticket-${review.ticket_number}.txt` })];
+  }
 
   const staffChannel = tc.reviewChannel && guild.channels.cache.get(tc.reviewChannel);
   let sent = staffChannel ? await staffChannel.send(view).catch(() => null) : null;
@@ -277,6 +287,7 @@ async function handleReviewComponent(interaction) {
 
     if (action === 'reject') {
       setStatusStmt.run('rejected', reviewId);
+      clearTranscriptStmt.run(reviewId);
       const embed = EmbedBuilder.from(interaction.message.embeds[0])
         .setColor(0xed4245)
         .setDescription(`❌ **Avis rejeté** par ${interaction.user} — ${ticketLabel(review)} (${starsLine(review.stars)})`);
@@ -289,6 +300,7 @@ async function handleReviewComponent(interaction) {
       setStatusStmt.run('awaiting', reviewId);
       return interaction.reply({ content: '❌ Impossible de publier dans le salon de feedback (vérifie qu\'il existe et mes permissions).', flags: MessageFlags.Ephemeral });
     }
+    clearTranscriptStmt.run(reviewId);
     const embed = EmbedBuilder.from(interaction.message.embeds[0])
       .setColor(0x57f287)
       .setDescription(`✅ **Avis publié** par ${interaction.user} — ${ticketLabel(review)} (${starsLine(review.stars)})`);

@@ -222,9 +222,10 @@ async function closeTicketChannel(channel, row, closedBy) {
     }
   }
 
-  // Notation du ticket : demande d'avis en MP (ou avis 5⭐ auto si le membre est parti)
+  // Notation du ticket : demande d'avis en MP (ou avis 5⭐ auto si le membre est parti).
+  // Le transcript est conservé avec l'avis : le salon n'existera plus au moment de la validation.
   const { requestReview } = require('./ticketReviews');
-  await requestReview(guild, row, closedBy).catch((error) => console.error('[reviews] Erreur demande d\'avis :', error));
+  await requestReview(guild, row, closedBy, transcript).catch((error) => console.error('[reviews] Erreur demande d\'avis :', error));
 
   await channel.delete('Ticket fermé').catch(() => {});
 }
