@@ -60,7 +60,7 @@ function watchPanel(message) {
   clearTimeout(activePanels.get(message.id));
   activePanels.set(message.id, setTimeout(() => {
     activePanels.delete(message.id);
-    message.edit(expiredView()).catch(() => {});
+    message.edit(expiredView()).catch(() => { });
   }, PANEL_TIMEOUT_MS));
 }
 
@@ -93,12 +93,12 @@ function hubView(guild) {
     `🛡️ **Antiraid** — ${['antibot', 'antichannel', 'antirole', 'antiwebhook', 'antiban', 'massjoin'].filter((k) => settings.antiraidConfig[k].enabled).length}/6 protections actives`,
     '',
     '__**3️⃣ Les systèmes du serveur**__',
-    `🎫 **Tickets** — salon ${settings.ticketsConfig.panelChannel ? '🟢' : '🔴'} | ${settings.ticketsConfig.types.length} type(s)`,
-    `🔊 **Vocaux temporaires** — générateur ${settings.tempvocConfig.generatorChannel ? '🟢' : '🔴'}`,
     `📊 **Stats** — ${settings.statsConfig.counters.length} compteur(s)`,
     `📨 **Invite tracker** — ${settings.modules.invites ? '🟢 actif' : '🔴 inactif (à activer dans 🧩 Modules)'}`,
-    `🎉 **Giveaways** — ${require('./giveaways').activeGiveaways(guild.id).length} en cours | rôle requis ${settings.giveawaysConfig.requiredRole ? '🟢' : '🔴 aucun'}`,
     `🧩 **Commandes custom** — ${settings.customCommands.length} commande(s)`,
+    `🎫 **Tickets** — salon ${settings.ticketsConfig.panelChannel ? '🟢' : '🔴'} | ${settings.ticketsConfig.types.length} type(s)`,
+    `🔊 **Vocaux temporaires** — générateur ${settings.tempvocConfig.generatorChannel ? '🟢' : '🔴'}`,
+    `🎉 **Giveaways** — ${require('./giveaways').activeGiveaways(guild.id).length} en cours | rôle requis ${settings.giveawaysConfig.requiredRole ? '🟢' : '🔴 aucun'}`,
     '',
     'Choisis une section dans le menu · outils : `/embed` `/backup` `/update`',
   ].join('\n'));
@@ -125,17 +125,17 @@ function hubView(guild) {
         .setDescription('Antispam, antilink, antimention, mots interdits'),
       new StringSelectMenuOptionBuilder().setValue('antiraid').setLabel('8. Antiraid').setEmoji('🛡️')
         .setDescription('Antibot, rafales de salons/rôles/bans, whitelist'),
-      // 3️⃣ Les systèmes du serveur
-      new StringSelectMenuOptionBuilder().setValue('tickets').setLabel('9. Tickets').setEmoji('🎫')
-        .setDescription('Panneau à sélecteur, types de tickets, transcript'),
-      new StringSelectMenuOptionBuilder().setValue('tempvoc').setLabel('10. Vocaux temporaires').setEmoji('🔊')
-        .setDescription('Salon générateur, rôles d\'accès et admin'),
-      new StringSelectMenuOptionBuilder().setValue('stats').setLabel('11. Stats du serveur').setEmoji('📊')
+      // 3️⃣ Les systèmes du serveur (même ordre que le résumé ci-dessus)
+      new StringSelectMenuOptionBuilder().setValue('stats').setLabel('9. Stats du serveur').setEmoji('📊')
         .setDescription('Compteurs membres et rôles en vocaux verrouillés'),
-      new StringSelectMenuOptionBuilder().setValue('giveaways').setLabel('12. Giveaways').setEmoji('🎉')
-        .setDescription('Rôle requis pour participer, giveaways en cours'),
-      new StringSelectMenuOptionBuilder().setValue('custom').setLabel('13. Commandes custom').setEmoji('🧩')
+      new StringSelectMenuOptionBuilder().setValue('custom').setLabel('10. Commandes custom').setEmoji('🧩')
         .setDescription('Commandes à préfixe avec réponse personnalisée'),
+      new StringSelectMenuOptionBuilder().setValue('tickets').setLabel('11. Tickets').setEmoji('🎫')
+        .setDescription('Panneau à sélecteur, types de tickets, transcript'),
+      new StringSelectMenuOptionBuilder().setValue('tempvoc').setLabel('12. Vocaux temporaires').setEmoji('🔊')
+        .setDescription('Salon générateur, rôles d\'accès et admin'),
+      new StringSelectMenuOptionBuilder().setValue('giveaways').setLabel('13. Giveaways').setEmoji('🎉')
+        .setDescription('Rôle requis pour participer, giveaways en cours'),
     );
 
   const buttons = new ActionRowBuilder().addComponents(
@@ -1634,7 +1634,7 @@ async function handleSetupComponent(interaction) {
         // Supprime l'ancien panneau publié, puis mémorise le nouveau
         if (tc.lastPanelChannel && tc.lastPanelMessage) {
           const oldChannel = guild.channels.cache.get(tc.lastPanelChannel);
-          await oldChannel?.messages.delete(tc.lastPanelMessage).catch(() => {});
+          await oldChannel?.messages.delete(tc.lastPanelMessage).catch(() => { });
         }
         updateSettings(guild.id, (s) => {
           s.modules.tickets = true;
@@ -1642,7 +1642,7 @@ async function handleSetupComponent(interaction) {
           s.ticketsConfig.lastPanelMessage = sent.id;
         });
         await interaction.reply({ content: `📤 Panneau de tickets publié dans ${channel}${tc.lastPanelMessage ? ' (ancien panneau supprimé)' : ''}.`, flags: MessageFlags.Ephemeral });
-        return interaction.message.edit(ticketsView(guild)).catch(() => {});
+        return interaction.message.edit(ticketsView(guild)).catch(() => { });
       }
 
       if (sub === 'reqroleid') {
@@ -2034,8 +2034,8 @@ async function handleSetupComponent(interaction) {
       if (sub === 'refresh') {
         await interaction.deferUpdate();
         const { applyStatsPermissions } = require('./stats');
-        await applyStatsPermissions(guild).catch(() => {}); // réapplique aussi les permissions
-        await updateCounters(guild).catch(() => {});
+        await applyStatsPermissions(guild).catch(() => { }); // réapplique aussi les permissions
+        await updateCounters(guild).catch(() => { });
         return interaction.editReply(statsView(guild));
       }
 
@@ -2190,7 +2190,7 @@ async function handleSetupComponent(interaction) {
         // Supprime l'ancien panneau publié, puis mémorise le nouveau
         if (vc.lastPanelChannel && vc.lastPanelMessage) {
           const oldChannel = guild.channels.cache.get(vc.lastPanelChannel);
-          await oldChannel?.messages.delete(vc.lastPanelMessage).catch(() => {});
+          await oldChannel?.messages.delete(vc.lastPanelMessage).catch(() => { });
         }
         updateSettings(guild.id, (s) => {
           s.modules.verification = true;
@@ -2198,7 +2198,7 @@ async function handleSetupComponent(interaction) {
           s.verifConfig.lastPanelMessage = sent.id;
         });
         await interaction.reply({ content: `📤 Panneau de vérification publié dans ${channel}${vc.lastPanelMessage ? ' (ancien panneau supprimé)' : ''}.`, flags: MessageFlags.Ephemeral });
-        return interaction.message.edit(verificationView(guild)).catch(() => {});
+        return interaction.message.edit(verificationView(guild)).catch(() => { });
       }
 
       if (sub === 'msg') {
