@@ -166,14 +166,19 @@ async function serialize(guild) {
   const { getActivityText } = require('./botStatus');
 
   // Structure du serveur (rôles, salons, permissions) + photo des rôles des membres.
-  // En cas d'échec (permissions, rate-limit), le backup config part quand même.
+  // En cas d'échec (permissions, rate-limit), le backup config part quand même —
+  // les deux captures sont indépendantes pour que l'une ne coule pas l'autre.
+  const { snapshotMemberRoles, captureServer } = require('./serverBackup');
+  try {
+    await snapshotMemberRoles(guild);
+  } catch (error) {
+    console.error(`[backups] Photo des rôles des membres impossible (${guild.id}) :`, error);
+  }
   let server = null;
   try {
-    const { snapshotMemberRoles, captureServer } = require('./serverBackup');
-    await snapshotMemberRoles(guild);
     server = await captureServer(guild);
   } catch (error) {
-    console.error(`[backups] Capture de la structure du serveur impossible (${guild.id}) :`, error.message);
+    console.error(`[backups] Capture de la structure du serveur impossible (${guild.id}) :`, error);
   }
 
   return JSON.stringify(
@@ -445,9 +450,7 @@ async function applyRestore(interaction, payload, mode) {
       ? `• Structure : ${structure.createdRoles} rôle(s) et ${structure.createdChannels} salon(s) ${mode === 'rebuild' ? 'recréés' : 'recréés/réparés'}, permissions réappliquées`
       : null,
     `• Configuration complète appliquée${images ? ` • ${images} image(s)` : ''}${rows ? ` • ${rows} donnée(s) : sanctions, tickets, invitations, giveaways, rôles des membres` : ''}`,
-    reassigned?.members
-      ? `• 🎭 ${reassigned.roles} rôle(s) remis à ${reassigned.members} membre(s) présent(s)`
-      : null,
+    reassigned?.members ? `• 🎭 ${reassigned.roles} rôle(s) remis à ${reassigned.members} membre(s) présent(s)` : null,
     structure ? '• Les membres qui (re)joignent récupèrent automatiquement leurs rôles mémorisés' : null,
     'Vérifie dans `/setup` (un backup pré-restauration a été créé au cas où).',
   ]
@@ -486,9 +489,18 @@ async function handleBackupComponent(interaction) {
     }); // active l'auto quotidien
     await interaction.editReply(backupPanel(guild, interaction.user.id));
     const row = getStmt.get(id, guild.id);
+    let structureNote = '';
+    try {
+      if (!JSON.parse(row.data).server) {
+        structureNote =
+          '\n⚠️ **Structure du serveur non capturée** (rôles/salons absents de ce backup) — regarde 🚨 logs-erreurs ou `pm2 logs` pour la cause.';
+      }
+    } catch {
+      /* vérification best-effort */
+    }
     return interaction
       .followUp({
-        content: `✅ Backup \`#${id}\` créé et stocké sur le serveur ! Le veux-tu en local ? Le voici :`,
+        content: `✅ Backup \`#${id}\` créé et stocké sur le serveur ! Le veux-tu en local ? Le voici :${structureNote}`,
         files: [backupFile(guild.id, row.data, row.created_at)],
         flags: MessageFlags.Ephemeral,
       })
