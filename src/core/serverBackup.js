@@ -27,9 +27,22 @@ const setMemberRolesStmt = db.prepare('UPDATE member_roles SET roles = ? WHERE g
 
 // ── Capture ───────────────────────────────────────────────────────────────────
 
+// Liste complète des membres, en économisant le gateway : le cache est complet
+// après le premier fetch (l'intent membres le tient à jour), et en cas de
+// rate-limit (opcode 8) on se rabat dessus plutôt que de tout perdre
+async function fetchAllMembers(guild) {
+  if (guild.members.cache.size >= guild.memberCount) return guild.members.cache;
+  try {
+    return await guild.members.fetch();
+  } catch (error) {
+    console.error(`[backups] Fetch des membres limité (${guild.id}), cache utilisé :`, error.message ?? error);
+    return guild.members.cache;
+  }
+}
+
 // Photographie les rôles de chaque membre (pour les lui remettre s'il revient)
 async function snapshotMemberRoles(guild) {
-  const members = await guild.members.fetch();
+  const members = await fetchAllMembers(guild);
   const now = Date.now();
   const write = db.transaction(() => {
     for (const member of members.values()) {
@@ -168,7 +181,7 @@ async function repairServer(guild, server, progress = async () => {}) {
         await existing
           .edit({
             name: r.name,
-            color: r.color,
+            colors: { primaryColor: r.color },
             hoist: r.hoist,
             mentionable: r.mentionable,
             permissions: BigInt(r.permissions),
@@ -180,7 +193,7 @@ async function repairServer(guild, server, progress = async () => {}) {
       const created = await guild.roles
         .create({
           name: r.name,
-          color: r.color,
+          colors: { primaryColor: r.color },
           hoist: r.hoist,
           mentionable: r.mentionable,
           permissions: BigInt(r.permissions),
@@ -252,7 +265,7 @@ async function rebuildServer(guild, server, progress = async () => {}) {
     const created = await guild.roles
       .create({
         name: r.name,
-        color: r.color,
+        colors: { primaryColor: r.color },
         hoist: r.hoist,
         mentionable: r.mentionable,
         permissions: BigInt(r.permissions),
@@ -329,8 +342,7 @@ async function reassignRolesOnJoin(member) {
 // Après une réparation/reconstruction : les membres DÉJÀ présents récupèrent
 // aussi leurs rôles (aucun événement "join" ne se déclenche pour eux)
 async function reassignRolesForPresentMembers(guild) {
-  const members = await guild.members.fetch().catch(() => null);
-  if (!members) return { members: 0, roles: 0 };
+  const members = await fetchAllMembers(guild);
   let touched = 0;
   let total = 0;
   for (const member of members.values()) {
