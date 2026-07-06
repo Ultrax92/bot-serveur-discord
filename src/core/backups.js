@@ -451,6 +451,9 @@ async function applyRestore(interaction, payload, mode) {
       : null,
     `• Configuration complète appliquée${images ? ` • ${images} image(s)` : ''}${rows ? ` • ${rows} donnée(s) : sanctions, tickets, invitations, giveaways, rôles des membres` : ''}`,
     reassigned?.members ? `• 🎭 ${reassigned.roles} rôle(s) remis à ${reassigned.members} membre(s) présent(s)` : null,
+    structure?.fallbackChannels
+      ? `• ⚠️ ${structure.fallbackChannels} salon(s) annonces/forum/stage recréés en textuel/vocal simple : ce serveur n'a pas la fonction **Communauté** — active-la (Paramètres du serveur → Communauté) puis reconvertis-les dans les paramètres de chaque salon`
+      : null,
     structure ? '• Les membres qui (re)joignent récupèrent automatiquement leurs rôles mémorisés' : null,
     'Vérifie dans `/setup` (un backup pré-restauration a été créé au cas où).',
   ]

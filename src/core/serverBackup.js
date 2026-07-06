@@ -126,6 +126,25 @@ function mapOverwrites(overwrites, idMap) {
     .filter((o) => o.id);
 }
 
+// Types réservés aux serveurs Communauté → repli si la création est refusée
+// (annonces/forum → textuel, stage → vocal) : permissions et contenu conservés,
+// le mode se réactive dans les paramètres du salon une fois Communauté activée
+const COMMUNITY_FALLBACK_TYPES = {
+  [ChannelType.GuildAnnouncement]: ChannelType.GuildText,
+  [ChannelType.GuildForum]: ChannelType.GuildText,
+  [ChannelType.GuildStageVoice]: ChannelType.GuildVoice,
+};
+
+async function createChannelWithFallback(guild, c, idMap) {
+  const options = channelCreateOptions(guild, c, idMap);
+  const created = await guild.channels.create(options).catch(() => null);
+  if (created) return { created, fallback: false };
+  const fallbackType = COMMUNITY_FALLBACK_TYPES[c.type];
+  if (fallbackType === undefined) return { created: null, fallback: false };
+  const fallbackChannel = await guild.channels.create({ ...options, type: fallbackType }).catch(() => null);
+  return { created: fallbackChannel, fallback: Boolean(fallbackChannel) };
+}
+
 function channelCreateOptions(guild, c, idMap) {
   const options = {
     name: c.name,
@@ -166,6 +185,7 @@ async function repairServer(guild, server, progress = async () => {}) {
   const me = guild.members.me;
   let createdRoles = 0;
   let createdChannels = 0;
+  let fallbackChannels = 0;
 
   await progress('🎭 Réparation des rôles…');
   for (const r of server.roles) {
@@ -223,17 +243,18 @@ async function repairServer(guild, server, progress = async () => {}) {
         .set(mapOverwrites(c.overwrites, idMap), 'Réparation du backup serveur')
         .catch(() => {});
     } else {
-      const created = await guild.channels.create(channelCreateOptions(guild, c, idMap)).catch(() => null);
+      const { created, fallback } = await createChannelWithFallback(guild, c, idMap);
       if (created) {
         idMap[c.id] = created.id;
         createdChannels++;
+        if (fallback) fallbackChannels++;
       }
     }
   }
 
   await progress('⚙️ Réglages du serveur…');
   await applyGuildSettings(guild, server, idMap);
-  return { idMap, createdRoles, createdChannels };
+  return { idMap, createdRoles, createdChannels, fallbackChannels };
 }
 
 // 🏗️ RECONSTRUIRE 1:1 : supprime tous les salons et rôles supprimables, puis
@@ -276,16 +297,18 @@ async function rebuildServer(guild, server, progress = async () => {}) {
   }
 
   await progress(`📁 Création des ${server.channels.length} salons…`);
+  let fallbackChannels = 0;
   const categories = server.channels.filter((c) => c.type === ChannelType.GuildCategory);
   const others = server.channels.filter((c) => c.type !== ChannelType.GuildCategory);
   for (const c of [...categories, ...others]) {
-    const created = await guild.channels.create(channelCreateOptions(guild, c, idMap)).catch(() => null);
+    const { created, fallback } = await createChannelWithFallback(guild, c, idMap);
     if (created) idMap[c.id] = created.id;
+    if (fallback) fallbackChannels++;
   }
 
   await progress('⚙️ Réglages du serveur (nom, icône, vérification)…');
   await applyGuildSettings(guild, server, idMap);
-  return { idMap, createdRoles: server.roles.length, createdChannels: server.channels.length };
+  return { idMap, createdRoles: server.roles.length, createdChannels: server.channels.length, fallbackChannels };
 }
 
 // ── Remappage anciens ids → nouveaux ──────────────────────────────────────────
