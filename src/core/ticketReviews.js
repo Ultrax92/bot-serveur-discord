@@ -88,8 +88,8 @@ async function publishReview(client, review) {
       `**${starsLine(review.stars)}**`,
       review.comment ? `> ${review.comment.replace(/\n/g, '\n> ')}` : null,
     ].filter(Boolean).join('\n'))
-    .setFooter({ text: `Ticket n°${review.ticket_number}${review.type_label ? ` · ${review.type_label}` : ''}` })
     .setTimestamp();
+  if (review.type_label) embed.setFooter({ text: review.type_label });
   if (user) embed.setAuthor(userAuthor(user));
 
   const files = [];
