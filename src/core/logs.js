@@ -13,6 +13,7 @@ const LOG_TYPES = {
   ticket: { label: 'Tickets', emoji: '🎫', channelName: 'logs-tickets' },
   raid: { label: 'Antiraid', emoji: '🛡️', channelName: 'logs-raid' },
   command: { label: 'Commandes du bot', emoji: '🤖', channelName: 'logs-commandes' },
+  error: { label: 'Erreurs du bot', emoji: '🚨', channelName: 'logs-erreurs' },
 };
 
 // En-tête d'embed au format compact : avatar + nom cliquable (lien vers le profil)
