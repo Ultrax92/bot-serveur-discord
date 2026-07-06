@@ -431,6 +431,14 @@ async function applyRestore(interaction, payload, mode) {
     require('./botStatus').setActivityText(interaction.client, payload.botActivity);
   }
 
+  // Les compteurs de stats recréés portent les chiffres de la capture :
+  // rafraîchis tout de suite avec les vrais effectifs du serveur cible
+  if (isModuleEnabled(guild.id, 'stats')) {
+    await require('./stats')
+      .updateCounters(guild)
+      .catch(() => {});
+  }
+
   // 4. Les membres déjà présents récupèrent leurs rôles mémorisés (ceux qui
   // rejoindront plus tard les recevront à leur arrivée)
   let reassigned = null;

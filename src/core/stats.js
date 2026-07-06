@@ -164,7 +164,9 @@ async function removeCounter(guild, counterId) {
 async function updateCounters(guild) {
   const { counters } = getSettings(guild.id).statsConfig;
   if (!counters.length) return;
-  await guild.members.fetch().catch(() => {});
+  // Cache utilisé s'il est complet : évite les rate-limits gateway (opcode 8)
+  const { fetchAllMembers } = require('./serverBackup');
+  await fetchAllMembers(guild);
 
   for (const counter of counters) {
     const channel = guild.channels.cache.get(counter.channelId);
