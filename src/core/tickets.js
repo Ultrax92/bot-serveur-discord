@@ -16,13 +16,16 @@ const countOpenStmt = db.prepare("SELECT COUNT(*) AS c FROM tickets WHERE guild_
 // Numérotation de 1 à 9999, puis on repart à 1
 const nextNumberStmt = db.prepare('SELECT (COALESCE(MAX(number), 0) % 9999) + 1 AS n FROM tickets WHERE guild_id = ?');
 const insertStmt = db.prepare(`
-  INSERT INTO tickets (guild_id, channel_id, user_id, number, type_id, created_at)
-  VALUES (?, ?, ?, ?, ?, ?)
+  INSERT INTO tickets (guild_id, channel_id, user_id, number, type_id, created_at, last_activity_at)
+  VALUES (?, ?, ?, ?, ?, ?, ?)
 `);
 const byChannelStmt = db.prepare('SELECT * FROM tickets WHERE channel_id = ?');
 const openByUserStmt = db.prepare("SELECT * FROM tickets WHERE guild_id = ? AND user_id = ? AND status = 'open'");
+const openByGuildStmt = db.prepare("SELECT * FROM tickets WHERE guild_id = ? AND status = 'open'");
 const claimStmt = db.prepare('UPDATE tickets SET claimed_by = ? WHERE channel_id = ?');
 const closeStmt = db.prepare("UPDATE tickets SET status = 'closed' WHERE channel_id = ?");
+const setActivityStmt = db.prepare('UPDATE tickets SET last_activity_at = ?, warned_at = NULL WHERE channel_id = ?');
+const setWarnedStmt = db.prepare('UPDATE tickets SET warned_at = ? WHERE channel_id = ?');
 
 // Le panneau publié : embed + sélecteur des types de tickets
 function buildTicketPanel(guild, publisher = null) {
@@ -117,7 +120,8 @@ async function openTicket(interaction) {
     return interaction.editReply('❌ Impossible de créer le salon du ticket (vérifie mes permissions et la catégorie configurée).');
   }
 
-  insertStmt.run(guild.id, channel.id, interaction.user.id, number, type.id, Date.now());
+  const createdAt = Date.now();
+  insertStmt.run(guild.id, channel.id, interaction.user.id, number, type.id, createdAt, createdAt);
 
   const mentions = [`${interaction.user}`, ...(type.mentionRoles ?? []).map((id) => `<@&${id}>`)].join(' ');
   const embed = new EmbedBuilder()
@@ -188,8 +192,9 @@ async function buildTranscript(channel) {
   return lines.reverse().join('\n') || 'Aucun message.';
 }
 
-// Fermeture générique : transcript, log, MP, suppression du salon
-async function closeTicketChannel(channel, row, closedBy) {
+// Fermeture générique : transcript, log, MP, suppression du salon.
+// reason distingue les fermetures automatiques : 'leave' (membre parti) | 'inactivity'
+async function closeTicketChannel(channel, row, closedBy, reason = 'leave') {
   closeStmt.run(channel.id);
   const guild = channel.guild;
   const tc = getSettings(guild.id).ticketsConfig;
@@ -203,7 +208,7 @@ async function closeTicketChannel(channel, row, closedBy) {
     .setDescription([
       `🔒 **Ticket fermé** — n°${row.number}${type ? ` (${type.label})` : ''}`,
       `**Ouvert par :** <@${row.user_id}> · \`${row.user_id}\``,
-      `**Fermé par :** ${closedBy ? `${closedBy} · \`${closedBy.id}\`` : 'automatique (membre parti)'}`,
+      `**Fermé par :** ${closedBy ? `${closedBy} · \`${closedBy.id}\`` : reason === 'inactivity' ? 'automatique (inactivité)' : 'automatique (membre parti)'}`,
       row.claimed_by ? `**Pris en charge par :** <@${row.claimed_by}>` : null,
     ].filter(Boolean).join('\n'))
     .setTimestamp();
@@ -223,9 +228,11 @@ async function closeTicketChannel(channel, row, closedBy) {
   }
 
   // Notation du ticket : demande d'avis en MP (ou avis 5⭐ auto si le membre est parti).
+  // Fermé pour inactivité = le membre est encore là : il reçoit la demande d'avis normale.
   // Le transcript est conservé avec l'avis : le salon n'existera plus au moment de la validation.
   const { requestReview } = require('./ticketReviews');
-  await requestReview(guild, row, closedBy, transcript).catch((error) => console.error('[reviews] Erreur demande d\'avis :', error));
+  const reviewCloser = closedBy ?? (reason === 'inactivity' ? guild.client.user : null);
+  await requestReview(guild, row, reviewCloser, transcript).catch((error) => console.error('[reviews] Erreur demande d\'avis :', error));
 
   await channel.delete('Ticket fermé').catch(() => {});
 }
@@ -263,6 +270,62 @@ async function handleTicketComponent(interaction) {
   if (action === 'close') return closeTicket(interaction);
 }
 
+// ── Fermeture automatique des tickets inactifs ────────────────────────────────
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+// Seuls les messages de l'OUVREUR comptent comme activité : un staff qui relance
+// sans réponse ne prolonge pas le ticket. Un message de l'ouvreur remet le
+// compteur à zéro et annule l'avertissement en cours.
+function trackTicketActivity(message) {
+  if (!message.inGuild() || message.author.bot) return;
+  const row = byChannelStmt.get(message.channelId);
+  if (!row || row.status !== 'open' || row.user_id !== message.author.id) return;
+  setActivityStmt.run(Date.now(), message.channelId);
+}
+
+// Avertissement avec mention à X-1 jours d'inactivité, fermeture 24 h plus tard
+// sans réponse (X = ticketsConfig.autoCloseDays, 0 = désactivé)
+function startTicketInactivityWorker(client) {
+  const tick = async () => {
+    const now = Date.now();
+    for (const guild of client.guilds.cache.values()) {
+      if (!isModuleEnabled(guild.id, 'tickets')) continue;
+      const days = getSettings(guild.id).ticketsConfig.autoCloseDays;
+      if (!days || days < 2) continue;
+
+      for (const row of openByGuildStmt.all(guild.id)) {
+        // Tickets d'avant la mise à jour : leur compteur démarre maintenant
+        if (!row.last_activity_at) {
+          setActivityStmt.run(now, row.channel_id);
+          continue;
+        }
+        const channel = guild.channels.cache.get(row.channel_id);
+        if (!channel) {
+          closeStmt.run(row.channel_id); // salon supprimé à la main
+          continue;
+        }
+        if (row.warned_at) {
+          if (now - row.warned_at >= DAY_MS) {
+            await closeTicketChannel(channel, row, null, 'inactivity').catch(() => {});
+          }
+        } else if (now - row.last_activity_at >= (days - 1) * DAY_MS) {
+          const embed = new EmbedBuilder()
+            .setColor(0xfaa61a)
+            .setDescription([
+              `⏰ **Ce ticket est inactif depuis ${days - 1} jour${days - 1 > 1 ? 's' : ''}.**`,
+              `Sans message de <@${row.user_id}> dans les **24 heures**, il sera fermé automatiquement.`,
+            ].join('\n'));
+          const warning = await channel.send({ content: `<@${row.user_id}>`, embeds: [embed] }).catch(() => null);
+          if (warning) setWarnedStmt.run(now, row.channel_id);
+        }
+      }
+    }
+  };
+  tick().catch((error) => console.error('[tickets] Erreur fermeture auto :', error));
+  setInterval(() => tick().catch((error) => console.error('[tickets] Erreur fermeture auto :', error)), 60 * 60 * 1000);
+}
+
 // Le salon est-il un ticket ouvert ? (utilisé par l'automod pour exempter les tickets)
 function isOpenTicketChannel(channelId) {
   const row = byChannelStmt.get(channelId);
@@ -280,4 +343,5 @@ function setClaim(channelId, userId) {
 module.exports = {
   buildTicketPanel, handleTicketComponent, closeTicketsForMember,
   closeTicket, closeTicketChannel, canManageTicket, isOpenTicketChannel, getTicketByChannel, setClaim,
+  trackTicketActivity, startTicketInactivityWorker,
 };

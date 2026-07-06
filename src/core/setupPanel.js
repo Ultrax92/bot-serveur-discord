@@ -511,9 +511,11 @@ function ticketSettingsView(guild) {
     `🔢 **Tickets max par personne** — ${tc.maxPerUser}`,
     `${tc.closeOnLeave ? '🟢' : '🔴'} **Fermeture automatique** des tickets d'un membre qui quitte le serveur`,
     `${tc.transcriptDM ? '🟢' : '🔴'} **Transcript en MP** à l'ouvreur quand le ticket est fermé`,
+    `${tc.autoCloseDays ? '🟢' : '🔴'} **Fermeture des tickets inactifs** — ${tc.autoCloseDays ? `sans message de l'ouvreur depuis **${tc.autoCloseDays} jours** (avertissement 24 h avant)` : 'désactivée'}`,
     '',
     '*Le transcript est toujours envoyé dans le salon 📜 logs-tickets s\'il est configuré.*',
-  ].join('\n'));
+    tc.autoCloseDays ? '*Seuls les messages de l\'ouvreur comptent : une relance du staff sans réponse ne prolonge pas le ticket.*' : '',
+  ].filter(Boolean).join('\n'));
 
   const buttons = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('setup:tk:maxper').setLabel('🔢 Max par personne').setStyle(ButtonStyle.Primary),
@@ -523,6 +525,7 @@ function ticketSettingsView(guild) {
     new ButtonBuilder().setCustomId('setup:tk:transcriptdm')
       .setLabel(tc.transcriptDM ? '🔴 Désactiver transcript MP' : '🟢 Activer transcript MP')
       .setStyle(tc.transcriptDM ? ButtonStyle.Danger : ButtonStyle.Success),
+    new ButtonBuilder().setCustomId('setup:tk:autoclose').setLabel('⏰ Tickets inactifs').setStyle(ButtonStyle.Primary),
     backButton('tickets'),
   );
   return { embeds: [embed], components: [buttons] };
@@ -1247,6 +1250,15 @@ async function handleSetupComponent(interaction) {
         return interaction.update(ticketSettingsView(guild));
       }
 
+      if (args[0] === 'tkautoclose') {
+        const days = parseInt(interaction.fields.getTextInputValue('days'), 10);
+        if (!Number.isInteger(days) || (days !== 0 && (days < 2 || days > 60))) {
+          return interaction.reply({ content: '❌ Valeur invalide : 0 (désactivé) ou entre 2 et 60 jours (l\'avertissement part 24 h avant la fermeture).', flags: MessageFlags.Ephemeral });
+        }
+        updateSettings(guild.id, (s) => { s.ticketsConfig.autoCloseDays = days; });
+        return interaction.update(ticketSettingsView(guild));
+      }
+
       if (args[0] === 'tkpanel') {
         updateSettings(guild.id, (s) => {
           s.ticketsConfig.panelTitle = interaction.fields.getTextInputValue('title').trim();
@@ -1715,6 +1727,18 @@ async function handleSetupComponent(interaction) {
       if (sub === 'transcriptdm') {
         updateSettings(guild.id, (s) => { s.ticketsConfig.transcriptDM = !s.ticketsConfig.transcriptDM; });
         return interaction.update(ticketSettingsView(guild));
+      }
+
+      if (sub === 'autoclose') {
+        const modal = new ModalBuilder()
+          .setCustomId('setup:modal:tkautoclose')
+          .setTitle('Fermeture des tickets inactifs')
+          .addComponents(new ActionRowBuilder().addComponents(
+            new TextInputBuilder().setCustomId('days').setLabel('Jours d\'inactivité (0 = désactivé, 2 à 60)')
+              .setValue(`${getSettings(guild.id).ticketsConfig.autoCloseDays}`)
+              .setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(2),
+          ));
+        return interaction.showModal(modal);
       }
 
       if (sub === 'maxper') {

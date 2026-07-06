@@ -37,7 +37,9 @@ CREATE TABLE IF NOT EXISTS tickets (
   type_id TEXT,
   status TEXT NOT NULL DEFAULT 'open',   -- open | closed
   claimed_by TEXT,
-  created_at INTEGER NOT NULL
+  created_at INTEGER NOT NULL,
+  last_activity_at INTEGER,              -- dernier message de l'ouvreur (fermeture auto des inactifs)
+  warned_at INTEGER                      -- avertissement d'inactivité envoyé, fermeture 24 h après
 );
 CREATE INDEX IF NOT EXISTS idx_tickets_guild_user ON tickets (guild_id, user_id, status);
 
@@ -115,5 +117,7 @@ CREATE INDEX IF NOT EXISTS idx_invite_joins_inviter ON invite_joins (guild_id, i
 try { db.exec('ALTER TABLE ticket_reviews ADD COLUMN review_channel_id TEXT'); } catch { /* déjà présente */ }
 try { db.exec('ALTER TABLE ticket_reviews ADD COLUMN transcript TEXT'); } catch { /* déjà présente */ }
 try { db.exec('ALTER TABLE ticket_reviews ADD COLUMN image TEXT'); } catch { /* déjà présente */ }
+try { db.exec('ALTER TABLE tickets ADD COLUMN last_activity_at INTEGER'); } catch { /* déjà présente */ }
+try { db.exec('ALTER TABLE tickets ADD COLUMN warned_at INTEGER'); } catch { /* déjà présente */ }
 
 module.exports = db;

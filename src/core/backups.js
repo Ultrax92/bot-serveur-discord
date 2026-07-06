@@ -58,7 +58,7 @@ function restoreImageFiles(files) {
 // d'invitations, giveaways en cours, vocaux temporaires suivis
 const TABLE_COLUMNS = {
   sanctions: ['id', 'guild_id', 'user_id', 'moderator_id', 'type', 'reason', 'created_at', 'expires_at', 'active'],
-  tickets: ['id', 'guild_id', 'channel_id', 'user_id', 'number', 'type_id', 'status', 'claimed_by', 'created_at'],
+  tickets: ['id', 'guild_id', 'channel_id', 'user_id', 'number', 'type_id', 'status', 'claimed_by', 'created_at', 'last_activity_at', 'warned_at'],
   invite_joins: ['guild_id', 'user_id', 'inviter_id', 'code', 'fake', 'has_left', 'joined_at'],
   giveaways: ['id', 'guild_id', 'channel_id', 'message_id', 'prize', 'winners', 'host_id', 'required_role', 'ends_at', 'ended', 'participants'],
   tempvoc_channels: ['channel_id', 'guild_id', 'owner_id'],

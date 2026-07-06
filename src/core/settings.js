@@ -62,6 +62,7 @@ const DEFAULT_SETTINGS = {
     requiredRole: null,      // rôle requis pour ouvrir un ticket (ex: rôle vérifié)
     maxPerUser: 1,
     closeOnLeave: true,      // ferme les tickets d'un membre qui quitte le serveur
+    autoCloseDays: 0,        // ferme les tickets sans message de l'ouvreur depuis X jours (0 = off, avertissement à X-1)
     transcriptDM: true,      // envoie le transcript en MP à l'ouvreur à la fermeture
     lastPanelChannel: null,  // dernier panneau publié, supprimé à la republication
     lastPanelMessage: null,

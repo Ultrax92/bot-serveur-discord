@@ -5,6 +5,7 @@ const { cleanupTempvoc } = require('../core/tempvoc');
 const { startStatsWorker } = require('../core/stats');
 const { startBackupWorker } = require('../core/backups');
 const { startReviewWorker } = require('../core/ticketReviews');
+const { startTicketInactivityWorker } = require('../core/tickets');
 
 module.exports = {
   name: 'clientReady',
@@ -19,5 +20,6 @@ module.exports = {
     startStatsWorker(client);
     startBackupWorker(client);
     startReviewWorker(client);
+    startTicketInactivityWorker(client);
   },
 };
