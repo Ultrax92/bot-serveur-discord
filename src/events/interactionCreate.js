@@ -1,6 +1,6 @@
 const { MessageFlags, EmbedBuilder } = require('discord.js');
 const { isModuleEnabled, MODULES } = require('../core/settings');
-const { isBotAdmin, canManageAdmins } = require('../core/permissions');
+const { isBotAdmin, canManageAdmins, isOwner } = require('../core/permissions');
 const { handleSetupComponent } = require('../core/setupPanel');
 const { handleVerifyButton } = require('../core/verification');
 const { handleTicketComponent } = require('../core/tickets');
@@ -99,6 +99,22 @@ module.exports = {
         await handleBackupComponent(interaction);
       } catch (error) {
         console.error('Erreur sur les backups :', error);
+        await interaction
+          .reply({ content: 'Une erreur est survenue, réessaie.', flags: MessageFlags.Ephemeral })
+          .catch(() => {});
+      }
+      return;
+    }
+
+    // Recovery : campagne de rappel des membres (owner ; le bouton ⏹️ vit dans ses MP)
+    if ((interaction.isButton() || interaction.isModalSubmit()) && interaction.customId.startsWith('rc:')) {
+      const allowed = interaction.inGuild() ? canManageAdmins(interaction) : isOwner(interaction.user.id);
+      if (!allowed) return;
+      try {
+        const { handleRecoveryComponent } = require('../core/recovery');
+        await handleRecoveryComponent(interaction);
+      } catch (error) {
+        console.error('Erreur sur le recovery :', error);
         await interaction
           .reply({ content: 'Une erreur est survenue, réessaie.', flags: MessageFlags.Ephemeral })
           .catch(() => {});

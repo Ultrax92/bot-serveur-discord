@@ -357,6 +357,7 @@ async function reassignRolesForPresentMembers(guild) {
 }
 
 module.exports = {
+  fetchAllMembers,
   snapshotMemberRoles,
   captureServer,
   repairServer,
