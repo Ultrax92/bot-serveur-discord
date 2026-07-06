@@ -541,8 +541,8 @@ function ticketReviewsView(guild) {
     `🛃 **Salon staff de validation** — ${review ? `${review}` : '📬 aucun : les avis arrivent en MP au owner pour validation'}`,
     `🎁 **Rôle donné au client** à la publication — ${role ? `${role}` : '*aucun*'}`,
     '',
-    '**Fonctionnement :** à la fermeture d\'un ticket, l\'ouvreur reçoit en MP une demande de note (1 à 5 ⭐, commentaire facultatif). L\'avis est toujours validé (✅ publier / ❌ rejeter) avant publication : dans le salon de validation, ou en MP au owner si aucun n\'est configuré.',
-    '*Sans réponse sous 7 jours, ou si le membre est parti, un avis 5⭐ générique est publié automatiquement.*',
+    '**Fonctionnement :** à la fermeture d\'un ticket, l\'ouvreur reçoit en MP une demande d\'avis : note 1 à 5 ⭐, commentaire et image facultatifs, envoi par bouton 📤. Un **5⭐ sans commentaire ni image** est publié directement ; tout autre avis est validé (✅ / ❌, transcript joint) dans le salon de validation, ou en MP au owner si aucun n\'est configuré.',
+    '*Sans envoi sous 7 jours, ou si le membre est parti, un avis 5⭐ générique est publié automatiquement.*',
   ].join('\n'));
 
   const feedbackSelect = new ChannelSelectMenuBuilder()

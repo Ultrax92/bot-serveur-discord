@@ -7,6 +7,10 @@ module.exports = {
   async execute(message) {
     // Sauvegarde des images pour pouvoir les montrer dans les logs si suppression
     cacheMessageImages(message).catch(() => {});
+    // Image d'avis client en attente (flux du bouton 🖼️ en MP, hors serveur)
+    const { handlePendingReviewImage } = require('../core/ticketReviews');
+    const reviewImageConsumed = await handlePendingReviewImage(message).catch((error) => { console.error('Erreur image avis :', error); return false; });
+    if (reviewImageConsumed) return;
     // Fichier de backup en attente (flux du bouton 📤 Importer de /backup)
     const { handlePendingBackupFile } = require('../core/backups');
     const backupConsumed = await handlePendingBackupFile(message).catch((error) => { console.error('Erreur import backup :', error); return false; });

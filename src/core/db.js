@@ -57,6 +57,7 @@ CREATE TABLE IF NOT EXISTS ticket_reviews (
   review_channel_id TEXT,                  -- message de validation : salon staff ou MP du owner
   review_message_id TEXT,
   transcript TEXT,                         -- transcript du ticket, joint à la validation puis purgé
+  image TEXT,                              -- image d'illustration de l'avis (fichier dans data/images)
   deadline INTEGER,                        -- pending : date de l'avis auto (J+7)
   created_at INTEGER NOT NULL
 );
@@ -113,5 +114,6 @@ CREATE INDEX IF NOT EXISTS idx_invite_joins_inviter ON invite_joins (guild_id, i
 // Colonnes ajoutées après coup (ALTER silencieux si la colonne existe déjà)
 try { db.exec('ALTER TABLE ticket_reviews ADD COLUMN review_channel_id TEXT'); } catch { /* déjà présente */ }
 try { db.exec('ALTER TABLE ticket_reviews ADD COLUMN transcript TEXT'); } catch { /* déjà présente */ }
+try { db.exec('ALTER TABLE ticket_reviews ADD COLUMN image TEXT'); } catch { /* déjà présente */ }
 
 module.exports = db;
