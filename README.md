@@ -37,8 +37,8 @@ Prérequis : Node.js ≥ 20.
 
 ```bash
 npm install
-cp .env.example .env   # puis remplir DISCORD_TOKEN, CLIENT_ID, GUILD_ID
-npm run deploy          # enregistre les slash commands
+cp .env.example .env   # puis remplir DISCORD_TOKEN, CLIENT_ID (GUILD_ID inutile désormais)
+npm run deploy          # enregistre les slash commands sur tous les serveurs du bot
 npm start
 ```
 

@@ -1,5 +1,6 @@
-// Enregistre les slash commands auprès de Discord.
-// À relancer à chaque ajout/modification de commande : npm run deploy
+// Enregistre les slash commands auprès de Discord, sur TOUS les serveurs où le
+// bot est présent (l'enregistrement par serveur est instantané, contrairement au
+// global qui peut prendre 1h). À relancer à chaque ajout/modification : npm run deploy
 require('dotenv').config();
 const fs = require('node:fs');
 const path = require('node:path');
@@ -19,15 +20,11 @@ const rest = new REST().setToken(process.env.DISCORD_TOKEN);
 
 (async () => {
   try {
-    console.log(`Enregistrement de ${commands.length} commandes…`);
-    if (process.env.GUILD_ID) {
-      // Enregistrement sur un seul serveur : instantané, idéal pour tester
-      await rest.put(Routes.applicationGuildCommands(process.env.CLIENT_ID, process.env.GUILD_ID), { body: commands });
-      console.log(`✅ Commandes enregistrées sur le serveur ${process.env.GUILD_ID}.`);
-    } else {
-      // Enregistrement global : peut prendre jusqu'à 1h pour se propager
-      await rest.put(Routes.applicationCommands(process.env.CLIENT_ID), { body: commands });
-      console.log('✅ Commandes enregistrées globalement.');
+    const guilds = await rest.get(Routes.userGuilds());
+    console.log(`Enregistrement de ${commands.length} commandes sur ${guilds.length} serveur(s)…`);
+    for (const guild of guilds) {
+      await rest.put(Routes.applicationGuildCommands(process.env.CLIENT_ID, guild.id), { body: commands });
+      console.log(`✅ ${guild.name} (${guild.id})`);
     }
   } catch (error) {
     console.error("Erreur lors de l'enregistrement :", error);
