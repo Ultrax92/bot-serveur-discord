@@ -65,6 +65,14 @@ CREATE TABLE IF NOT EXISTS ticket_reviews (
 );
 CREATE INDEX IF NOT EXISTS idx_ticket_reviews_pending ON ticket_reviews (status, deadline);
 
+CREATE TABLE IF NOT EXISTS member_roles (
+  guild_id TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  roles TEXT NOT NULL DEFAULT '[]',      -- rôles du membre à la dernière photo (remis à son retour)
+  updated_at INTEGER NOT NULL,
+  PRIMARY KEY (guild_id, user_id)
+);
+
 CREATE TABLE IF NOT EXISTS kv (
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL

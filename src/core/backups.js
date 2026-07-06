@@ -95,6 +95,7 @@ const TABLE_COLUMNS = {
     'participants',
   ],
   tempvoc_channels: ['channel_id', 'guild_id', 'owner_id'],
+  member_roles: ['guild_id', 'user_id', 'roles', 'updated_at'],
   ticket_reviews: [
     'id',
     'guild_id',
@@ -142,6 +143,7 @@ function restoreDatabase(guildId, database) {
     for (const row of rows) {
       const values = {};
       for (const column of columns) values[column] = row[column] ?? null;
+      values.guild_id = guildId; // backup venu d'un autre serveur : les données suivent le serveur cible
       try {
         insertWithId.run(values);
         restored++;
@@ -159,18 +161,31 @@ function restoreDatabase(guildId, database) {
   return restored;
 }
 
-function serialize(guildId) {
-  const settings = getSettings(guildId);
+async function serialize(guild) {
+  const settings = getSettings(guild.id);
   const { getActivityText } = require('./botStatus');
+
+  // Structure du serveur (rôles, salons, permissions) + photo des rôles des membres.
+  // En cas d'échec (permissions, rate-limit), le backup config part quand même.
+  let server = null;
+  try {
+    const { snapshotMemberRoles, captureServer } = require('./serverBackup');
+    await snapshotMemberRoles(guild);
+    server = await captureServer(guild);
+  } catch (error) {
+    console.error(`[backups] Capture de la structure du serveur impossible (${guild.id}) :`, error.message);
+  }
+
   return JSON.stringify(
     {
       bot: 'bot-serveur-discord',
-      version: 2,
-      guildId,
+      version: 3,
+      guildId: guild.id,
       createdAt: Date.now(),
       settings,
+      server,
       files: collectImageFiles(settings),
-      database: collectDatabase(guildId),
+      database: collectDatabase(guild.id),
       botActivity: getActivityText(),
     },
     null,
@@ -178,9 +193,9 @@ function serialize(guildId) {
   );
 }
 
-function createBackup(guildId, kind = 'manuel') {
-  const info = insertStmt.run(guildId, kind, Date.now(), serialize(guildId));
-  pruneStmt.run(guildId, guildId);
+async function createBackup(guild, kind = 'manuel') {
+  const info = insertStmt.run(guild.id, kind, Date.now(), await serialize(guild));
+  pruneStmt.run(guild.id, guild.id);
   return info.lastInsertRowid;
 }
 
@@ -206,7 +221,7 @@ function backupPanel(guild, userId) {
     .setTitle('💾 Backups du bot')
     .setDescription(
       [
-        "Sauvegarde/restauration **complète et à l'identique** : toute la configuration (modules, logs, tickets et leurs types, automod, antiraid, commandes custom…), les **images**, et les **données** (casier des sanctions, numérotation des tickets, compteurs d'invitations, giveaways, statut du bot).",
+        "Sauvegarde/restauration **complète et à l'identique** : toute la configuration du bot, les **images**, les **données** (sanctions, tickets, invitations, giveaways…), et la **structure du serveur** — rôles, salons, permissions, réglages, plus les rôles de chaque membre (remis à son retour).",
         '',
         `**Backups en base (${rows.length}/15${isModuleEnabled(guild.id, 'backups') ? ', auto quotidien 🟢' : ', auto quotidien 🔴 — active le module 💾'}) :**`,
         rows.length
@@ -222,7 +237,7 @@ function backupPanel(guild, userId) {
           ? `\n📦 **Import prêt à appliquer** : backup du <t:${Math.floor(staged.createdAt / 1000)}:f>${staged.guildId !== guild.id ? " ⚠️ *provenant d'un autre serveur*" : ''} → clique ♻️`
           : '',
         '',
-        "✅ *Backup complet : config + images + données — l'import restaure le bot à l'identique.*",
+        '✅ *À la restauration : config bot seule, 🔧 réparation du serveur (recrée ce qui manque), ou 🏗️ reconstruction 1:1 sur un serveur neuf.*',
       ]
         .filter(Boolean)
         .join('\n'),
@@ -291,21 +306,155 @@ function backupDetail(guild, backupId) {
   return { embeds: [embed], components: [buttons] };
 }
 
-function confirmView(guild, target, label) {
+function confirmView(guild, target, label, hasServer) {
   const embed = new EmbedBuilder()
     .setColor(0xed4245)
     .setTitle('⚠️ Confirmer la restauration')
     .setDescription(
       [
-        `Tu vas **remplacer toute la configuration actuelle** du bot par ${label}.`,
-        'Un backup *pré-restauration* de la configuration actuelle sera créé automatiquement avant, au cas où.',
-      ].join('\n'),
+        `Tu vas restaurer ${label}. Choisis l'étendue :`,
+        '',
+        '⚙️ **Config bot** — remplace la configuration, les images et les données du bot (comme avant).',
+        hasServer
+          ? '🔧 **Config + réparer le serveur** — en plus : recrée les rôles/salons manquants et réapplique **toutes les permissions**, sans rien supprimer.'
+          : null,
+        hasServer
+          ? '🏗️ **Config + reconstruire 1:1** — ⚠️ **supprime tous les salons et rôles actuels** puis recrée tout depuis le backup (pensé pour un serveur neuf ou dévasté). Suivi envoyé en MP.'
+          : null,
+        !hasServer ? '*Ce backup (ancien format) ne contient pas la structure du serveur.*' : null,
+        '',
+        'Un backup *pré-restauration* sera créé automatiquement avant, au cas où.',
+      ]
+        .filter(Boolean)
+        .join('\n'),
     );
   const buttons = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId(`bk:confirm:${target}`).setLabel('⚠️ Oui, restaurer').setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId(`bk:confirm:${target}`).setLabel('⚙️ Config bot').setStyle(ButtonStyle.Danger),
+    new ButtonBuilder()
+      .setCustomId(`bk:repair:${target}`)
+      .setLabel('🔧 Config + réparer')
+      .setStyle(ButtonStyle.Danger)
+      .setDisabled(!hasServer),
+    new ButtonBuilder()
+      .setCustomId(`bk:rebuild:${target}`)
+      .setLabel('🏗️ Reconstruire 1:1')
+      .setStyle(ButtonStyle.Danger)
+      .setDisabled(!hasServer),
     new ButtonBuilder().setCustomId('bk:home').setLabel('❌ Annuler').setStyle(ButtonStyle.Secondary),
   );
   return { embeds: [embed], components: [buttons] };
+}
+
+function rebuildConfirmView(target) {
+  const embed = new EmbedBuilder()
+    .setColor(0xed4245)
+    .setTitle('🏗️ DERNIÈRE CONFIRMATION — Reconstruction 1:1')
+    .setDescription(
+      [
+        '⚠️ **TOUS les salons et TOUS les rôles actuels de ce serveur vont être SUPPRIMÉS**, puis recréés depuis le backup.',
+        "L'historique des messages des salons actuels sera **perdu définitivement** (limite Discord : aucun bot ne peut restaurer des messages).",
+        '',
+        'Le suivi de la reconstruction est envoyé **en MP au owner** (ce salon va disparaître).',
+      ].join('\n'),
+    );
+  const buttons = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`bk:rebuild2:${target}`)
+      .setLabel('🏗️ OUI, tout supprimer et reconstruire')
+      .setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId('bk:home').setLabel('❌ Annuler').setStyle(ButtonStyle.Secondary),
+  );
+  return { embeds: [embed], components: [buttons] };
+}
+
+// ── Pipeline de restauration ──────────────────────────────────────────────────
+
+// mode : 'config' (bot seul) | 'repair' (+ répare le serveur) | 'rebuild' (+ reconstruit 1:1)
+async function applyRestore(interaction, payload, mode) {
+  const guild = interaction.guild;
+  await createBackup(guild, 'pré-restauration');
+
+  // Suivi de progression : en MP au owner pour la reconstruction (les salons
+  // disparaissent), en éphémère sinon
+  const ownerUser =
+    mode === 'rebuild' && process.env.OWNER_ID
+      ? await interaction.client.users.fetch(process.env.OWNER_ID).catch(() => null)
+      : null;
+  const lines = [];
+  let statusMessage = null;
+  const progress = async (text) => {
+    lines.push(text);
+    const content = lines.join('\n');
+    try {
+      if (mode === 'rebuild') {
+        if (!ownerUser) return;
+        if (!statusMessage) statusMessage = await ownerUser.send(content);
+        else await statusMessage.edit(content);
+      } else {
+        if (!statusMessage) statusMessage = await interaction.followUp({ content, flags: MessageFlags.Ephemeral });
+        else await statusMessage.edit(content);
+      }
+    } catch {
+      /* suivi best-effort */
+    }
+  };
+
+  // 1. Structure du serveur (rôles, salons, permissions) si demandé
+  let idMap = null;
+  let structure = null;
+  if (mode !== 'config' && payload.server) {
+    const { repairServer, rebuildServer } = require('./serverBackup');
+    structure =
+      mode === 'rebuild'
+        ? await rebuildServer(guild, payload.server, progress)
+        : await repairServer(guild, payload.server, progress);
+    idMap = structure.idMap;
+    await progress('🤖 Restauration de la configuration du bot…');
+  }
+
+  // 2. Config du bot, remappée vers les nouveaux ids de rôles/salons si besoin
+  const { remapIdsInText, remapMemberRoles } = require('./serverBackup');
+  let settings = payload.settings;
+  if (idMap) settings = JSON.parse(remapIdsInText(JSON.stringify(settings), idMap));
+  saveSettings(guild.id, settings);
+
+  // 3. Images, données vivantes, rôles mémorisés des membres, statut
+  const images = restoreImageFiles(payload.files);
+  const rows = restoreDatabase(guild.id, payload.database);
+  if (idMap) remapMemberRoles(guild.id, idMap);
+  if (typeof payload.botActivity === 'string') {
+    require('./botStatus').setActivityText(interaction.client, payload.botActivity);
+  }
+
+  const summary = [
+    mode === 'rebuild'
+      ? "🏗️ **Serveur reconstruit à l'identique !**"
+      : mode === 'repair'
+        ? '🔧 **Serveur réparé et bot restauré !**'
+        : "♻️ **Bot restauré à l'identique !**",
+    structure
+      ? `• Structure : ${structure.createdRoles} rôle(s) et ${structure.createdChannels} salon(s) ${mode === 'rebuild' ? 'recréés' : 'recréés/réparés'}, permissions réappliquées`
+      : null,
+    `• Configuration complète appliquée${images ? ` • ${images} image(s)` : ''}${rows ? ` • ${rows} donnée(s) : sanctions, tickets, invitations, giveaways, rôles des membres` : ''}`,
+    structure ? '• Les membres qui (re)joignent récupèrent automatiquement leurs rôles mémorisés' : null,
+    'Vérifie dans `/setup` (un backup pré-restauration a été créé au cas où).',
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  if (mode === 'rebuild' && ownerUser) await ownerUser.send(summary).catch(() => {});
+  return summary;
+}
+
+function resolvePayload(interaction, arg, { consume = false } = {}) {
+  const key = `${interaction.guild.id}:${interaction.user.id}`;
+  if (arg === 'staged') {
+    const payload = pendingImports.get(key)?.staged;
+    if (consume) pendingImports.delete(key);
+    return payload;
+  }
+  const row = getStmt.get(arg, interaction.guild.id);
+  return row && JSON.parse(row.data);
 }
 
 // ── Interactions (customId "bk:...") ─────────────────────────────────────────
@@ -318,11 +467,12 @@ async function handleBackupComponent(interaction) {
   if (action === 'home') return interaction.update(backupPanel(guild, interaction.user.id));
 
   if (action === 'create') {
-    const id = createBackup(guild.id, 'manuel');
+    await interaction.deferUpdate(); // la capture (membres, structure, icône) peut prendre quelques secondes
+    const id = await createBackup(guild, 'manuel');
     updateSettings(guild.id, (s) => {
       s.modules.backups = true;
     }); // active l'auto quotidien
-    await interaction.update(backupPanel(guild, interaction.user.id));
+    await interaction.editReply(backupPanel(guild, interaction.user.id));
     const row = getStmt.get(id, guild.id);
     return interaction
       .followUp({
@@ -380,7 +530,10 @@ async function handleBackupComponent(interaction) {
       );
   }
 
-  if (action === 'restore') return interaction.update(confirmView(guild, arg, `le backup \`#${arg}\``));
+  if (action === 'restore') {
+    const payload = resolvePayload(interaction, arg);
+    return interaction.update(confirmView(guild, arg, `le backup \`#${arg}\``, Boolean(payload?.server)));
+  }
 
   if (action === 'applyimport') {
     const staged = pendingImports.get(key)?.staged;
@@ -390,38 +543,38 @@ async function handleBackupComponent(interaction) {
         guild,
         'staged',
         `le fichier importé (backup du ${new Date(staged.createdAt).toLocaleString('fr-FR')})`,
+        Boolean(staged.server),
       ),
     );
   }
 
-  if (action === 'confirm') {
-    let payload;
-    if (arg === 'staged') {
-      payload = pendingImports.get(key)?.staged;
-      pendingImports.delete(key);
-    } else {
-      const row = getStmt.get(arg, guild.id);
-      payload = row && JSON.parse(row.data);
-    }
-    if (!payload?.settings) {
-      return interaction.update(backupPanel(guild, interaction.user.id));
-    }
-    createBackup(guild.id, 'pré-restauration');
-    saveSettings(guild.id, payload.settings);
-    const images = restoreImageFiles(payload.files);
-    const rows = restoreDatabase(guild.id, payload.database);
-    if (typeof payload.botActivity === 'string') {
-      require('./botStatus').setActivityText(interaction.client, payload.botActivity);
-    }
-    await interaction.update(backupPanel(guild, interaction.user.id));
-    return interaction.followUp({
-      content: [
-        "♻️ **Bot restauré à l'identique !**",
-        `• Configuration complète appliquée${images ? ` • ${images} image(s)` : ''}${rows ? ` • ${rows} donnée(s) : sanctions, tickets, invitations, giveaways` : ''}`,
-        'Vérifie dans `/setup` (un backup pré-restauration a été créé au cas où).',
-      ].join('\n'),
-      flags: MessageFlags.Ephemeral,
-    });
+  // ⚙️ Config bot seule, ou 🔧 config + réparation du serveur
+  if (action === 'confirm' || action === 'repair') {
+    const payload = resolvePayload(interaction, arg, { consume: true });
+    if (!payload?.settings) return interaction.update(backupPanel(guild, interaction.user.id));
+    await interaction.deferUpdate();
+    const summary = await applyRestore(interaction, payload, action === 'repair' ? 'repair' : 'config');
+    await interaction.editReply(backupPanel(guild, interaction.user.id));
+    return interaction.followUp({ content: summary, flags: MessageFlags.Ephemeral }).catch(() => {});
+  }
+
+  // 🏗️ Reconstruction 1:1 : double confirmation, puis suivi en MP au owner
+  if (action === 'rebuild') {
+    const payload = resolvePayload(interaction, arg);
+    if (!payload?.server) return interaction.update(backupPanel(guild, interaction.user.id));
+    return interaction.update(rebuildConfirmView(arg));
+  }
+
+  if (action === 'rebuild2') {
+    const payload = resolvePayload(interaction, arg, { consume: true });
+    if (!payload?.settings || !payload.server) return interaction.update(backupPanel(guild, interaction.user.id));
+    const embed = new EmbedBuilder()
+      .setColor(0xfaa61a)
+      .setTitle('🏗️ Reconstruction lancée')
+      .setDescription('Suivi et bilan envoyés **en MP au owner** (ce salon va probablement disparaître).');
+    await interaction.update({ embeds: [embed], components: [] }).catch(() => {});
+    await applyRestore(interaction, payload, 'rebuild');
+    return;
   }
 
   if (action === 'delete') {
@@ -469,7 +622,7 @@ async function handlePendingBackupFile(message) {
   if (
     !parsed ||
     parsed.bot !== 'bot-serveur-discord' ||
-    ![1, 2].includes(parsed.version) ||
+    ![1, 2, 3].includes(parsed.version) ||
     typeof parsed.settings?.modules !== 'object'
   ) {
     await notice("❌ Ce fichier n'est pas un backup valide de ce bot.");
@@ -511,10 +664,10 @@ async function sendBackupDM(client, guild, data, createdAt) {
 // Backup automatique quotidien (4h30) pour les serveurs avec le module 💾 actif,
 // suivi de l'export en MP au owner si activé (quotidien, ou hebdo le lundi)
 function startBackupWorker(client) {
-  const tick = () => {
+  const tick = async () => {
     for (const guild of client.guilds.cache.values()) {
       if (!isModuleEnabled(guild.id, 'backups')) continue;
-      const id = createBackup(guild.id, 'auto');
+      const id = await createBackup(guild, 'auto');
       const dmExport = getSettings(guild.id).backupsConfig?.dmExport ?? 'off';
       if (dmExport === 'daily' || (dmExport === 'weekly' && new Date().getDay() === 1)) {
         const row = getStmt.get(id, guild.id);
@@ -528,7 +681,7 @@ function startBackupWorker(client) {
     next.setHours(4, 30, 0, 0);
     if (next <= now) next.setDate(next.getDate() + 1);
     setTimeout(() => {
-      tick();
+      tick().catch((error) => console.error('[backups] Erreur backup automatique :', error));
       scheduleNext();
     }, next.getTime() - now.getTime());
   };

@@ -21,7 +21,7 @@ Bot Serveur Discord . Slash commands, modules activables par serveur, stockage S
 | 📊 Stats serveur | ✅ Fait | configuré via `/setup` → 📊 : compteurs Membres + par rôle en salons vocaux verrouillés (connexion et chat bloqués), actualisés toutes les 10 min — remplace ServerStats |
 | 🎨 Générateur d'embeds | ✅ Fait | `/embed [salon] [mp]` : panneau éphémère = aperçu en direct — titre/description/couleur, image (URL ou upload stocké), boutons-liens, import d'un embed existant par lien de message, envoi dans un salon ou en MP |
 | 🎭 Rolemenu | ⬜ En attente | menus de rôles self-service (utilité à confirmer vu la vérification) |
-| 💾 Backups | ✅ Fait | `/backup` (owner) : snapshots de toute la config du bot en base (15 max, auto quotidien 4h30), téléchargement en `.json` local, import du fichier avec confirmation, backup pré-restauration automatique, export auto en MP au owner (hebdo lundi ou quotidien, sans images si trop volumineux) |
+| 💾 Backups | ✅ Fait | `/backup` (owner) : snapshots de toute la config du bot en base (15 max, auto quotidien 4h30), téléchargement en `.json` local, import du fichier avec confirmation, backup pré-restauration automatique, export auto en MP au owner (hebdo lundi ou quotidien, sans images si trop volumineux) ; **structure du serveur** incluse (rôles, salons, permissions ✅/❌ par rôle et par membre, nom/icône/réglages) avec 3 modes de restauration : ⚙️ config bot, 🔧 réparer (recrée ce qui manque, ne supprime rien), 🏗️ reconstruire 1:1 (serveur neuf, double confirmation, suivi en MP) — rôles de chaque membre photographiés et remis automatiquement à son retour |
 
 ## Système de permissions
 
