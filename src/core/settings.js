@@ -99,6 +99,9 @@ const DEFAULT_SETTINGS = {
     accessRoles: [],  // rôles voyant les compteurs (vide = visibles par tous) ; everyone est sinon totalement refusé
     counters: [],     // { id, type: 'members'|'role', roleId, channelId, label }
   },
+  backupsConfig: {
+    dmExport: 'off',  // envoi du backup auto en MP au owner : off | weekly (lundi) | daily
+  },
   color: 0x5865f2,    // couleur des embeds (modifiable via /config)
 };
 

@@ -125,12 +125,18 @@ function backupFile(guildId, data, createdAt) {
 
 // ── Panneau /backup (éphémère) ────────────────────────────────────────────────
 
+// Export du backup auto en MP au owner : off → weekly (lundi) → daily
+const DM_EXPORT_ORDER = ['off', 'weekly', 'daily'];
+const DM_EXPORT_LABELS = { off: 'OFF', weekly: 'Hebdo', daily: 'Quotidien' };
+
 function backupPanel(guild, userId) {
   const rows = listStmt.all(guild.id);
   const staged = pendingImports.get(`${guild.id}:${userId}`)?.staged;
+  const settings = getSettings(guild.id);
+  const dmExport = settings.backupsConfig?.dmExport ?? 'off';
 
   const embed = new EmbedBuilder()
-    .setColor(getSettings(guild.id).color)
+    .setColor(settings.color)
     .setTitle('💾 Backups du bot')
     .setDescription([
       'Sauvegarde/restauration **complète et à l\'identique** : toute la configuration (modules, logs, tickets et leurs types, automod, antiraid, commandes custom…), les **images**, et les **données** (casier des sanctions, numérotation des tickets, compteurs d\'invitations, giveaways, statut du bot).',
@@ -139,6 +145,7 @@ function backupPanel(guild, userId) {
       rows.length
         ? rows.map((r) => `\`#${r.id}\` — <t:${Math.floor(r.created_at / 1000)}:f> · ${r.kind} · ${(r.size / 1024).toFixed(1)} Ko`).join('\n')
         : '*Aucun backup pour l\'instant.*',
+      `\n📬 **Export en MP au owner :** ${dmExport === 'off' ? '🔴 désactivé' : dmExport === 'weekly' ? '🟢 hebdomadaire (lundi, après le backup auto)' : '🟢 quotidien (après le backup auto)'}`,
       staged ? `\n📦 **Import prêt à appliquer** : backup du <t:${Math.floor(staged.createdAt / 1000)}:f>${staged.guildId !== guild.id ? ' ⚠️ *provenant d\'un autre serveur*' : ''} → clique ♻️` : '',
       '',
       '✅ *Backup complet : config + images + données — l\'import restaure le bot à l\'identique.*',
@@ -149,6 +156,8 @@ function backupPanel(guild, userId) {
     new ButtonBuilder().setCustomId('bk:import').setLabel('📤 Importer un fichier').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId('bk:applyimport').setLabel('♻️ Appliquer l\'import').setStyle(ButtonStyle.Danger)
       .setDisabled(!staged),
+    new ButtonBuilder().setCustomId('bk:dmexport').setLabel(`📬 MP : ${DM_EXPORT_LABELS[dmExport]}`)
+      .setStyle(dmExport === 'off' ? ButtonStyle.Secondary : ButtonStyle.Success),
     new ButtonBuilder().setCustomId('bk:home').setLabel('🔄 Actualiser').setStyle(ButtonStyle.Secondary),
   );
 
@@ -229,6 +238,16 @@ async function handleBackupComponent(interaction) {
       content: `✅ Backup \`#${id}\` créé et stocké sur le serveur — mais **trop volumineux pour être envoyé sur Discord** (images lourdes). Allège tes images ou récupère \`data/bot.sqlite\` depuis le VPS.`,
       flags: MessageFlags.Ephemeral,
     }).catch(() => {}));
+  }
+
+  if (action === 'dmexport') {
+    updateSettings(guild.id, (s) => {
+      const current = s.backupsConfig?.dmExport ?? 'off';
+      const next = DM_EXPORT_ORDER[(DM_EXPORT_ORDER.indexOf(current) + 1) % DM_EXPORT_ORDER.length];
+      s.backupsConfig = { ...s.backupsConfig, dmExport: next };
+      if (next !== 'off') s.modules.backups = true; // l'export part du backup auto : configurer = activer
+    });
+    return interaction.update(backupPanel(guild, interaction.user.id));
   }
 
   if (action === 'import') {
@@ -341,11 +360,43 @@ async function handlePendingBackupFile(message) {
   return true;
 }
 
-// Backup automatique quotidien (4h30) pour les serveurs avec le module 💾 actif
+// Limite d'upload d'un bot en MP (~10 Mo) : au-delà, le backup part sans les images
+const DM_FILE_LIMIT = 9 * 1024 * 1024;
+
+async function sendBackupDM(client, guild, data, createdAt) {
+  const ownerId = process.env.OWNER_ID;
+  if (!ownerId) return;
+  let file = backupFile(guild.id, data, createdAt);
+  let warning = '';
+  if (Buffer.byteLength(data, 'utf8') > DM_FILE_LIMIT) {
+    const light = JSON.parse(data);
+    delete light.files;
+    file = backupFile(guild.id, JSON.stringify(light, null, 2), createdAt);
+    warning = '\n⚠️ Backup trop volumineux pour Discord : envoyé **sans les images** (elles restent sur le VPS uniquement).';
+  }
+  try {
+    const owner = await client.users.fetch(ownerId);
+    await owner.send({
+      content: `📬 Backup automatique de **${guild.name}** — garde ce fichier en lieu sûr, il restaure le bot à l'identique via \`/backup\` → 📤 Importer.${warning}`,
+      files: [file],
+    });
+  } catch (error) {
+    console.error(`[backups] Envoi du backup en MP au owner impossible (serveur ${guild.id}) :`, error.message);
+  }
+}
+
+// Backup automatique quotidien (4h30) pour les serveurs avec le module 💾 actif,
+// suivi de l'export en MP au owner si activé (quotidien, ou hebdo le lundi)
 function startBackupWorker(client) {
   const tick = () => {
     for (const guild of client.guilds.cache.values()) {
-      if (isModuleEnabled(guild.id, 'backups')) createBackup(guild.id, 'auto');
+      if (!isModuleEnabled(guild.id, 'backups')) continue;
+      const id = createBackup(guild.id, 'auto');
+      const dmExport = getSettings(guild.id).backupsConfig?.dmExport ?? 'off';
+      if (dmExport === 'daily' || (dmExport === 'weekly' && new Date().getDay() === 1)) {
+        const row = getStmt.get(id, guild.id);
+        if (row) sendBackupDM(client, guild, row.data, row.created_at);
+      }
     }
   };
   const scheduleNext = () => {
