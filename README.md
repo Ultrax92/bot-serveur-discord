@@ -6,7 +6,7 @@ Bot Serveur Discord . Slash commands, modules activables par serveur, stockage S
 
 | Module | Statut | Contenu |
 |---|---|---|
-| 🔨 Modération | ✅ Fait | warn, mute/unmute (timeout), kick, ban/tempban, unban, clear, clean-channel (purge complète en arrière-plan, owner), sanctions, lock, hide, role — les commandes à variantes utilisent une option "action" à choix plutôt que des sous-commandes |
+| 🔨 Modération | ✅ Fait | warn, mute/unmute (timeout), kick, ban/tempban, unban, clear, clean-channel (purge complète en arrière-plan, owner), sanctions, lock, hide, role — les commandes à variantes utilisent une option "action" à choix plutôt que des sous-commandes ; sanctions par paliers (`/setup` → 🔨) : X warns en Z jours → mute auto (durée réglable), Y warns → ban définitif — warns manuels + automod, fenêtre glissante, owner/admins exemptés, sanctions inscrites au casier |
 | ⚙️ Config | ✅ Fait | `/setup` : panneau interactif unique (modules, admins du bot, couleur, réglages modération, salons de logs) + `/help` |
 | 🧰 Utilitaire | 🔶 Partiel | serverinfo, userinfo — reste : banlist, boosters, rolemembers, snipe, emoji |
 | 📜 Logs | ✅ Fait | configuré via `/setup` → 📜 (salon existant, création en un clic, saisie par ID, ou désactivé, par type) — modération, messages supprimés/édités, vocal, rôles, boosts, arrivées, départs, commandes du bot (exécutées, refusées, bloquées, en erreur) + salons vérif/tickets/raid (alimentés quand leurs modules arriveront) |

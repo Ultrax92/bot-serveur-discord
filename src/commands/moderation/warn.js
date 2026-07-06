@@ -37,6 +37,11 @@ module.exports = {
       await member.send(`⚠️ Tu as reçu un avertissement sur **${interaction.guild.name}** : ${reason}`).catch(() => {});
     }
     await logModAction(interaction, { emoji: '⚠️', action: 'Warn', target: member.user, reason });
-    return interaction.reply({ embeds: [successEmbed(interaction, `**${member.user.tag}** a été averti.\n**Raison :** ${reason}`)] });
+
+    // Sanctions par paliers : ce warn a peut-être fait atteindre un seuil
+    const { checkStrikes } = require('../../core/strikes');
+    const strikeNote = await checkStrikes(interaction.guild, member).catch(() => null);
+
+    return interaction.reply({ embeds: [successEmbed(interaction, `**${member.user.tag}** a été averti.\n**Raison :** ${reason}${strikeNote ? `\n${strikeNote}` : ''}`)] });
   },
 };

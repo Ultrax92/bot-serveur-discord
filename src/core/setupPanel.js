@@ -236,11 +236,15 @@ function modulesView(guild) {
 
 function moderationView(guild) {
   const settings = getSettings(guild.id);
-  const { dmOnSanction, defaultMuteDuration } = settings.moderationConfig;
+  const { dmOnSanction, defaultMuteDuration, strikes } = settings.moderationConfig;
 
   const embed = panelEmbed(guild, '🔨 Réglages de modération', [
     `${dmOnSanction ? '🟢' : '🔴'} **MP au membre sanctionné** — le bot prévient en privé lors d'un warn/mute/kick/ban`,
     `⏱️ **Durée de mute par défaut** — \`${defaultMuteDuration}\` quand /mute est utilisé sans durée`,
+    '',
+    `${strikes.enabled ? '🟢' : '🔴'} **Sanctions par paliers** — ${strikes.enabled ? 'les warns accumulés déclenchent des sanctions automatiques' : 'désactivées'}`,
+    `> 📈 ${strikes.muteThreshold} warns en ${strikes.windowDays} jours → mute \`${strikes.muteDuration}\` · ${strikes.banThreshold} warns → **ban définitif**`,
+    '*Les warns manuels et automod comptent · owner et admins du bot exemptés · chaque sanction est inscrite au casier.*',
   ].join('\n'));
 
   const buttons = new ActionRowBuilder().addComponents(
@@ -248,6 +252,10 @@ function moderationView(guild) {
       .setLabel(dmOnSanction ? '🔴 Désactiver le MP sanction' : '🟢 Activer le MP sanction')
       .setStyle(dmOnSanction ? ButtonStyle.Danger : ButtonStyle.Success),
     new ButtonBuilder().setCustomId('setup:mod:muteduration').setLabel('⏱️ Durée de mute par défaut').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('setup:mod:strikes')
+      .setLabel(strikes.enabled ? '🔴 Désactiver les paliers' : '🟢 Activer les paliers')
+      .setStyle(strikes.enabled ? ButtonStyle.Danger : ButtonStyle.Success),
+    new ButtonBuilder().setCustomId('setup:mod:strikescfg').setLabel('📈 Régler les paliers').setStyle(ButtonStyle.Primary),
     backButton('home'),
   );
   return { embeds: [embed], components: [buttons] };
@@ -1086,6 +1094,39 @@ async function handleSetupComponent(interaction) {
         updateSettings(guild.id, (s) => { s.moderationConfig.dmOnSanction = !s.moderationConfig.dmOnSanction; });
         return interaction.update(moderationView(guild));
       }
+      if (args[0] === 'strikes') {
+        updateSettings(guild.id, (s) => { s.moderationConfig.strikes.enabled = !s.moderationConfig.strikes.enabled; });
+        return interaction.update(moderationView(guild));
+      }
+      if (args[0] === 'strikescfg') {
+        const strikes = getSettings(guild.id).moderationConfig.strikes;
+        const modal = new ModalBuilder()
+          .setCustomId('setup:modal:modstrikes')
+          .setTitle('Sanctions par paliers')
+          .addComponents(
+            new ActionRowBuilder().addComponents(
+              new TextInputBuilder().setCustomId('window').setLabel('Fenêtre en jours (seuls ces warns comptent)')
+                .setValue(`${strikes.windowDays}`)
+                .setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(2),
+            ),
+            new ActionRowBuilder().addComponents(
+              new TextInputBuilder().setCustomId('mutecount').setLabel('Warns pour le mute automatique')
+                .setValue(`${strikes.muteThreshold}`)
+                .setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(2),
+            ),
+            new ActionRowBuilder().addComponents(
+              new TextInputBuilder().setCustomId('muteduration').setLabel('Durée du mute (ex: 1h, 24h, 3j — max 28j)')
+                .setValue(strikes.muteDuration)
+                .setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(10),
+            ),
+            new ActionRowBuilder().addComponents(
+              new TextInputBuilder().setCustomId('bancount').setLabel('Warns pour le ban définitif')
+                .setValue(`${strikes.banThreshold}`)
+                .setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(2),
+            ),
+          );
+        return interaction.showModal(modal);
+      }
       if (args[0] === 'muteduration') {
         const modal = new ModalBuilder()
           .setCustomId('setup:modal:muteduration')
@@ -1239,6 +1280,30 @@ async function handleSetupComponent(interaction) {
           }
         });
         return interaction.update(customEditView(guild, commandId));
+      }
+
+      if (args[0] === 'modstrikes') {
+        const windowDays = parseInt(interaction.fields.getTextInputValue('window'), 10);
+        const muteThreshold = parseInt(interaction.fields.getTextInputValue('mutecount'), 10);
+        const banThreshold = parseInt(interaction.fields.getTextInputValue('bancount'), 10);
+        const muteDuration = interaction.fields.getTextInputValue('muteduration').trim();
+        if (!Number.isInteger(windowDays) || windowDays < 1 || windowDays > 90) {
+          return interaction.reply({ content: '❌ Fenêtre invalide : entre 1 et 90 jours.', flags: MessageFlags.Ephemeral });
+        }
+        if (!Number.isInteger(muteThreshold) || muteThreshold < 1 || muteThreshold > 50) {
+          return interaction.reply({ content: '❌ Seuil de mute invalide : entre 1 et 50 warns.', flags: MessageFlags.Ephemeral });
+        }
+        if (!Number.isInteger(banThreshold) || banThreshold <= muteThreshold || banThreshold > 50) {
+          return interaction.reply({ content: '❌ Seuil de ban invalide : il doit être supérieur au seuil de mute (et ≤ 50).', flags: MessageFlags.Ephemeral });
+        }
+        const durationMs = parseDuration(muteDuration);
+        if (!durationMs || durationMs > 28 * 24 * 60 * 60 * 1000) {
+          return interaction.reply({ content: '❌ Durée de mute invalide (ex: `1h`, `24h`, `3j` — maximum 28j, limite Discord).', flags: MessageFlags.Ephemeral });
+        }
+        updateSettings(guild.id, (s) => {
+          s.moderationConfig.strikes = { enabled: true, windowDays, muteThreshold, muteDuration, banThreshold }; // on configure → ça s'active
+        });
+        return interaction.update(moderationView(guild));
       }
 
       if (args[0] === 'tkmax') {

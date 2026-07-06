@@ -77,7 +77,10 @@ async function applySanction(message, trigger, config) {
   const reason = `Automod : ${trigger}`;
   if (config.sanction === 'warn') {
     addSanction({ guildId: message.guildId, userId: message.author.id, moderatorId: message.client.user.id, type: 'warn', reason });
-    return 'warn';
+    // Sanctions par paliers : ce warn automod compte comme les autres
+    const { checkStrikes } = require('./strikes');
+    const strike = await checkStrikes(message.guild, message.member).catch(() => null);
+    return strike ? `warn → ${strike.includes('ban') ? 'ban' : 'mute'} (palier de warns atteint)` : 'warn';
   }
   if (config.sanction === 'mute' && message.member?.moderatable) {
     const duration = parseDuration(config.muteDuration) ?? 600_000;

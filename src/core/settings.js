@@ -40,6 +40,13 @@ const DEFAULT_SETTINGS = {
   moderationConfig: {
     dmOnSanction: true,          // envoyer un MP au membre sanctionné
     defaultMuteDuration: '1h',   // durée du mute quand aucune durée n'est précisée
+    strikes: {
+      enabled: false,      // sanctions par paliers selon les warns accumulés
+      windowDays: 7,       // fenêtre glissante : seuls les warns des X derniers jours comptent
+      muteThreshold: 3,    // X warns dans la fenêtre → mute automatique
+      muteDuration: '24h',
+      banThreshold: 5,     // Y warns dans la fenêtre → ban définitif
+    },
   },
   logsChannels: {},   // un salon par type de log (voir LOG_TYPES dans core/logs.js)
   verifConfig: {
