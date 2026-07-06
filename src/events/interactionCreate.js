@@ -57,6 +57,18 @@ module.exports = {
       return;
     }
 
+    // Notation des tickets : étoiles/commentaire en MP (ouvreur), validation en serveur (staff)
+    if ((interaction.isButton() || interaction.isModalSubmit()) && interaction.customId.startsWith('rv:')) {
+      try {
+        const { handleReviewComponent } = require('../core/ticketReviews');
+        await handleReviewComponent(interaction);
+      } catch (error) {
+        console.error('Erreur sur la notation des tickets :', error);
+        await interaction.reply({ content: 'Une erreur est survenue, réessaie.', flags: MessageFlags.Ephemeral }).catch(() => {});
+      }
+      return;
+    }
+
     // Giveaways : participation publique, fin/reroll vérifiés côté handler
     if ((interaction.isButton() || interaction.isModalSubmit()) && interaction.customId.startsWith('gw:')) {
       if (!interaction.inGuild()) return;

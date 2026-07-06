@@ -4,6 +4,7 @@ const { initInvites } = require('../core/invites');
 const { cleanupTempvoc } = require('../core/tempvoc');
 const { startStatsWorker } = require('../core/stats');
 const { startBackupWorker } = require('../core/backups');
+const { startReviewWorker } = require('../core/ticketReviews');
 
 module.exports = {
   name: 'clientReady',
@@ -17,5 +18,6 @@ module.exports = {
     cleanupTempvoc(client).catch((error) => console.error('Erreur nettoyage tempvoc :', error));
     startStatsWorker(client);
     startBackupWorker(client);
+    startReviewWorker(client);
   },
 };

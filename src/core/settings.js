@@ -66,6 +66,9 @@ const DEFAULT_SETTINGS = {
     lastPanelChannel: null,  // dernier panneau publié, supprimé à la republication
     lastPanelMessage: null,
     types: [],               // { id, emoji, label, description, categoryId, mentionRoles, accessRoles, openMessage }
+    feedbackChannel: null,   // salon où les avis clients sont publiés — le configurer active la notation
+    reviewChannel: null,     // salon staff où les avis attendent validation (vide = publication directe)
+    reviewRole: null,        // rôle donné au client à la publication de son avis
   },
   automodConfig: {
     antispam: { enabled: false, messages: 5, seconds: 5 },   // X messages en Y secondes

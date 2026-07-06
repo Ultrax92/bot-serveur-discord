@@ -41,6 +41,25 @@ CREATE TABLE IF NOT EXISTS tickets (
 );
 CREATE INDEX IF NOT EXISTS idx_tickets_guild_user ON tickets (guild_id, user_id, status);
 
+CREATE TABLE IF NOT EXISTS ticket_reviews (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  guild_id TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  ticket_number INTEGER NOT NULL,
+  type_id TEXT,
+  type_label TEXT,
+  status TEXT NOT NULL DEFAULT 'pending',  -- pending (attend le client) | awaiting (attend le staff) | published | rejected
+  stars INTEGER,
+  comment TEXT,
+  auto INTEGER NOT NULL DEFAULT 0,         -- 1 = avis 5⭐ générique publié automatiquement
+  dm_channel_id TEXT,                      -- message MP de notation, pour l'éditer ensuite
+  dm_message_id TEXT,
+  review_message_id TEXT,                  -- message dans le salon de validation
+  deadline INTEGER,                        -- pending : date de l'avis auto (J+7)
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_ticket_reviews_pending ON ticket_reviews (status, deadline);
+
 CREATE TABLE IF NOT EXISTS kv (
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL

@@ -222,6 +222,10 @@ async function closeTicketChannel(channel, row, closedBy) {
     }
   }
 
+  // Notation du ticket : demande d'avis en MP (ou avis 5⭐ auto si le membre est parti)
+  const { requestReview } = require('./ticketReviews');
+  await requestReview(guild, row, closedBy).catch((error) => console.error('[reviews] Erreur demande d\'avis :', error));
+
   await channel.delete('Ticket fermé').catch(() => {});
 }
 

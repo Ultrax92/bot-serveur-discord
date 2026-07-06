@@ -447,6 +447,7 @@ function ticketsView(guild) {
     `🖼️ **Image du panneau** — ${imageStatus}`,
     `🎭 **Rôle requis pour ouvrir** — ${role ? `${role}` : 'aucun (tout le monde)'}`,
     `⚙️ **Réglages** — max ${tc.maxPerUser}/personne | fermeture au départ ${tc.closeOnLeave ? '🟢' : '🔴'} | transcript MP ${tc.transcriptDM ? '🟢' : '🔴'}`,
+    `⭐ **Notation des avis** — ${tc.feedbackChannel ? '🟢 active' : '🔴 inactive'} (bouton ⭐ ci-dessous)`,
     '',
     `**Types de tickets (${tc.types.length}) :**`,
     typesList,
@@ -489,6 +490,7 @@ function ticketsView(guild) {
   const channelButtons = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('setup:tk:chanid').setLabel('🆔 Salon par ID ou lien').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId('setup:tk:reqroleid').setLabel('🆔 Rôle requis par ID').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('setup:goto:tkreviews').setLabel('⭐ Notation des avis').setStyle(ButtonStyle.Primary),
   );
 
   return {
@@ -524,6 +526,68 @@ function ticketSettingsView(guild) {
     backButton('tickets'),
   );
   return { embeds: [embed], components: [buttons] };
+}
+
+function ticketReviewsView(guild) {
+  const tc = getSettings(guild.id).ticketsConfig;
+  const feedback = tc.feedbackChannel && guild.channels.cache.get(tc.feedbackChannel);
+  const review = tc.reviewChannel && guild.channels.cache.get(tc.reviewChannel);
+  const role = tc.reviewRole && guild.roles.cache.get(tc.reviewRole);
+
+  const embed = panelEmbed(guild, '⭐ Notation des avis clients', [
+    `${feedback ? '🟢 **Notation active**' : '🔴 **Notation inactive** — configure le salon des avis pour l\'activer'}`,
+    '',
+    `⭐ **Salon des avis publiés** — ${feedback ? `${feedback}` : '🔴 non configuré'}`,
+    `🛃 **Salon staff de validation** — ${review ? `${review}` : '⚠️ aucun : les avis sont publiés directement, sans validation'}`,
+    `🎁 **Rôle donné au client** à la publication — ${role ? `${role}` : '*aucun*'}`,
+    '',
+    '**Fonctionnement :** à la fermeture d\'un ticket, l\'ouvreur reçoit en MP une demande de note (1 à 5 ⭐, commentaire facultatif). L\'avis passe par le salon de validation (✅ publier / ❌ rejeter) avant d\'être publié.',
+    '*Sans réponse sous 7 jours, ou si le membre est parti, un avis 5⭐ générique est publié automatiquement.*',
+  ].join('\n'));
+
+  const feedbackSelect = new ChannelSelectMenuBuilder()
+    .setCustomId('setup:tk:fbchan')
+    .setPlaceholder('⭐ Salon où publier les avis clients…')
+    .setChannelTypes(ChannelType.GuildText);
+  if (feedback) feedbackSelect.setDefaultChannels([feedback.id]);
+
+  const reviewSelect = new ChannelSelectMenuBuilder()
+    .setCustomId('setup:tk:rvchan')
+    .setPlaceholder('🛃 Salon staff de validation (vide = publication directe)…')
+    .setChannelTypes(ChannelType.GuildText)
+    .setMinValues(0)
+    .setMaxValues(1);
+  if (review) reviewSelect.setDefaultChannels([review.id]);
+
+  const roleSelect = new RoleSelectMenuBuilder()
+    .setCustomId('setup:tk:fbrole')
+    .setPlaceholder('🎁 Rôle donné au client à la publication (vide = aucun)…')
+    .setMinValues(0)
+    .setMaxValues(1);
+  if (role) roleSelect.setDefaultRoles([role.id]);
+
+  const idButtons = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('setup:tk:fbchanid').setLabel('🆔 Salon avis par ID').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('setup:tk:rvchanid').setLabel('🆔 Salon validation par ID').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('setup:tk:fbroleid').setLabel('🆔 Rôle par ID').setStyle(ButtonStyle.Primary),
+  );
+
+  const buttons = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('setup:tk:fboff').setLabel('🔴 Désactiver la notation').setStyle(ButtonStyle.Danger)
+      .setDisabled(!tc.feedbackChannel),
+    backButton('tickets'),
+  );
+
+  return {
+    embeds: [embed],
+    components: [
+      new ActionRowBuilder().addComponents(feedbackSelect),
+      new ActionRowBuilder().addComponents(reviewSelect),
+      new ActionRowBuilder().addComponents(roleSelect),
+      idButtons,
+      buttons,
+    ],
+  };
 }
 
 function ticketTypeView(guild, typeId) {
@@ -926,6 +990,7 @@ const PAGES = {
   automod: automodView,
   tickets: ticketsView,
   tksettings: ticketSettingsView,
+  tkreviews: ticketReviewsView,
   custom: customView,
   giveaways: giveawaysView,
   tempvoc: tempvocView,
@@ -1204,6 +1269,42 @@ async function handleSetupComponent(interaction) {
           s.modules.tickets = true;
         });
         return interaction.update(ticketsView(guild));
+      }
+
+      if (args[0] === 'tkfbchanid' || args[0] === 'tkrvchanid') {
+        const isFeedback = args[0] === 'tkfbchanid';
+        const raw = interaction.fields.getTextInputValue('id').trim();
+        if (!isFeedback && !raw) {
+          updateSettings(guild.id, (s) => { s.ticketsConfig.reviewChannel = null; });
+          return interaction.update(ticketReviewsView(guild));
+        }
+        const id = extractId(raw);
+        if (!id) {
+          return interaction.reply({ content: '❌ ID invalide. Colle un ID de salon, une mention `<#…>` ou un lien de salon.', flags: MessageFlags.Ephemeral });
+        }
+        const channel = await guild.channels.fetch(id).catch(() => null);
+        if (!channel || !channel.isTextBased() || channel.isThread() || channel.isVoiceBased()) {
+          return interaction.reply({ content: `❌ Aucun salon textuel trouvé sur ce serveur avec l'ID \`${id}\`.`, flags: MessageFlags.Ephemeral });
+        }
+        updateSettings(guild.id, (s) => {
+          if (isFeedback) {
+            s.ticketsConfig.feedbackChannel = channel.id;
+            s.modules.tickets = true;
+          } else {
+            s.ticketsConfig.reviewChannel = channel.id;
+          }
+        });
+        return interaction.update(ticketReviewsView(guild));
+      }
+
+      if (args[0] === 'tkfbroleid') {
+        const raw = interaction.fields.getTextInputValue('id').trim();
+        const id = extractId(raw);
+        if (raw && (!id || !guild.roles.cache.has(id))) {
+          return interaction.reply({ content: '❌ Aucun rôle trouvé sur ce serveur avec cet ID.', flags: MessageFlags.Ephemeral });
+        }
+        updateSettings(guild.id, (s) => { s.ticketsConfig.reviewRole = id ?? null; });
+        return interaction.update(ticketReviewsView(guild));
       }
 
       if (args[0] === 'tklabel') {
@@ -1557,6 +1658,54 @@ async function handleSetupComponent(interaction) {
       }
 
       if (sub === 'settings') return interaction.update(ticketSettingsView(guild));
+
+      if (sub === 'fbchan') {
+        updateSettings(guild.id, (s) => {
+          s.ticketsConfig.feedbackChannel = interaction.values[0];
+          s.modules.tickets = true; // on configure → le module s'active
+        });
+        return interaction.update(ticketReviewsView(guild));
+      }
+
+      if (sub === 'rvchan') {
+        updateSettings(guild.id, (s) => { s.ticketsConfig.reviewChannel = interaction.values[0] ?? null; });
+        return interaction.update(ticketReviewsView(guild));
+      }
+
+      if (sub === 'fbrole') {
+        updateSettings(guild.id, (s) => { s.ticketsConfig.reviewRole = interaction.values[0] ?? null; });
+        return interaction.update(ticketReviewsView(guild));
+      }
+
+      if (sub === 'fboff') {
+        updateSettings(guild.id, (s) => { s.ticketsConfig.feedbackChannel = null; });
+        return interaction.update(ticketReviewsView(guild));
+      }
+
+      if (sub === 'fbchanid' || sub === 'rvchanid') {
+        const modal = new ModalBuilder()
+          .setCustomId(`setup:modal:tk${sub}`)
+          .setTitle(sub === 'fbchanid' ? 'Salon des avis publiés' : 'Salon staff de validation')
+          .addComponents(new ActionRowBuilder().addComponents(
+            new TextInputBuilder().setCustomId('id')
+              .setLabel(sub === 'fbchanid' ? 'ID, mention <#…> ou lien du salon' : 'ID ou lien (vide = publication directe)')
+              .setPlaceholder('1234567890123456789')
+              .setStyle(TextInputStyle.Short).setRequired(sub === 'fbchanid').setMaxLength(100),
+          ));
+        return interaction.showModal(modal);
+      }
+
+      if (sub === 'fbroleid') {
+        const modal = new ModalBuilder()
+          .setCustomId('setup:modal:tkfbroleid')
+          .setTitle('Rôle donné au client')
+          .addComponents(new ActionRowBuilder().addComponents(
+            new TextInputBuilder().setCustomId('id').setLabel('ID ou mention du rôle (vide = aucun)')
+              .setValue(getSettings(guild.id).ticketsConfig.reviewRole ?? '')
+              .setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(100),
+          ));
+        return interaction.showModal(modal);
+      }
 
       if (sub === 'closeonleave') {
         updateSettings(guild.id, (s) => { s.ticketsConfig.closeOnLeave = !s.ticketsConfig.closeOnLeave; });
