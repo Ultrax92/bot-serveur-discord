@@ -35,11 +35,11 @@ async function getExecutor(guild, auditType) {
 async function raidLog(guild, executor, description, action) {
   const embed = new EmbedBuilder()
     .setColor(0xed4245)
-    .setDescription([
-      `🛡️ **${description}**`,
-      executor ? idLine(executor) : null,
-      `**Action :** ${action}`,
-    ].filter(Boolean).join('\n'))
+    .setDescription(
+      [`🛡️ **${description}**`, executor ? idLine(executor) : null, `**Action :** ${action}`]
+        .filter(Boolean)
+        .join('\n'),
+    )
     .setTimestamp();
   if (executor) embed.setAuthor(userAuthor(executor));
   await sendLog(guild, 'raid', embed);
@@ -60,21 +60,42 @@ async function punish(guild, executor, trigger) {
   if (sanction === 'mute') {
     const member = await guild.members.fetch(executor.id).catch(() => null);
     if (member) {
-      const removable = member.roles.cache.filter((r) =>
-        r.id !== guild.roles.everyone.id && !r.managed && r.position < guild.members.me.roles.highest.position);
+      const removable = member.roles.cache.filter(
+        (r) => r.id !== guild.roles.everyone.id && !r.managed && r.position < guild.members.me.roles.highest.position,
+      );
       await member.roles.remove(removable, reason).catch(() => {});
       await member.timeout(DAY_MS, reason).catch(() => {});
       action = `derank complet (${removable.size} rôle(s)) + mute 24h`;
-      addSanction({ guildId: guild.id, userId: executor.id, moderatorId: guild.client.user.id, type: 'mute', reason, expiresAt: Date.now() + DAY_MS });
+      addSanction({
+        guildId: guild.id,
+        userId: executor.id,
+        moderatorId: guild.client.user.id,
+        type: 'mute',
+        reason,
+        expiresAt: Date.now() + DAY_MS,
+      });
     }
   } else if (sanction === 'ban24') {
-    const banned = await guild.bans.create(executor.id, { reason }).then(() => true).catch(() => false);
+    const banned = await guild.bans
+      .create(executor.id, { reason })
+      .then(() => true)
+      .catch(() => false);
     if (banned) {
       action = 'ban 24h (levé automatiquement)';
-      addSanction({ guildId: guild.id, userId: executor.id, moderatorId: guild.client.user.id, type: 'ban', reason, expiresAt: Date.now() + DAY_MS });
+      addSanction({
+        guildId: guild.id,
+        userId: executor.id,
+        moderatorId: guild.client.user.id,
+        type: 'ban',
+        reason,
+        expiresAt: Date.now() + DAY_MS,
+      });
     }
   } else {
-    const banned = await guild.bans.create(executor.id, { reason }).then(() => true).catch(() => false);
+    const banned = await guild.bans
+      .create(executor.id, { reason })
+      .then(() => true)
+      .catch(() => false);
     if (banned) {
       action = 'ban définitif';
       addSanction({ guildId: guild.id, userId: executor.id, moderatorId: guild.client.user.id, type: 'ban', reason });
@@ -98,16 +119,23 @@ async function checkBurst(guild, auditType, kind, label) {
   }
 }
 
-const onChannelCreate = (channel) => channel.guild && isModuleEnabled(channel.guild.id, 'antiraid')
-  && checkBurst(channel.guild, AuditLogEvent.ChannelCreate, 'antichannel', 'Créations de salons en rafale');
-const onChannelDelete = (channel) => channel.guild && isModuleEnabled(channel.guild.id, 'antiraid')
-  && checkBurst(channel.guild, AuditLogEvent.ChannelDelete, 'antichannel', 'Suppressions de salons en rafale');
-const onRoleCreate = (role) => isModuleEnabled(role.guild.id, 'antiraid')
-  && checkBurst(role.guild, AuditLogEvent.RoleCreate, 'antirole', 'Créations de rôles en rafale');
-const onRoleDelete = (role) => isModuleEnabled(role.guild.id, 'antiraid')
-  && checkBurst(role.guild, AuditLogEvent.RoleDelete, 'antirole', 'Suppressions de rôles en rafale');
-const onBanAdd = (ban) => isModuleEnabled(ban.guild.id, 'antiraid')
-  && checkBurst(ban.guild, AuditLogEvent.MemberBanAdd, 'antiban', 'Bannissements en rafale');
+const onChannelCreate = (channel) =>
+  channel.guild &&
+  isModuleEnabled(channel.guild.id, 'antiraid') &&
+  checkBurst(channel.guild, AuditLogEvent.ChannelCreate, 'antichannel', 'Créations de salons en rafale');
+const onChannelDelete = (channel) =>
+  channel.guild &&
+  isModuleEnabled(channel.guild.id, 'antiraid') &&
+  checkBurst(channel.guild, AuditLogEvent.ChannelDelete, 'antichannel', 'Suppressions de salons en rafale');
+const onRoleCreate = (role) =>
+  isModuleEnabled(role.guild.id, 'antiraid') &&
+  checkBurst(role.guild, AuditLogEvent.RoleCreate, 'antirole', 'Créations de rôles en rafale');
+const onRoleDelete = (role) =>
+  isModuleEnabled(role.guild.id, 'antiraid') &&
+  checkBurst(role.guild, AuditLogEvent.RoleDelete, 'antirole', 'Suppressions de rôles en rafale');
+const onBanAdd = (ban) =>
+  isModuleEnabled(ban.guild.id, 'antiraid') &&
+  checkBurst(ban.guild, AuditLogEvent.MemberBanAdd, 'antiban', 'Bannissements en rafale');
 
 // Webhook créé par un non-whitelisté : suppression + punition
 async function onWebhooksUpdate(channel) {
@@ -154,20 +182,38 @@ async function onMemberAdd(member) {
       if (Date.now() - last < 60_000) {
         // Alerte déjà envoyée : en mode kick on continue d'expulser les arrivants de la vague
         if (config.massjoin.mode === 'kick' && !isExempt(guild, member.id)) {
-          await member.kick('Antiraid : vague d\'arrivées').catch(() => {});
+          await member.kick("Antiraid : vague d'arrivées").catch(() => {});
         }
         return;
       }
       lastMassJoinAlert.set(guild.id, Date.now());
 
       if (config.massjoin.mode === 'kick' && !isExempt(guild, member.id)) {
-        await member.kick('Antiraid : vague d\'arrivées').catch(() => {});
-        await raidLog(guild, null, `Vague d'arrivées : ${count} membres en ${config.massjoin.seconds}s`, 'kick des nouveaux arrivants pendant 60s');
+        await member.kick("Antiraid : vague d'arrivées").catch(() => {});
+        await raidLog(
+          guild,
+          null,
+          `Vague d'arrivées : ${count} membres en ${config.massjoin.seconds}s`,
+          'kick des nouveaux arrivants pendant 60s',
+        );
       } else {
-        await raidLog(guild, null, `Vague d'arrivées : ${count} membres en ${config.massjoin.seconds}s`, '⚠️ alerte seulement — aucun membre touché (mode alerte)');
+        await raidLog(
+          guild,
+          null,
+          `Vague d'arrivées : ${count} membres en ${config.massjoin.seconds}s`,
+          '⚠️ alerte seulement — aucun membre touché (mode alerte)',
+        );
       }
     }
   }
 }
 
-module.exports = { onChannelCreate, onChannelDelete, onRoleCreate, onRoleDelete, onBanAdd, onWebhooksUpdate, onMemberAdd };
+module.exports = {
+  onChannelCreate,
+  onChannelDelete,
+  onRoleCreate,
+  onRoleDelete,
+  onBanAdd,
+  onWebhooksUpdate,
+  onMemberAdd,
+};

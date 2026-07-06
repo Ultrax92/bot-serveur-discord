@@ -13,7 +13,9 @@ module.exports = {
     // Met à jour le compteur de l'inviteur et l'affiche dans le log de départ
     const inviteInfo = recordLeave(member);
     if (inviteInfo) {
-      lines.push(`📨 **Avait été invité par** <@${inviteInfo.inviterId}> — il lui reste **${inviteInfo.stats.active}** invitation(s)`);
+      lines.push(
+        `📨 **Avait été invité par** <@${inviteInfo.inviterId}> — il lui reste **${inviteInfo.stats.active}** invitation(s)`,
+      );
     }
     if (!member.partial) {
       if (member.joinedTimestamp) {
@@ -21,7 +23,12 @@ module.exports = {
       }
       const roles = member.roles.cache.filter((r) => r.id !== member.guild.roles.everyone.id);
       if (roles.size) {
-        lines.push(`**Rôles :** ${roles.map((r) => `${r}`).join(' ').slice(0, 900)}`);
+        lines.push(
+          `**Rôles :** ${roles
+            .map((r) => `${r}`)
+            .join(' ')
+            .slice(0, 900)}`,
+        );
       }
     }
 

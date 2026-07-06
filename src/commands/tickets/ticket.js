@@ -12,15 +12,21 @@ module.exports = {
     .setName('ticket')
     .setDescription('Gère un ticket (celui où tu es, ou celui indiqué)')
     .addStringOption((opt) =>
-      opt.setName('action').setDescription('L\'action à effectuer').setRequired(true)
+      opt
+        .setName('action')
+        .setDescription("L'action à effectuer")
+        .setRequired(true)
         .addChoices(
           { name: '➕ Ajouter un membre', value: 'add' },
           { name: '➖ Retirer un membre', value: 'del' },
           { name: '🙋 Claim', value: 'claim' },
           { name: '🔒 Fermer', value: 'close' },
-        ))
+        ),
+    )
     .addUserOption((opt) => opt.setName('membre').setDescription('Le membre (requis pour ajouter/retirer)'))
-    .addStringOption((opt) => opt.setName('ticket').setDescription('ID ou lien du salon ticket (vide = ticket actuel)')),
+    .addStringOption((opt) =>
+      opt.setName('ticket').setDescription('ID ou lien du salon ticket (vide = ticket actuel)'),
+    ),
 
   async execute(interaction) {
     const action = interaction.options.getString('action');
@@ -30,15 +36,21 @@ module.exports = {
     const rawTicket = interaction.options.getString('ticket');
     if (rawTicket) {
       const id = extractId(rawTicket);
-      channel = id && await interaction.guild.channels.fetch(id).catch(() => null);
+      channel = id && (await interaction.guild.channels.fetch(id).catch(() => null));
       if (!channel) {
-        return interaction.reply({ embeds: [errorEmbed(interaction, `Aucun salon trouvé pour \`${rawTicket.slice(0, 100)}\`.`)], flags: MessageFlags.Ephemeral });
+        return interaction.reply({
+          embeds: [errorEmbed(interaction, `Aucun salon trouvé pour \`${rawTicket.slice(0, 100)}\`.`)],
+          flags: MessageFlags.Ephemeral,
+        });
       }
     }
 
     const row = getTicketByChannel(channel.id);
     if (!row || row.status !== 'open') {
-      return interaction.reply({ embeds: [errorEmbed(interaction, `${channel} n'est pas un ticket ouvert.`)], flags: MessageFlags.Ephemeral });
+      return interaction.reply({
+        embeds: [errorEmbed(interaction, `${channel} n'est pas un ticket ouvert.`)],
+        flags: MessageFlags.Ephemeral,
+      });
     }
 
     const type = getSettings(interaction.guildId).ticketsConfig.types.find((t) => t.id === row.type_id);
@@ -48,13 +60,21 @@ module.exports = {
 
     if (action === 'claim') {
       if (!isStaff) {
-        return interaction.reply({ embeds: [errorEmbed(interaction, 'Seul le staff peut claim un ticket.')], flags: MessageFlags.Ephemeral });
+        return interaction.reply({
+          embeds: [errorEmbed(interaction, 'Seul le staff peut claim un ticket.')],
+          flags: MessageFlags.Ephemeral,
+        });
       }
       if (row.claimed_by) {
-        return interaction.reply({ embeds: [errorEmbed(interaction, `Ce ticket est déjà pris en charge par <@${row.claimed_by}>.`)], flags: MessageFlags.Ephemeral });
+        return interaction.reply({
+          embeds: [errorEmbed(interaction, `Ce ticket est déjà pris en charge par <@${row.claimed_by}>.`)],
+          flags: MessageFlags.Ephemeral,
+        });
       }
       setClaim(channel.id, interaction.user.id);
-      const embed = new EmbedBuilder().setColor(0x57f287).setDescription(`🙋 Ticket pris en charge par ${interaction.user}.`);
+      const embed = new EmbedBuilder()
+        .setColor(0x57f287)
+        .setDescription(`🙋 Ticket pris en charge par ${interaction.user}.`);
       await channel.send({ embeds: [embed] }).catch(() => {});
       return interaction.reply({
         embeds: [successEmbed(interaction, `Tu as claim le ticket ${channel}.`)],
@@ -64,7 +84,10 @@ module.exports = {
 
     if (action === 'close') {
       if (!isOpener && !isStaff) {
-        return interaction.reply({ embeds: [errorEmbed(interaction, 'Seuls l\'ouvreur du ticket et le staff peuvent le fermer.')], flags: MessageFlags.Ephemeral });
+        return interaction.reply({
+          embeds: [errorEmbed(interaction, "Seuls l'ouvreur du ticket et le staff peuvent le fermer.")],
+          flags: MessageFlags.Ephemeral,
+        });
       }
       await interaction.reply({
         content: `🔒 Fermeture de ${channel} : génération du transcript…`,
@@ -76,27 +99,50 @@ module.exports = {
     // add / del : membre requis
     const member = interaction.options.getMember('membre');
     if (!member) {
-      return interaction.reply({ embeds: [errorEmbed(interaction, 'Précise le membre à ajouter ou retirer.')], flags: MessageFlags.Ephemeral });
+      return interaction.reply({
+        embeds: [errorEmbed(interaction, 'Précise le membre à ajouter ou retirer.')],
+        flags: MessageFlags.Ephemeral,
+      });
     }
     if (!isOpener && !isStaff) {
-      return interaction.reply({ embeds: [errorEmbed(interaction, 'Seuls l\'ouvreur du ticket et le staff peuvent gérer ses membres.')], flags: MessageFlags.Ephemeral });
+      return interaction.reply({
+        embeds: [errorEmbed(interaction, "Seuls l'ouvreur du ticket et le staff peuvent gérer ses membres.")],
+        flags: MessageFlags.Ephemeral,
+      });
     }
     if (member.user.bot) {
-      return interaction.reply({ embeds: [errorEmbed(interaction, 'Impossible d\'ajouter ou retirer un bot.')], flags: MessageFlags.Ephemeral });
+      return interaction.reply({
+        embeds: [errorEmbed(interaction, "Impossible d'ajouter ou retirer un bot.")],
+        flags: MessageFlags.Ephemeral,
+      });
     }
 
     if (action === 'add') {
-      await channel.permissionOverwrites.edit(member.id, {
-        ViewChannel: true, SendMessages: true, ReadMessageHistory: true, AttachFiles: true,
-      }, { reason: `Ajouté au ticket par ${interaction.user.tag}` });
+      await channel.permissionOverwrites.edit(
+        member.id,
+        {
+          ViewChannel: true,
+          SendMessages: true,
+          ReadMessageHistory: true,
+          AttachFiles: true,
+        },
+        { reason: `Ajouté au ticket par ${interaction.user.tag}` },
+      );
       return interaction.reply({ embeds: [successEmbed(interaction, `${member} a été ajouté au ticket ${channel}.`)] });
     }
 
     if (action === 'del') {
       if (member.id === row.user_id) {
-        return interaction.reply({ embeds: [errorEmbed(interaction, 'Impossible de retirer l\'ouvreur de son propre ticket (utilise 🔒 Fermer).')], flags: MessageFlags.Ephemeral });
+        return interaction.reply({
+          embeds: [
+            errorEmbed(interaction, "Impossible de retirer l'ouvreur de son propre ticket (utilise 🔒 Fermer)."),
+          ],
+          flags: MessageFlags.Ephemeral,
+        });
       }
-      await channel.permissionOverwrites.delete(member.id, `Retiré du ticket par ${interaction.user.tag}`).catch(() => {});
+      await channel.permissionOverwrites
+        .delete(member.id, `Retiré du ticket par ${interaction.user.tag}`)
+        .catch(() => {});
       return interaction.reply({ embeds: [successEmbed(interaction, `${member} a été retiré du ticket ${channel}.`)] });
     }
   },

@@ -1,8 +1,15 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const {
-  EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle,
-  ModalBuilder, TextInputBuilder, TextInputStyle, MessageFlags, AttachmentBuilder,
+  EmbedBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle,
+  MessageFlags,
+  AttachmentBuilder,
 } = require('discord.js');
 const db = require('./db');
 const { getSettings } = require('./settings');
@@ -16,10 +23,10 @@ const REVIEW_DEADLINE_MS = 7 * 24 * 60 * 60 * 1000;
 
 // Textes génériques des avis 5⭐ automatiques (client parti ou sans réponse sous 7 jours)
 const AUTO_REVIEW_TEXTS = [
-  'Rien à redire, tout s\'est parfaitement passé. Merci !',
+  "Rien à redire, tout s'est parfaitement passé. Merci !",
   'Service rapide et efficace, je recommande.',
   'Très bonne expérience, équipe au top.',
-  'Nickel du début à la fin, merci à l\'équipe.',
+  "Nickel du début à la fin, merci à l'équipe.",
   'Réponse rapide et demande réglée, parfait.',
   'Super service, rien à signaler.',
   'Tout est OK, merci pour la prise en charge.',
@@ -33,15 +40,21 @@ const insertStmt = db.prepare(`
   VALUES (@guild_id, @user_id, @ticket_number, @type_id, @type_label, @status, @stars, @comment, @auto, @deadline, @transcript, @created_at)
 `);
 const getStmt = db.prepare('SELECT * FROM ticket_reviews WHERE id = ?');
-const dueStmt = db.prepare("SELECT * FROM ticket_reviews WHERE status = 'pending' AND deadline IS NOT NULL AND deadline <= ?");
+const dueStmt = db.prepare(
+  "SELECT * FROM ticket_reviews WHERE status = 'pending' AND deadline IS NOT NULL AND deadline <= ?",
+);
 const setDmMessageStmt = db.prepare('UPDATE ticket_reviews SET dm_channel_id = ?, dm_message_id = ? WHERE id = ?');
 const setStarsStmt = db.prepare('UPDATE ticket_reviews SET stars = ? WHERE id = ?');
 const setCommentStmt = db.prepare('UPDATE ticket_reviews SET comment = ? WHERE id = ?');
 const setImageStmt = db.prepare('UPDATE ticket_reviews SET image = ? WHERE id = ?');
 const setStatusStmt = db.prepare('UPDATE ticket_reviews SET status = ? WHERE id = ?');
-const setValidationMsgStmt = db.prepare('UPDATE ticket_reviews SET review_channel_id = ?, review_message_id = ? WHERE id = ?');
+const setValidationMsgStmt = db.prepare(
+  'UPDATE ticket_reviews SET review_channel_id = ?, review_message_id = ? WHERE id = ?',
+);
 // L'avis auto est générique : il n'embarque jamais le brouillon (image comprise) du client
-const publishAutoStmt = db.prepare("UPDATE ticket_reviews SET status = 'published', stars = 5, comment = ?, auto = 1, image = NULL WHERE id = ?");
+const publishAutoStmt = db.prepare(
+  "UPDATE ticket_reviews SET status = 'published', stars = 5, comment = ?, auto = 1, image = NULL WHERE id = ?",
+);
 // Une fois l'avis traité, le transcript ne sert plus : purgé pour garder la base et les backups légers
 const clearTranscriptStmt = db.prepare('UPDATE ticket_reviews SET transcript = NULL WHERE id = ?');
 
@@ -63,7 +76,11 @@ function ticketLabel(review) {
 
 function deleteReviewImage(review) {
   if (!review?.image) return;
-  try { fs.unlinkSync(path.join(imagesDir, review.image)); } catch { /* déjà supprimée */ }
+  try {
+    fs.unlinkSync(path.join(imagesDir, review.image));
+  } catch {
+    /* déjà supprimée */
+  }
 }
 
 function imageAttachment(review) {
@@ -84,10 +101,11 @@ async function publishReview(client, review) {
   const user = await client.users.fetch(review.user_id).catch(() => null);
   const embed = new EmbedBuilder()
     .setColor(getSettings(guild.id).color)
-    .setDescription([
-      `**${starsLine(review.stars)}**`,
-      review.comment ? `> ${review.comment.replace(/\n/g, '\n> ')}` : null,
-    ].filter(Boolean).join('\n'))
+    .setDescription(
+      [`**${starsLine(review.stars)}**`, review.comment ? `> ${review.comment.replace(/\n/g, '\n> ')}` : null]
+        .filter(Boolean)
+        .join('\n'),
+    )
     .setTimestamp();
   if (review.type_label) embed.setFooter({ text: review.type_label });
   if (user) embed.setAuthor(userAuthor(user));
@@ -117,7 +135,8 @@ async function publishAutoReview(client, reviewId) {
   publishAutoStmt.run(text, reviewId);
   const review = getStmt.get(reviewId);
   const ok = await publishReview(client, review);
-  if (!ok) setStatusStmt.run('pending', reviewId); // salon indisponible : on retentera au prochain passage
+  if (!ok)
+    setStatusStmt.run('pending', reviewId); // salon indisponible : on retentera au prochain passage
   else clearTranscriptStmt.run(reviewId);
   return ok;
 }
@@ -155,16 +174,18 @@ async function requestReview(guild, ticketRow, closedBy, transcript = null) {
   const embed = new EmbedBuilder()
     .setColor(getSettings(guild.id).color)
     .setTitle('⭐ Ton avis compte !')
-    .setDescription([
-      `Ton ${ticketLabel(review)} sur **${guild.name}** vient d'être fermé.`,
-      '',
-      'Note ton expérience de 1 à 5 étoiles — tu pourras ensuite ajouter un commentaire et/ou une image (facultatif) avant d\'envoyer ton avis.',
-      '',
-      '⏳ *Sans avis de ta part sous 7 jours, un avis 5⭐ sera publié automatiquement.*',
-    ].join('\n'));
+    .setDescription(
+      [
+        `Ton ${ticketLabel(review)} sur **${guild.name}** vient d'être fermé.`,
+        '',
+        "Note ton expérience de 1 à 5 étoiles — tu pourras ensuite ajouter un commentaire et/ou une image (facultatif) avant d'envoyer ton avis.",
+        '',
+        '⏳ *Sans avis de ta part sous 7 jours, un avis 5⭐ sera publié automatiquement.*',
+      ].join('\n'),
+    );
 
   const opener = await guild.client.users.fetch(ticketRow.user_id).catch(() => null);
-  const sent = opener && await opener.send({ embeds: [embed], components: starsRow(review) }).catch(() => null);
+  const sent = opener && (await opener.send({ embeds: [embed], components: starsRow(review) }).catch(() => null));
   // MP fermés : la ligne reste en pending → avis 5⭐ auto à J+7 comme sans réponse
   if (sent) setDmMessageStmt.run(sent.channelId, sent.id, reviewId);
 }
@@ -172,33 +193,46 @@ async function requestReview(guild, ticketRow, closedBy, transcript = null) {
 // ── Brouillon d'avis en MP (note + commentaire + image, envoi par 📤) ────────
 
 function starsRow(review) {
-  return [new ActionRowBuilder().addComponents(
-    [1, 2, 3, 4, 5].map((n) => new ButtonBuilder()
-      .setCustomId(`rv:star:${review.id}:${n}`)
-      .setLabel(`${n} ⭐`)
-      .setStyle(n === review.stars ? ButtonStyle.Primary : ButtonStyle.Secondary)),
-  )];
+  return [
+    new ActionRowBuilder().addComponents(
+      [1, 2, 3, 4, 5].map((n) =>
+        new ButtonBuilder()
+          .setCustomId(`rv:star:${review.id}:${n}`)
+          .setLabel(`${n} ⭐`)
+          .setStyle(n === review.stars ? ButtonStyle.Primary : ButtonStyle.Secondary),
+      ),
+    ),
+  ];
 }
 
 function draftView(review) {
   const embed = new EmbedBuilder()
     .setColor(getSettings(review.guild_id).color)
     .setTitle('⭐ Ton avis')
-    .setDescription([
-      `**Note :** ${review.stars ? starsLine(review.stars) : '*choisis de 1 à 5 ⭐*'} — ${ticketLabel(review)}`,
-      `**Commentaire :** ${review.comment ? `\n> ${review.comment.replace(/\n/g, '\n> ')}` : '*aucun (facultatif)*'}`,
-      `**Image :** ${review.image ? '🟢 ajoutée' : '*aucune (facultatif)*'}`,
-      '',
-      'Quand tout est prêt, clique **📤 Envoyer mon avis**.',
-      '⏳ *Sans envoi de ta part sous 7 jours, un avis 5⭐ sera publié automatiquement.*',
-    ].join('\n'));
+    .setDescription(
+      [
+        `**Note :** ${review.stars ? starsLine(review.stars) : '*choisis de 1 à 5 ⭐*'} — ${ticketLabel(review)}`,
+        `**Commentaire :** ${review.comment ? `\n> ${review.comment.replace(/\n/g, '\n> ')}` : '*aucun (facultatif)*'}`,
+        `**Image :** ${review.image ? '🟢 ajoutée' : '*aucune (facultatif)*'}`,
+        '',
+        'Quand tout est prêt, clique **📤 Envoyer mon avis**.',
+        '⏳ *Sans envoi de ta part sous 7 jours, un avis 5⭐ sera publié automatiquement.*',
+      ].join('\n'),
+    );
 
   const actions = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId(`rv:comment:${review.id}`)
-      .setLabel(review.comment ? '💬 Modifier le commentaire' : '💬 Ajouter un commentaire').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId(`rv:image:${review.id}`)
-      .setLabel(review.image ? '🖼️ Changer l\'image' : '🖼️ Ajouter une image').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId(`rv:send:${review.id}`).setLabel('📤 Envoyer mon avis').setStyle(ButtonStyle.Success)
+    new ButtonBuilder()
+      .setCustomId(`rv:comment:${review.id}`)
+      .setLabel(review.comment ? '💬 Modifier le commentaire' : '💬 Ajouter un commentaire')
+      .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder()
+      .setCustomId(`rv:image:${review.id}`)
+      .setLabel(review.image ? "🖼️ Changer l'image" : '🖼️ Ajouter une image')
+      .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder()
+      .setCustomId(`rv:send:${review.id}`)
+      .setLabel('📤 Envoyer mon avis')
+      .setStyle(ButtonStyle.Success)
       .setDisabled(!review.stars),
   );
   return { embeds: [embed], components: [...starsRow(review), actions] };
@@ -208,10 +242,7 @@ function sentView(review, message) {
   const embed = new EmbedBuilder()
     .setColor(0x57f287)
     .setTitle('✅ Merci pour ton avis !')
-    .setDescription([
-      `**${starsLine(review.stars)}** — ${ticketLabel(review)}`,
-      message,
-    ].join('\n'));
+    .setDescription([`**${starsLine(review.stars)}** — ${ticketLabel(review)}`, message].join('\n'));
   return { embeds: [embed], components: [] };
 }
 
@@ -227,12 +258,14 @@ function canModerateReview(member, review) {
 function validationView(guild, review) {
   const embed = new EmbedBuilder()
     .setColor(getSettings(guild.id).color)
-    .setDescription([
-      `⭐ **Nouvel avis à valider** — ${ticketLabel(review)}`,
-      `**Note :** ${starsLine(review.stars)}`,
-      review.comment ? `**Commentaire :**\n> ${review.comment.replace(/\n/g, '\n> ')}` : '**Commentaire :** *aucun*',
-      idLine(review.user_id),
-    ].join('\n'))
+    .setDescription(
+      [
+        `⭐ **Nouvel avis à valider** — ${ticketLabel(review)}`,
+        `**Note :** ${starsLine(review.stars)}`,
+        review.comment ? `**Commentaire :**\n> ${review.comment.replace(/\n/g, '\n> ')}` : '**Commentaire :** *aucun*',
+        idLine(review.user_id),
+      ].join('\n'),
+    )
     .setTimestamp();
   const buttons = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId(`rv:approve:${review.id}`).setLabel('✅ Publier').setStyle(ButtonStyle.Success),
@@ -260,20 +293,30 @@ async function submitForValidation(client, review) {
     view.embeds[0].setImage(`attachment://${review.image}`);
   }
   if (review.transcript && Buffer.byteLength(review.transcript, 'utf8') < 9 * 1024 * 1024) {
-    view.files.push(new AttachmentBuilder(Buffer.from(review.transcript, 'utf8'), { name: `transcript-ticket-${review.ticket_number}.txt` }));
+    view.files.push(
+      new AttachmentBuilder(Buffer.from(review.transcript, 'utf8'), {
+        name: `transcript-ticket-${review.ticket_number}.txt`,
+      }),
+    );
   }
 
   const staffChannel = tc.reviewChannel && guild.channels.cache.get(tc.reviewChannel);
   let sent = staffChannel ? await staffChannel.send(view).catch(() => null) : null;
   if (!sent && process.env.OWNER_ID) {
     const owner = await client.users.fetch(process.env.OWNER_ID).catch(() => null);
-    sent = owner && await owner.send({
-      content: `🛃 **Avis à valider** — aucun salon de validation configuré sur **${guild.name}** :`,
-      ...view,
-    }).catch(() => null);
+    sent =
+      owner &&
+      (await owner
+        .send({
+          content: `🛃 **Avis à valider** — aucun salon de validation configuré sur **${guild.name}** :`,
+          ...view,
+        })
+        .catch(() => null));
   }
   if (!sent) {
-    console.error(`[reviews] Avis #${review.id} : demande de validation impossible à envoyer (salon staff et MP owner indisponibles).`);
+    console.error(
+      `[reviews] Avis #${review.id} : demande de validation impossible à envoyer (salon staff et MP owner indisponibles).`,
+    );
     return null;
   }
   setValidationMsgStmt.run(sent.channelId, sent.id, review.id);
@@ -286,14 +329,17 @@ async function handleReviewComponent(interaction) {
   const [, action, reviewId, extra] = interaction.customId.split(':');
   const review = getStmt.get(reviewId);
   if (!review) {
-    return interaction.reply({ content: '⚠️ Cet avis n\'existe plus.', flags: MessageFlags.Ephemeral }).catch(() => {});
+    return interaction.reply({ content: "⚠️ Cet avis n'existe plus.", flags: MessageFlags.Ephemeral }).catch(() => {});
   }
 
   // ── Côté client, en MP : brouillon (étoiles, commentaire, image, envoi) ──
   if (action === 'star' || action === 'comment' || action === 'image' || action === 'send' || action === 'modal') {
     if (interaction.user.id !== review.user_id) return;
     if (review.status !== 'pending') {
-      return interaction.reply({ content: '⚠️ Ton avis a déjà été envoyé (ou le délai de 7 jours est passé).', flags: MessageFlags.Ephemeral });
+      return interaction.reply({
+        content: '⚠️ Ton avis a déjà été envoyé (ou le délai de 7 jours est passé).',
+        flags: MessageFlags.Ephemeral,
+      });
     }
 
     if (action === 'star') {
@@ -306,11 +352,17 @@ async function handleReviewComponent(interaction) {
       const modal = new ModalBuilder()
         .setCustomId(`rv:modal:${reviewId}`)
         .setTitle('Ton commentaire')
-        .addComponents(new ActionRowBuilder().addComponents(
-          new TextInputBuilder().setCustomId('text').setLabel('Commentaire (vide = le retirer)')
-            .setValue(review.comment ?? '')
-            .setStyle(TextInputStyle.Paragraph).setRequired(false).setMaxLength(1000),
-        ));
+        .addComponents(
+          new ActionRowBuilder().addComponents(
+            new TextInputBuilder()
+              .setCustomId('text')
+              .setLabel('Commentaire (vide = le retirer)')
+              .setValue(review.comment ?? '')
+              .setStyle(TextInputStyle.Paragraph)
+              .setRequired(false)
+              .setMaxLength(1000),
+          ),
+        );
       return interaction.showModal(modal);
     }
 
@@ -336,7 +388,10 @@ async function handleReviewComponent(interaction) {
 
     if (action === 'send') {
       if (!review.stars) {
-        return interaction.reply({ content: '⚠️ Choisis d\'abord une note de 1 à 5 ⭐.', flags: MessageFlags.Ephemeral });
+        return interaction.reply({
+          content: "⚠️ Choisis d'abord une note de 1 à 5 ⭐.",
+          flags: MessageFlags.Ephemeral,
+        });
       }
       pendingReviewImages.delete(interaction.user.id);
 
@@ -346,7 +401,10 @@ async function handleReviewComponent(interaction) {
         const ok = await publishReview(interaction.client, getStmt.get(reviewId));
         if (!ok) {
           setStatusStmt.run('pending', reviewId);
-          return interaction.reply({ content: '❌ Impossible de publier ton avis pour le moment, réessaie plus tard.', flags: MessageFlags.Ephemeral });
+          return interaction.reply({
+            content: '❌ Impossible de publier ton avis pour le moment, réessaie plus tard.',
+            flags: MessageFlags.Ephemeral,
+          });
         }
         clearTranscriptStmt.run(reviewId);
         return interaction.update(sentView(review, 'Ton avis est **publié**, merci beaucoup ! 🙏'));
@@ -355,7 +413,9 @@ async function handleReviewComponent(interaction) {
       // Sinon : validation par le staff (salon configuré, ou MP au owner)
       setStatusStmt.run('awaiting', reviewId);
       await submitForValidation(interaction.client, getStmt.get(reviewId));
-      return interaction.update(sentView(review, 'Ton avis a été transmis, il sera publié après vérification par l\'équipe. Merci ! 🙏'));
+      return interaction.update(
+        sentView(review, "Ton avis a été transmis, il sera publié après vérification par l'équipe. Merci ! 🙏"),
+      );
     }
   }
 
@@ -365,7 +425,10 @@ async function handleReviewComponent(interaction) {
       ? canModerateReview(interaction.member, review)
       : isOwner(interaction.user.id);
     if (!allowed) {
-      return interaction.reply({ content: 'Seul le staff peut valider ou rejeter un avis.', flags: MessageFlags.Ephemeral });
+      return interaction.reply({
+        content: 'Seul le staff peut valider ou rejeter un avis.',
+        flags: MessageFlags.Ephemeral,
+      });
     }
     if (review.status !== 'awaiting') {
       return interaction.reply({ content: '⚠️ Cet avis a déjà été traité.', flags: MessageFlags.Ephemeral });
@@ -377,7 +440,9 @@ async function handleReviewComponent(interaction) {
       deleteReviewImage(review);
       const embed = EmbedBuilder.from(interaction.message.embeds[0])
         .setColor(0xed4245)
-        .setDescription(`❌ **Avis rejeté** par ${interaction.user} — ${ticketLabel(review)} (${starsLine(review.stars)})`);
+        .setDescription(
+          `❌ **Avis rejeté** par ${interaction.user} — ${ticketLabel(review)} (${starsLine(review.stars)})`,
+        );
       return interaction.update({ embeds: [embed], components: [] });
     }
 
@@ -385,13 +450,18 @@ async function handleReviewComponent(interaction) {
     const ok = await publishReview(interaction.client, getStmt.get(reviewId));
     if (!ok) {
       setStatusStmt.run('awaiting', reviewId);
-      return interaction.reply({ content: '❌ Impossible de publier dans le salon de feedback (vérifie qu\'il existe et mes permissions).', flags: MessageFlags.Ephemeral });
+      return interaction.reply({
+        content: "❌ Impossible de publier dans le salon de feedback (vérifie qu'il existe et mes permissions).",
+        flags: MessageFlags.Ephemeral,
+      });
     }
     clearTranscriptStmt.run(reviewId);
     deleteReviewImage(review); // l'image vit désormais sur le message publié
     const embed = EmbedBuilder.from(interaction.message.embeds[0])
       .setColor(0x57f287)
-      .setDescription(`✅ **Avis publié** par ${interaction.user} — ${ticketLabel(review)} (${starsLine(review.stars)})`);
+      .setDescription(
+        `✅ **Avis publié** par ${interaction.user} — ${ticketLabel(review)} (${starsLine(review.stars)})`,
+      );
     return interaction.update({ embeds: [embed], components: [] });
   }
 }
@@ -418,7 +488,7 @@ async function handlePendingReviewImage(message) {
   if (!attachment) return false; // message texte normal, on n'y touche pas
 
   if (!attachment.contentType?.startsWith('image/')) {
-    await message.channel.send('❌ Ce fichier n\'est pas une image, réessaie.').catch(() => {});
+    await message.channel.send("❌ Ce fichier n'est pas une image, réessaie.").catch(() => {});
     return true;
   }
   if (attachment.size > 8 * 1024 * 1024) {
@@ -428,7 +498,7 @@ async function handlePendingReviewImage(message) {
 
   const response = await fetch(attachment.url).catch(() => null);
   if (!response?.ok) {
-    await message.channel.send('❌ Impossible de télécharger l\'image, réessaie.').catch(() => {});
+    await message.channel.send("❌ Impossible de télécharger l'image, réessaie.").catch(() => {});
     return true;
   }
   const buffer = Buffer.from(await response.arrayBuffer());
@@ -465,9 +535,12 @@ async function processDueReviews(client) {
 
 function startReviewWorker(client) {
   processDueReviews(client).catch((error) => console.error('[reviews] Erreur avis automatiques :', error));
-  setInterval(() => {
-    processDueReviews(client).catch((error) => console.error('[reviews] Erreur avis automatiques :', error));
-  }, 60 * 60 * 1000);
+  setInterval(
+    () => {
+      processDueReviews(client).catch((error) => console.error('[reviews] Erreur avis automatiques :', error));
+    },
+    60 * 60 * 1000,
+  );
 }
 
 module.exports = { requestReview, handleReviewComponent, handlePendingReviewImage, startReviewWorker, reviewsEnabled };

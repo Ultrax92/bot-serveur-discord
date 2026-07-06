@@ -30,7 +30,15 @@ module.exports = {
 
         const uncached = message.attachments.size - images.length;
         if (uncached > 0) {
-          lines.push(`📎 ${message.attachments.map((a) => a.name).join(', ').slice(0, 500)}${images.length ? '' : ' *(visuel indisponible : envoyé avant le démarrage du bot ou il y a plus d\'une heure)*'}`);
+          lines.push(
+            `📎 ${message.attachments
+              .map((a) => a.name)
+              .join(', ')
+              .slice(
+                0,
+                500,
+              )}${images.length ? '' : " *(visuel indisponible : envoyé avant le démarrage du bot ou il y a plus d'une heure)*"}`,
+          );
         }
       }
     }

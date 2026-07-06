@@ -77,7 +77,8 @@ async function handlePendingImage(message) {
   const refreshPanel = async () => {
     if (pending.kind === 'embed') return;
     const { customEditView, ticketsView, watchPanel } = require('./setupPanel');
-    const view = pending.kind === 'ticket' ? ticketsView(message.guild) : customEditView(message.guild, pending.commandId);
+    const view =
+      pending.kind === 'ticket' ? ticketsView(message.guild) : customEditView(message.guild, pending.commandId);
     const newPanel = await message.channel.send(view).catch(() => null);
     if (newPanel) {
       watchPanel(newPanel);
@@ -101,13 +102,16 @@ async function handlePendingImage(message) {
   if (/^https?:\/\/\S+$/.test(trimmed) && !message.attachments.size) {
     if (/(cdn|media)\.discordapp\.(com|net)/.test(trimmed)) {
       await message.delete().catch(() => {});
-      await tempReply(message.channel, '❌ Les liens d\'images Discord expirent au bout de quelques jours — envoie plutôt l\'image en pièce jointe, je la stockerai durablement.');
+      await tempReply(
+        message.channel,
+        "❌ Les liens d'images Discord expirent au bout de quelques jours — envoie plutôt l'image en pièce jointe, je la stockerai durablement.",
+      );
       return true;
     }
     pendingImages.delete(key);
     applyImage(trimmed);
     await message.delete().catch(() => {});
-    await tempReply(message.channel, '✅ URL d\'image enregistrée.');
+    await tempReply(message.channel, "✅ URL d'image enregistrée.");
     await refreshPanel();
     return true;
   }
@@ -117,7 +121,7 @@ async function handlePendingImage(message) {
 
   if (!attachment.contentType?.startsWith('image/')) {
     await message.delete().catch(() => {});
-    await tempReply(message.channel, '❌ Ce fichier n\'est pas une image, réessaie.');
+    await tempReply(message.channel, "❌ Ce fichier n'est pas une image, réessaie.");
     return true;
   }
   if (attachment.size > 8 * 1024 * 1024) {
@@ -129,25 +133,29 @@ async function handlePendingImage(message) {
   const response = await fetch(attachment.url).catch(() => null);
   if (!response?.ok) {
     await message.delete().catch(() => {});
-    await tempReply(message.channel, '❌ Impossible de télécharger l\'image, réessaie.');
+    await tempReply(message.channel, "❌ Impossible de télécharger l'image, réessaie.");
     return true;
   }
   const buffer = Buffer.from(await response.arrayBuffer());
   const ext = (attachment.name?.split('.').pop() ?? 'png').toLowerCase().replace(/[^a-z0-9]/g, '') || 'png';
-  const filename = pending.kind === 'ticket'
-    ? `tkpanel-${message.guildId}-${Date.now()}.${ext}`
-    : pending.kind === 'embed'
-      ? `eb-${message.guildId}-${message.author.id}-${Date.now()}.${ext}`
-      : `cc-${pending.commandId}-${Date.now()}.${ext}`;
+  const filename =
+    pending.kind === 'ticket'
+      ? `tkpanel-${message.guildId}-${Date.now()}.${ext}`
+      : pending.kind === 'embed'
+        ? `eb-${message.guildId}-${message.author.id}-${Date.now()}.${ext}`
+        : `cc-${pending.commandId}-${Date.now()}.${ext}`;
   fs.mkdirSync(imagesDir, { recursive: true });
   fs.writeFileSync(path.join(imagesDir, filename), buffer);
 
   pendingImages.delete(key);
   applyImage(`file:${filename}`);
   await message.delete().catch(() => {});
-  await tempReply(message.channel, pending.kind === 'embed'
-    ? '✅ Image enregistrée — clique **🔄 Aperçu** sur ton panneau /embed pour la voir.'
-    : '✅ Image enregistrée (stockée sur le serveur, elle n\'expirera pas).');
+  await tempReply(
+    message.channel,
+    pending.kind === 'embed'
+      ? '✅ Image enregistrée — clique **🔄 Aperçu** sur ton panneau /embed pour la voir.'
+      : "✅ Image enregistrée (stockée sur le serveur, elle n'expirera pas).",
+  );
   await refreshPanel();
   return true;
 }
@@ -175,9 +183,11 @@ async function handleCustomCommand(message) {
   if (!command) return false;
 
   // Rôles autorisés (vide = tout le monde) ; les admins du bot passent toujours
-  if (command.allowedRoles.length
-    && !isBotAdminMember(message.member)
-    && !command.allowedRoles.some((id) => message.member.roles.cache.has(id))) {
+  if (
+    command.allowedRoles.length &&
+    !isBotAdminMember(message.member) &&
+    !command.allowedRoles.some((id) => message.member.roles.cache.has(id))
+  ) {
     return false;
   }
 
@@ -215,11 +225,13 @@ async function handleCustomCommand(message) {
   const logEmbed = new EmbedBuilder()
     .setColor(0x5865f2)
     .setAuthor(userAuthor(message.author))
-    .setDescription([
-      `🧩 **Commande custom utilisée** dans ${message.channel}`,
-      idLine(message.author),
-      `\`${command.prefix}${command.name}\``,
-    ].join('\n'))
+    .setDescription(
+      [
+        `🧩 **Commande custom utilisée** dans ${message.channel}`,
+        idLine(message.author),
+        `\`${command.prefix}${command.name}\``,
+      ].join('\n'),
+    )
     .setTimestamp();
   sendLog(message.guild, 'command', logEmbed).catch(() => {});
 

@@ -12,12 +12,14 @@ module.exports = {
     const embed = new EmbedBuilder()
       .setColor(0xfaa61a)
       .setAuthor(userAuthor(newMessage.author))
-      .setDescription([
-        `**Message modifié dans** ${newMessage.channel} — [voir le message](${newMessage.url})`,
-        idLine(newMessage.author),
-        `**Avant :** ${(oldMessage.content || '*vide*').slice(0, 900)}`,
-        `**Après :** ${(newMessage.content || '*vide*').slice(0, 900)}`,
-      ].join('\n'))
+      .setDescription(
+        [
+          `**Message modifié dans** ${newMessage.channel} — [voir le message](${newMessage.url})`,
+          idLine(newMessage.author),
+          `**Avant :** ${(oldMessage.content || '*vide*').slice(0, 900)}`,
+          `**Après :** ${(newMessage.content || '*vide*').slice(0, 900)}`,
+        ].join('\n'),
+      )
       .setTimestamp();
 
     await sendLog(newMessage.guild, 'message', embed);

@@ -18,7 +18,9 @@ module.exports = {
     } else if (!newState.channelId) {
       embed.setColor(0xed4245).setDescription(`🔇 **A quitté le vocal** ${oldState.channel}\n${idLine(member)}`);
     } else {
-      embed.setColor(0xfaa61a).setDescription(`🔀 **Passé de** ${oldState.channel} **à** ${newState.channel}\n${idLine(member)}`);
+      embed
+        .setColor(0xfaa61a)
+        .setDescription(`🔀 **Passé de** ${oldState.channel} **à** ${newState.channel}\n${idLine(member)}`);
     }
 
     await sendLog(member.guild, 'voice', embed);

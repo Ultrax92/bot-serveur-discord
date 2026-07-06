@@ -8,7 +8,9 @@ const run = util.promisify(exec);
 const projectRoot = path.join(__dirname, '..', '..');
 
 const getKv = db.prepare('SELECT value FROM kv WHERE key = ?');
-const setKv = db.prepare('INSERT INTO kv (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value');
+const setKv = db.prepare(
+  'INSERT INTO kv (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+);
 const delKv = db.prepare('DELETE FROM kv WHERE key = ?');
 
 function git(command) {
@@ -78,11 +80,15 @@ async function notifyIfUpdated(client) {
     const embed = new EmbedBuilder()
       .setColor(0x57f287)
       .setTitle('✅ Le bot a bien été mis à jour !')
-      .setDescription([
-        `**${info.count}** commit(s) appliqué(s) — \`${info.from}\` → \`${info.to}\``,
-        current.trim() ? `**Version actuelle :** ${current.trim()}` : null,
-        `⏱️ Redémarrage effectué en ${Math.round((Date.now() - info.at) / 1000)}s`,
-      ].filter(Boolean).join('\n'))
+      .setDescription(
+        [
+          `**${info.count}** commit(s) appliqué(s) — \`${info.from}\` → \`${info.to}\``,
+          current.trim() ? `**Version actuelle :** ${current.trim()}` : null,
+          `⏱️ Redémarrage effectué en ${Math.round((Date.now() - info.at) / 1000)}s`,
+        ]
+          .filter(Boolean)
+          .join('\n'),
+      )
       .setTimestamp();
     await channel.send({ content: `<@${info.userId}>`, embeds: [embed] });
   } catch (error) {

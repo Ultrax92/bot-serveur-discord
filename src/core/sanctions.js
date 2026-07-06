@@ -11,7 +11,9 @@ function addSanction({ guildId, userId, moderatorId, type, reason = null, expire
 }
 
 function getSanctions(guildId, userId) {
-  return db.prepare('SELECT * FROM sanctions WHERE guild_id = ? AND user_id = ? ORDER BY created_at DESC').all(guildId, userId);
+  return db
+    .prepare('SELECT * FROM sanctions WHERE guild_id = ? AND user_id = ? ORDER BY created_at DESC')
+    .all(guildId, userId);
 }
 
 function deleteSanction(guildId, sanctionId) {

@@ -25,10 +25,10 @@ const NOTICES = {
   antispam: 'doucement sur le spam !',
   antilink: 'les liens ne sont pas autorisés ici.',
   antimention: 'trop de mentions dans un seul message.',
-  badwords: 'ce langage n\'est pas autorisé ici.',
+  badwords: "ce langage n'est pas autorisé ici.",
 };
 
-const spamTracker = new Map();      // "guildId:userId" → timestamps des derniers messages
+const spamTracker = new Map(); // "guildId:userId" → timestamps des derniers messages
 const sanctionCooldown = new Map(); // "guildId:userId" → date de la dernière sanction automod
 
 // Détecte quelle protection le message déclenche (null si aucune)
@@ -46,8 +46,7 @@ function detectTrigger(message, config) {
   }
 
   if (config.antimention.enabled) {
-    const mentions = message.mentions.users.size + message.mentions.roles.size
-      + (message.mentions.everyone ? 1 : 0);
+    const mentions = message.mentions.users.size + message.mentions.roles.size + (message.mentions.everyone ? 1 : 0);
     if (mentions >= config.antimention.max) return 'antimention';
   }
 
@@ -76,7 +75,13 @@ async function applySanction(message, trigger, config) {
 
   const reason = `Automod : ${trigger}`;
   if (config.sanction === 'warn') {
-    addSanction({ guildId: message.guildId, userId: message.author.id, moderatorId: message.client.user.id, type: 'warn', reason });
+    addSanction({
+      guildId: message.guildId,
+      userId: message.author.id,
+      moderatorId: message.client.user.id,
+      type: 'warn',
+      reason,
+    });
     // Sanctions par paliers : ce warn automod compte comme les autres
     const { checkStrikes } = require('./strikes');
     const strike = await checkStrikes(message.guild, message.member).catch(() => null);
@@ -86,8 +91,12 @@ async function applySanction(message, trigger, config) {
     const duration = parseDuration(config.muteDuration) ?? 600_000;
     await message.member.timeout(duration, reason).catch(() => {});
     addSanction({
-      guildId: message.guildId, userId: message.author.id, moderatorId: message.client.user.id,
-      type: 'mute', reason, expiresAt: Date.now() + duration,
+      guildId: message.guildId,
+      userId: message.author.id,
+      moderatorId: message.client.user.id,
+      type: 'mute',
+      reason,
+      expiresAt: Date.now() + duration,
     });
     return `mute ${formatDuration(duration)}`;
   }
@@ -114,7 +123,9 @@ async function handleMessage(message) {
     const recent = await message.channel.messages.fetch({ limit: 30 }).catch(() => null);
     if (recent) {
       const windowMs = config.antispam.seconds * 2000;
-      const toDelete = recent.filter((m) => m.author.id === message.author.id && Date.now() - m.createdTimestamp < windowMs);
+      const toDelete = recent.filter(
+        (m) => m.author.id === message.author.id && Date.now() - m.createdTimestamp < windowMs,
+      );
       await message.channel.bulkDelete(toDelete, true).catch(() => {});
     }
   }
@@ -128,12 +139,16 @@ async function handleMessage(message) {
   const embed = new EmbedBuilder()
     .setColor(0xe67e22)
     .setAuthor(userAuthor(message.author))
-    .setDescription([
-      `🤖 **Automod — ${trigger}** dans ${message.channel}`,
-      idLine(message.author),
-      `**Sanction :** message supprimé${sanction ? ` + ${sanction}` : ''}`,
-      message.content ? `**Message :** ${message.content.slice(0, 500)}` : null,
-    ].filter(Boolean).join('\n'))
+    .setDescription(
+      [
+        `🤖 **Automod — ${trigger}** dans ${message.channel}`,
+        idLine(message.author),
+        `**Sanction :** message supprimé${sanction ? ` + ${sanction}` : ''}`,
+        message.content ? `**Message :** ${message.content.slice(0, 500)}` : null,
+      ]
+        .filter(Boolean)
+        .join('\n'),
+    )
     .setTimestamp();
   await sendLog(message.guild, 'mod', embed);
   return true;

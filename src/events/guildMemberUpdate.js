@@ -28,8 +28,20 @@ module.exports = {
     const removed = oldMember.roles.cache.filter((r) => !newMember.roles.cache.has(r.id));
     if (added.size || removed.size) {
       const lines = ['🎭 **Rôles modifiés**', idLine(newMember)];
-      if (added.size) lines.push(`**Ajoutés :** ${added.map((r) => `${r}`).join(' ').slice(0, 900)}`);
-      if (removed.size) lines.push(`**Retirés :** ${removed.map((r) => `${r}`).join(' ').slice(0, 900)}`);
+      if (added.size)
+        lines.push(
+          `**Ajoutés :** ${added
+            .map((r) => `${r}`)
+            .join(' ')
+            .slice(0, 900)}`,
+        );
+      if (removed.size)
+        lines.push(
+          `**Retirés :** ${removed
+            .map((r) => `${r}`)
+            .join(' ')
+            .slice(0, 900)}`,
+        );
       const embed = new EmbedBuilder()
         .setColor(0x5865f2)
         .setAuthor(userAuthor(newMember.user))

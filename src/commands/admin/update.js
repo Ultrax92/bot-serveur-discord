@@ -17,12 +17,25 @@ module.exports = {
       });
     }
 
-    const progress = (description) => interaction.editReply({
-      embeds: [new EmbedBuilder().setColor(0xfaa61a).setTitle('🔄 Mise à jour du bot en cours…').setDescription(description).setTimestamp()],
-    });
+    const progress = (description) =>
+      interaction.editReply({
+        embeds: [
+          new EmbedBuilder()
+            .setColor(0xfaa61a)
+            .setTitle('🔄 Mise à jour du bot en cours…')
+            .setDescription(description)
+            .setTimestamp(),
+        ],
+      });
 
     await interaction.reply({
-      embeds: [new EmbedBuilder().setColor(0xfaa61a).setTitle('🔄 Mise à jour du bot').setDescription('🔍 Vérification des mises à jour disponibles…').setTimestamp()],
+      embeds: [
+        new EmbedBuilder()
+          .setColor(0xfaa61a)
+          .setTitle('🔄 Mise à jour du bot')
+          .setDescription('🔍 Vérification des mises à jour disponibles…')
+          .setTimestamp(),
+      ],
     });
 
     let check;
@@ -30,7 +43,14 @@ module.exports = {
       check = await checkForUpdates();
     } catch (error) {
       console.error('Erreur update (check) :', error);
-      return interaction.editReply({ embeds: [errorEmbed(interaction, `Impossible de vérifier les mises à jour :\n\`\`\`${String(error.message).slice(0, 500)}\`\`\``)] });
+      return interaction.editReply({
+        embeds: [
+          errorEmbed(
+            interaction,
+            `Impossible de vérifier les mises à jour :\n\`\`\`${String(error.message).slice(0, 500)}\`\`\``,
+          ),
+        ],
+      });
     }
 
     if (check.count === 0) {
@@ -42,13 +62,15 @@ module.exports = {
       return interaction.editReply({ embeds: [embed] });
     }
 
-    await progress([
-      `📥 **${check.count}** commit(s) à appliquer :`,
-      '```',
-      check.incoming.join('\n').slice(0, 1500),
-      '```',
-      '⏳ Téléchargement en cours…',
-    ].join('\n'));
+    await progress(
+      [
+        `📥 **${check.count}** commit(s) à appliquer :`,
+        '```',
+        check.incoming.join('\n').slice(0, 1500),
+        '```',
+        '⏳ Téléchargement en cours…',
+      ].join('\n'),
+    );
 
     let result;
     try {
@@ -56,7 +78,12 @@ module.exports = {
     } catch (error) {
       console.error('Erreur update (apply) :', error);
       return interaction.editReply({
-        embeds: [errorEmbed(interaction, `La mise à jour a échoué :\n\`\`\`${String(error.message).slice(0, 800)}\`\`\`\nVérifie sur le VPS (\`git status\`), il y a peut-être des modifications locales en conflit.`)],
+        embeds: [
+          errorEmbed(
+            interaction,
+            `La mise à jour a échoué :\n\`\`\`${String(error.message).slice(0, 800)}\`\`\`\nVérifie sur le VPS (\`git status\`), il y a peut-être des modifications locales en conflit.`,
+          ),
+        ],
       });
     }
 
@@ -69,7 +96,9 @@ module.exports = {
       to: result.to,
     });
 
-    await progress(`♻️ **${check.count}** commit(s) appliqué(s) (\`${result.from}\` → \`${result.to}\`, ${result.files} fichier(s)).\nRedémarrage du bot… je confirme ici dès que je suis de retour.`);
+    await progress(
+      `♻️ **${check.count}** commit(s) appliqué(s) (\`${result.from}\` → \`${result.to}\`, ${result.files} fichier(s)).\nRedémarrage du bot… je confirme ici dès que je suis de retour.`,
+    );
     restartViaPm2();
   },
 };

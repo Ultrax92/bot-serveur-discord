@@ -8,7 +8,10 @@ module.exports = {
   async execute(member) {
     await onMemberAdd(member).catch((error) => console.error('Erreur antiraid (memberAdd) :', error));
 
-    const inviteInfo = await recordJoin(member).catch((error) => { console.error('Erreur invite tracker :', error); return null; });
+    const inviteInfo = await recordJoin(member).catch((error) => {
+      console.error('Erreur invite tracker :', error);
+      return null;
+    });
 
     const accountAgeDays = Math.floor((Date.now() - member.user.createdTimestamp) / 86_400_000);
     const lines = [
@@ -17,7 +20,9 @@ module.exports = {
       `**Compte créé** <t:${Math.floor(member.user.createdTimestamp / 1000)}:R>${accountAgeDays < 7 ? ' ⚠️ **compte récent**' : ''}`,
     ];
     if (inviteInfo) {
-      lines.push(`📨 **Invité par** <@${inviteInfo.inviterId}> (${inviteInfo.stats.active} invitation(s))${inviteInfo.fake ? ' ⚠️ *compte récent, comptée comme suspecte*' : ''}`);
+      lines.push(
+        `📨 **Invité par** <@${inviteInfo.inviterId}> (${inviteInfo.stats.active} invitation(s))${inviteInfo.fake ? ' ⚠️ *compte récent, comptée comme suspecte*' : ''}`,
+      );
     }
 
     const embed = new EmbedBuilder()

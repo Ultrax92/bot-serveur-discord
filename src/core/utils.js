@@ -11,10 +11,19 @@ function parseDuration(input) {
     matched = true;
     const n = parseInt(amount, 10);
     switch (unit.toLowerCase()) {
-      case 'j': case 'd': total += n * 86_400_000; break;
-      case 'h': total += n * 3_600_000; break;
-      case 'm': total += n * 60_000; break;
-      case 's': total += n * 1_000; break;
+      case 'j':
+      case 'd':
+        total += n * 86_400_000;
+        break;
+      case 'h':
+        total += n * 3_600_000;
+        break;
+      case 'm':
+        total += n * 60_000;
+        break;
+      case 's':
+        total += n * 1_000;
+        break;
     }
   }
   return matched && total > 0 ? total : null;
@@ -60,7 +69,7 @@ function checkHierarchy(interaction, targetMember, { needsBotAbove = true } = {}
   const { isOwner } = require('./permissions');
   if (!targetMember) return null;
   if (targetMember.id === interaction.guild.ownerId || isOwner(targetMember.id))
-    return 'Impossible d\'agir sur le propriétaire.';
+    return "Impossible d'agir sur le propriétaire.";
   if (targetMember.id === interaction.client.user.id) return 'Je ne peux pas agir sur moi-même.';
   if (needsBotAbove && targetMember.roles.highest.position >= interaction.guild.members.me.roles.highest.position)
     return 'Ce membre a un rôle supérieur ou égal au mien, je ne peux pas agir sur lui. Monte mon rôle dans la hiérarchie.';

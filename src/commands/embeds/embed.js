@@ -7,12 +7,15 @@ module.exports = {
     .setName('embed')
     .setDescription('Crée un embed avec aperçu privé, puis publie-le où tu veux')
     .addChannelOption((opt) =>
-      opt.setName('salon').setDescription('Salon de destination (défaut : salon courant)')
-        .addChannelTypes(ChannelType.GuildText))
-    .addUserOption((opt) =>
-      opt.setName('mp').setDescription('Envoyer en MP à ce membre au lieu d\'un salon'))
+      opt
+        .setName('salon')
+        .setDescription('Salon de destination (défaut : salon courant)')
+        .addChannelTypes(ChannelType.GuildText),
+    )
+    .addUserOption((opt) => opt.setName('mp').setDescription("Envoyer en MP à ce membre au lieu d'un salon"))
     .addRoleOption((opt) =>
-      opt.setName('mp_role').setDescription('Envoyer en MP à TOUS les membres de ce rôle (confirmation avant envoi)')),
+      opt.setName('mp_role').setDescription('Envoyer en MP à TOUS les membres de ce rôle (confirmation avant envoi)'),
+    ),
 
   async execute(interaction) {
     const session = getSession(interaction.guildId, interaction.user.id);

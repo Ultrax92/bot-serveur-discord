@@ -12,14 +12,18 @@ module.exports = {
   module: 'moderation',
   data: new SlashCommandBuilder()
     .setName('role')
-    .setDescription('Gère les rôles d\'un membre')
+    .setDescription("Gère les rôles d'un membre")
     .addStringOption((opt) =>
-      opt.setName('action').setDescription('L\'action à effectuer').setRequired(true)
+      opt
+        .setName('action')
+        .setDescription("L'action à effectuer")
+        .setRequired(true)
         .addChoices(
           { name: '➕ Ajouter un rôle', value: 'add' },
           { name: '➖ Retirer un rôle', value: 'remove' },
           { name: '💥 Derank (retirer tous les rôles)', value: 'derank' },
-        ))
+        ),
+    )
     .addUserOption((opt) => opt.setName('membre').setDescription('Le membre concerné').setRequired(true))
     .addRoleOption((opt) => opt.setName('rôle').setDescription('Le rôle (requis pour ajouter/retirer)')),
 
@@ -29,7 +33,10 @@ module.exports = {
     const role = interaction.options.getRole('rôle');
 
     if (!member) {
-      return interaction.reply({ embeds: [errorEmbed(interaction, 'Membre introuvable sur ce serveur.')], flags: MessageFlags.Ephemeral });
+      return interaction.reply({
+        embeds: [errorEmbed(interaction, 'Membre introuvable sur ce serveur.')],
+        flags: MessageFlags.Ephemeral,
+      });
     }
 
     if (action === 'derank') {
@@ -37,14 +44,23 @@ module.exports = {
       if (hierarchyError) {
         return interaction.reply({ embeds: [errorEmbed(interaction, hierarchyError)], flags: MessageFlags.Ephemeral });
       }
-      const removable = member.roles.cache.filter((r) =>
-        r.id !== interaction.guild.roles.everyone.id && !r.managed && r.position < interaction.guild.members.me.roles.highest.position);
+      const removable = member.roles.cache.filter(
+        (r) =>
+          r.id !== interaction.guild.roles.everyone.id &&
+          !r.managed &&
+          r.position < interaction.guild.members.me.roles.highest.position,
+      );
       await member.roles.remove(removable, `Derank par ${interaction.user.tag}`);
-      return interaction.reply({ embeds: [successEmbed(interaction, `**${member.user.tag}** a perdu **${removable.size}** rôle(s).`)] });
+      return interaction.reply({
+        embeds: [successEmbed(interaction, `**${member.user.tag}** a perdu **${removable.size}** rôle(s).`)],
+      });
     }
 
     if (!role) {
-      return interaction.reply({ embeds: [errorEmbed(interaction, 'Précise le rôle à ajouter ou retirer.')], flags: MessageFlags.Ephemeral });
+      return interaction.reply({
+        embeds: [errorEmbed(interaction, 'Précise le rôle à ajouter ou retirer.')],
+        flags: MessageFlags.Ephemeral,
+      });
     }
     const roleError = checkRoleManageable(interaction, role);
     if (roleError) {
@@ -53,9 +69,13 @@ module.exports = {
 
     if (action === 'add') {
       await member.roles.add(role, `Rôle ajouté par ${interaction.user.tag}`);
-      return interaction.reply({ embeds: [successEmbed(interaction, `Le rôle ${role} a été ajouté à **${member.user.tag}**.`)] });
+      return interaction.reply({
+        embeds: [successEmbed(interaction, `Le rôle ${role} a été ajouté à **${member.user.tag}**.`)],
+      });
     }
     await member.roles.remove(role, `Rôle retiré par ${interaction.user.tag}`);
-    return interaction.reply({ embeds: [successEmbed(interaction, `Le rôle ${role} a été retiré à **${member.user.tag}**.`)] });
+    return interaction.reply({
+      embeds: [successEmbed(interaction, `Le rôle ${role} a été retiré à **${member.user.tag}**.`)],
+    });
   },
 };

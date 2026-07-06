@@ -7,7 +7,9 @@
   "scripts": {
     "start": "node src/index.js",
     "deploy": "node scripts/deploy-commands.js",
-    "dev": "node --watch src/index.js"
+    "dev": "node --watch src/index.js",
+    "format": "prettier --write \"src/**/*.js\" \"scripts/**/*.js\"",
+    "format:check": "prettier --check \"src/**/*.js\" \"scripts/**/*.js\""
   },
   "engines": {
     "node": ">=20"
@@ -16,5 +18,8 @@
     "better-sqlite3": "^12.2.0",
     "discord.js": "^14.16.0",
     "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "prettier": "^3.9.4"
   }
 }

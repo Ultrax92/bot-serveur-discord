@@ -10,14 +10,17 @@ module.exports = {
     .setName('kick')
     .setDescription('Expulse un membre du serveur')
     .addUserOption((opt) => opt.setName('membre').setDescription('Le membre à expulser').setRequired(true))
-    .addStringOption((opt) => opt.setName('raison').setDescription('La raison de l\'expulsion')),
+    .addStringOption((opt) => opt.setName('raison').setDescription("La raison de l'expulsion")),
 
   async execute(interaction) {
     const member = interaction.options.getMember('membre');
     const reason = interaction.options.getString('raison') ?? 'Aucune raison précisée';
 
     if (!member) {
-      return interaction.reply({ embeds: [errorEmbed(interaction, 'Membre introuvable sur ce serveur.')], flags: MessageFlags.Ephemeral });
+      return interaction.reply({
+        embeds: [errorEmbed(interaction, 'Membre introuvable sur ce serveur.')],
+        flags: MessageFlags.Ephemeral,
+      });
     }
     const hierarchyError = checkHierarchy(interaction, member);
     if (hierarchyError) {
@@ -37,6 +40,8 @@ module.exports = {
     });
 
     await logModAction(interaction, { emoji: '👢', action: 'Kick', target: member.user, reason });
-    return interaction.reply({ embeds: [successEmbed(interaction, `👢 **${member.user.tag}** a été expulsé.\n**Raison :** ${reason}`)] });
+    return interaction.reply({
+      embeds: [successEmbed(interaction, `👢 **${member.user.tag}** a été expulsé.\n**Raison :** ${reason}`)],
+    });
   },
 };

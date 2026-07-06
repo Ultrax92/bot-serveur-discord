@@ -3,9 +3,7 @@ const { baseEmbed } = require('../../core/utils');
 
 module.exports = {
   module: 'utility',
-  data: new SlashCommandBuilder()
-    .setName('serverinfo')
-    .setDescription('Affiche les informations du serveur'),
+  data: new SlashCommandBuilder().setName('serverinfo').setDescription('Affiche les informations du serveur'),
 
   async execute(interaction) {
     const { guild } = interaction;
@@ -20,10 +18,18 @@ module.exports = {
         { name: '🆔 ID', value: guild.id, inline: true },
         { name: '📅 Créé le', value: `<t:${Math.floor(guild.createdTimestamp / 1000)}:D>`, inline: true },
         { name: '👥 Membres', value: `${guild.memberCount}`, inline: true },
-        { name: '💬 Salons', value: `${channels.filter((c) => c.type === ChannelType.GuildText).size} textuels · ${channels.filter((c) => c.type === ChannelType.GuildVoice).size} vocaux`, inline: true },
+        {
+          name: '💬 Salons',
+          value: `${channels.filter((c) => c.type === ChannelType.GuildText).size} textuels · ${channels.filter((c) => c.type === ChannelType.GuildVoice).size} vocaux`,
+          inline: true,
+        },
         { name: '🎭 Rôles', value: `${guild.roles.cache.size}`, inline: true },
         { name: '😀 Émojis', value: `${guild.emojis.cache.size}`, inline: true },
-        { name: '🚀 Boosts', value: `${guild.premiumSubscriptionCount ?? 0} (niveau ${guild.premiumTier})`, inline: true },
+        {
+          name: '🚀 Boosts',
+          value: `${guild.premiumSubscriptionCount ?? 0} (niveau ${guild.premiumTier})`,
+          inline: true,
+        },
         { name: '🔒 Vérification', value: `${guild.verificationLevel}`, inline: true },
       );
     if (guild.bannerURL()) embed.setImage(guild.bannerURL({ size: 1024 }));

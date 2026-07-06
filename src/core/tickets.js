@@ -1,9 +1,16 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const {
-  EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle,
-  StringSelectMenuBuilder, StringSelectMenuOptionBuilder,
-  ChannelType, PermissionFlagsBits, MessageFlags, AttachmentBuilder,
+  EmbedBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  StringSelectMenuBuilder,
+  StringSelectMenuOptionBuilder,
+  ChannelType,
+  PermissionFlagsBits,
+  MessageFlags,
+  AttachmentBuilder,
 } = require('discord.js');
 const db = require('./db');
 
@@ -12,7 +19,9 @@ const { getSettings, isModuleEnabled } = require('./settings');
 const { isBotAdminMember } = require('./permissions');
 const { sendLog, userAuthor, idLine } = require('./logs');
 
-const countOpenStmt = db.prepare("SELECT COUNT(*) AS c FROM tickets WHERE guild_id = ? AND user_id = ? AND status = 'open'");
+const countOpenStmt = db.prepare(
+  "SELECT COUNT(*) AS c FROM tickets WHERE guild_id = ? AND user_id = ? AND status = 'open'",
+);
 // Numérotation de 1 à 9999, puis on repart à 1
 const nextNumberStmt = db.prepare('SELECT (COALESCE(MAX(number), 0) % 9999) + 1 AS n FROM tickets WHERE guild_id = ?');
 const insertStmt = db.prepare(`
@@ -32,9 +41,7 @@ function buildTicketPanel(guild, publisher = null) {
   const settings = getSettings(guild.id);
   const tc = settings.ticketsConfig;
 
-  const embed = new EmbedBuilder()
-    .setColor(settings.color)
-    .setDescription(tc.panelMessage.slice(0, 4096));
+  const embed = new EmbedBuilder().setColor(settings.color).setDescription(tc.panelMessage.slice(0, 4096));
   if (tc.panelTitle) embed.setTitle(tc.panelTitle.slice(0, 256));
   if (publisher) embed.setFooter({ text: publisher.username, iconURL: publisher.displayAvatarURL() });
 
@@ -52,13 +59,15 @@ function buildTicketPanel(guild, publisher = null) {
   const select = new StringSelectMenuBuilder()
     .setCustomId('ticket:open')
     .setPlaceholder('Fais un choix')
-    .addOptions(tc.types.map((type) => {
-      const option = new StringSelectMenuOptionBuilder()
-        .setValue(type.id)
-        .setLabel(`${type.emoji ? `${type.emoji} ` : ''}${type.label}`.slice(0, 100));
-      if (type.description) option.setDescription(type.description.slice(0, 100));
-      return option;
-    }));
+    .addOptions(
+      tc.types.map((type) => {
+        const option = new StringSelectMenuOptionBuilder()
+          .setValue(type.id)
+          .setLabel(`${type.emoji ? `${type.emoji} ` : ''}${type.label}`.slice(0, 100));
+        if (type.description) option.setDescription(type.description.slice(0, 100));
+        return option;
+      }),
+    );
 
   return { embeds: [embed], components: [new ActionRowBuilder().addComponents(select)], files };
 }
@@ -77,10 +86,16 @@ async function openTicket(interaction) {
   const tc = getSettings(guild.id).ticketsConfig;
   const type = tc.types.find((t) => t.id === interaction.values[0]);
   if (!type) {
-    return interaction.reply({ content: '⚠️ Ce type de ticket n\'existe plus. Préviens un admin.', flags: MessageFlags.Ephemeral });
+    return interaction.reply({
+      content: "⚠️ Ce type de ticket n'existe plus. Préviens un admin.",
+      flags: MessageFlags.Ephemeral,
+    });
   }
   if (tc.requiredRole && !interaction.member.roles.cache.has(tc.requiredRole)) {
-    return interaction.reply({ content: `Il te faut le rôle <@&${tc.requiredRole}> pour ouvrir un ticket.`, flags: MessageFlags.Ephemeral });
+    return interaction.reply({
+      content: `Il te faut le rôle <@&${tc.requiredRole}> pour ouvrir un ticket.`,
+      flags: MessageFlags.Ephemeral,
+    });
   }
   if (countOpenStmt.get(guild.id, interaction.user.id).c >= tc.maxPerUser) {
     return interaction.reply({
@@ -95,29 +110,48 @@ async function openTicket(interaction) {
   const category = type.categoryId && guild.channels.cache.get(type.categoryId);
   const accessRoles = (type.accessRoles ?? []).filter((id) => guild.roles.cache.has(id));
 
-  const channel = await guild.channels.create({
-    name: String(number),
-    type: ChannelType.GuildText,
-    parent: category?.id ?? null,
-    permissionOverwrites: [
-      { id: guild.roles.everyone.id, deny: [PermissionFlagsBits.ViewChannel] },
-      {
-        id: interaction.user.id,
-        allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory, PermissionFlagsBits.AttachFiles],
-      },
-      {
-        id: guild.members.me.id,
-        allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ManageChannels, PermissionFlagsBits.ReadMessageHistory],
-      },
-      ...accessRoles.map((id) => ({
-        id,
-        allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory, PermissionFlagsBits.AttachFiles],
-      })),
-    ],
-  }).catch(() => null);
+  const channel = await guild.channels
+    .create({
+      name: String(number),
+      type: ChannelType.GuildText,
+      parent: category?.id ?? null,
+      permissionOverwrites: [
+        { id: guild.roles.everyone.id, deny: [PermissionFlagsBits.ViewChannel] },
+        {
+          id: interaction.user.id,
+          allow: [
+            PermissionFlagsBits.ViewChannel,
+            PermissionFlagsBits.SendMessages,
+            PermissionFlagsBits.ReadMessageHistory,
+            PermissionFlagsBits.AttachFiles,
+          ],
+        },
+        {
+          id: guild.members.me.id,
+          allow: [
+            PermissionFlagsBits.ViewChannel,
+            PermissionFlagsBits.SendMessages,
+            PermissionFlagsBits.ManageChannels,
+            PermissionFlagsBits.ReadMessageHistory,
+          ],
+        },
+        ...accessRoles.map((id) => ({
+          id,
+          allow: [
+            PermissionFlagsBits.ViewChannel,
+            PermissionFlagsBits.SendMessages,
+            PermissionFlagsBits.ReadMessageHistory,
+            PermissionFlagsBits.AttachFiles,
+          ],
+        })),
+      ],
+    })
+    .catch(() => null);
 
   if (!channel) {
-    return interaction.editReply('❌ Impossible de créer le salon du ticket (vérifie mes permissions et la catégorie configurée).');
+    return interaction.editReply(
+      '❌ Impossible de créer le salon du ticket (vérifie mes permissions et la catégorie configurée).',
+    );
   }
 
   const createdAt = Date.now();
@@ -127,11 +161,13 @@ async function openTicket(interaction) {
   const embed = new EmbedBuilder()
     .setColor(getSettings(guild.id).color)
     .setAuthor(userAuthor(interaction.user))
-    .setDescription([
-      `🎫 **Ticket ${type.emoji ? `${type.emoji} ` : ''}${type.label}**`,
-      '',
-      type.openMessage || 'Merci de nous avoir contactés, précise ce que tu souhaites.',
-    ].join('\n'))
+    .setDescription(
+      [
+        `🎫 **Ticket ${type.emoji ? `${type.emoji} ` : ''}${type.label}**`,
+        '',
+        type.openMessage || 'Merci de nous avoir contactés, précise ce que tu souhaites.',
+      ].join('\n'),
+    )
     .setTimestamp();
   const buttons = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('ticket:claim').setLabel('🙋 Claim').setStyle(ButtonStyle.Primary),
@@ -142,10 +178,9 @@ async function openTicket(interaction) {
   const logEmbed = new EmbedBuilder()
     .setColor(0x57f287)
     .setAuthor(userAuthor(interaction.user))
-    .setDescription([
-      `🎫 **Ticket ouvert** — ${channel} (n°${number}, ${type.label})`,
-      idLine(interaction.user),
-    ].join('\n'))
+    .setDescription(
+      [`🎫 **Ticket ouvert** — ${channel} (n°${number}, ${type.label})`, idLine(interaction.user)].join('\n'),
+    )
     .setTimestamp();
   await sendLog(guild, 'ticket', logEmbed);
 
@@ -155,14 +190,17 @@ async function openTicket(interaction) {
 async function claimTicket(interaction) {
   const row = byChannelStmt.get(interaction.channelId);
   if (!row) {
-    return interaction.reply({ content: 'Ce salon n\'est pas un ticket.', flags: MessageFlags.Ephemeral });
+    return interaction.reply({ content: "Ce salon n'est pas un ticket.", flags: MessageFlags.Ephemeral });
   }
   const type = getSettings(interaction.guildId).ticketsConfig.types.find((t) => t.id === row.type_id);
   if (!canManageTicket(interaction.member, type)) {
     return interaction.reply({ content: 'Seul le staff peut claim un ticket.', flags: MessageFlags.Ephemeral });
   }
   if (row.claimed_by) {
-    return interaction.reply({ content: `Ce ticket est déjà pris en charge par <@${row.claimed_by}>.`, flags: MessageFlags.Ephemeral });
+    return interaction.reply({
+      content: `Ce ticket est déjà pris en charge par <@${row.claimed_by}>.`,
+      flags: MessageFlags.Ephemeral,
+    });
   }
 
   claimStmt.run(interaction.user.id, interaction.channelId);
@@ -182,7 +220,9 @@ async function buildTranscript(channel) {
     if (!batch || batch.size === 0) break;
     for (const message of batch.values()) {
       const time = new Date(message.createdTimestamp).toLocaleString('fr-FR');
-      const attachments = message.attachments.size ? ` [pièces jointes : ${message.attachments.map((a) => a.url).join(' ')}]` : '';
+      const attachments = message.attachments.size
+        ? ` [pièces jointes : ${message.attachments.map((a) => a.url).join(' ')}]`
+        : '';
       const embeds = message.embeds.length ? ' [embed]' : '';
       lines.push(`[${time}] ${message.author.tag} : ${message.content}${attachments}${embeds}`);
     }
@@ -201,16 +241,21 @@ async function closeTicketChannel(channel, row, closedBy, reason = 'leave') {
   const type = tc.types.find((t) => t.id === row.type_id);
 
   const transcript = await buildTranscript(channel);
-  const makeFile = () => new AttachmentBuilder(Buffer.from(transcript, 'utf8'), { name: `transcript-ticket-${row.number}.txt` });
+  const makeFile = () =>
+    new AttachmentBuilder(Buffer.from(transcript, 'utf8'), { name: `transcript-ticket-${row.number}.txt` });
 
   const logEmbed = new EmbedBuilder()
     .setColor(0xed4245)
-    .setDescription([
-      `🔒 **Ticket fermé** — n°${row.number}${type ? ` (${type.label})` : ''}`,
-      `**Ouvert par :** <@${row.user_id}> · \`${row.user_id}\``,
-      `**Fermé par :** ${closedBy ? `${closedBy} · \`${closedBy.id}\`` : reason === 'inactivity' ? 'automatique (inactivité)' : 'automatique (membre parti)'}`,
-      row.claimed_by ? `**Pris en charge par :** <@${row.claimed_by}>` : null,
-    ].filter(Boolean).join('\n'))
+    .setDescription(
+      [
+        `🔒 **Ticket fermé** — n°${row.number}${type ? ` (${type.label})` : ''}`,
+        `**Ouvert par :** <@${row.user_id}> · \`${row.user_id}\``,
+        `**Fermé par :** ${closedBy ? `${closedBy} · \`${closedBy.id}\`` : reason === 'inactivity' ? 'automatique (inactivité)' : 'automatique (membre parti)'}`,
+        row.claimed_by ? `**Pris en charge par :** <@${row.claimed_by}>` : null,
+      ]
+        .filter(Boolean)
+        .join('\n'),
+    )
     .setTimestamp();
 
   const logChannelId = getSettings(guild.id).logsChannels.ticket;
@@ -220,10 +265,12 @@ async function closeTicketChannel(channel, row, closedBy, reason = 'leave') {
   if (tc.transcriptDM) {
     const opener = await guild.client.users.fetch(row.user_id).catch(() => null);
     if (opener) {
-      await opener.send({
-        content: `🔒 Ton ticket n°${row.number} sur **${guild.name}** a été fermé. Voici le transcript :`,
-        files: [makeFile()],
-      }).catch(() => {});
+      await opener
+        .send({
+          content: `🔒 Ton ticket n°${row.number} sur **${guild.name}** a été fermé. Voici le transcript :`,
+          files: [makeFile()],
+        })
+        .catch(() => {});
     }
   }
 
@@ -232,7 +279,9 @@ async function closeTicketChannel(channel, row, closedBy, reason = 'leave') {
   // Le transcript est conservé avec l'avis : le salon n'existera plus au moment de la validation.
   const { requestReview } = require('./ticketReviews');
   const reviewCloser = closedBy ?? (reason === 'inactivity' ? guild.client.user : null);
-  await requestReview(guild, row, reviewCloser, transcript).catch((error) => console.error('[reviews] Erreur demande d\'avis :', error));
+  await requestReview(guild, row, reviewCloser, transcript).catch((error) =>
+    console.error("[reviews] Erreur demande d'avis :", error),
+  );
 
   await channel.delete('Ticket fermé').catch(() => {});
 }
@@ -240,12 +289,15 @@ async function closeTicketChannel(channel, row, closedBy, reason = 'leave') {
 async function closeTicket(interaction) {
   const row = byChannelStmt.get(interaction.channelId);
   if (!row || row.status !== 'open') {
-    return interaction.reply({ content: 'Ce salon n\'est pas un ticket ouvert.', flags: MessageFlags.Ephemeral });
+    return interaction.reply({ content: "Ce salon n'est pas un ticket ouvert.", flags: MessageFlags.Ephemeral });
   }
   const type = getSettings(interaction.guildId).ticketsConfig.types.find((t) => t.id === row.type_id);
   const isOpener = interaction.user.id === row.user_id;
   if (!isOpener && !canManageTicket(interaction.member, type)) {
-    return interaction.reply({ content: 'Seuls l\'ouvreur du ticket et le staff peuvent le fermer.', flags: MessageFlags.Ephemeral });
+    return interaction.reply({
+      content: "Seuls l'ouvreur du ticket et le staff peuvent le fermer.",
+      flags: MessageFlags.Ephemeral,
+    });
   }
 
   await interaction.reply({ content: '🔒 Fermeture du ticket : génération du transcript…' });
@@ -312,10 +364,12 @@ function startTicketInactivityWorker(client) {
         } else if (now - row.last_activity_at >= (days - 1) * DAY_MS) {
           const embed = new EmbedBuilder()
             .setColor(0xfaa61a)
-            .setDescription([
-              `⏰ **Ce ticket est inactif depuis ${days - 1} jour${days - 1 > 1 ? 's' : ''}.**`,
-              `Sans message de <@${row.user_id}> dans les **24 heures**, il sera fermé automatiquement.`,
-            ].join('\n'));
+            .setDescription(
+              [
+                `⏰ **Ce ticket est inactif depuis ${days - 1} jour${days - 1 > 1 ? 's' : ''}.**`,
+                `Sans message de <@${row.user_id}> dans les **24 heures**, il sera fermé automatiquement.`,
+              ].join('\n'),
+            );
           const warning = await channel.send({ content: `<@${row.user_id}>`, embeds: [embed] }).catch(() => null);
           if (warning) setWarnedStmt.run(now, row.channel_id);
         }
@@ -341,7 +395,15 @@ function setClaim(channelId, userId) {
 }
 
 module.exports = {
-  buildTicketPanel, handleTicketComponent, closeTicketsForMember,
-  closeTicket, closeTicketChannel, canManageTicket, isOpenTicketChannel, getTicketByChannel, setClaim,
-  trackTicketActivity, startTicketInactivityWorker,
+  buildTicketPanel,
+  handleTicketComponent,
+  closeTicketsForMember,
+  closeTicket,
+  closeTicketChannel,
+  canManageTicket,
+  isOpenTicketChannel,
+  getTicketByChannel,
+  setClaim,
+  trackTicketActivity,
+  startTicketInactivityWorker,
 };

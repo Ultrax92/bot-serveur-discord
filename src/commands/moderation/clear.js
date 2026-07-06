@@ -8,7 +8,13 @@ module.exports = {
     .setName('clear')
     .setDescription('Supprime des messages dans le salon actuel')
     .addIntegerOption((opt) =>
-      opt.setName('nombre').setDescription('Nombre de messages à supprimer (1 à 100)').setRequired(true).setMinValue(1).setMaxValue(100))
+      opt
+        .setName('nombre')
+        .setDescription('Nombre de messages à supprimer (1 à 100)')
+        .setRequired(true)
+        .setMinValue(1)
+        .setMaxValue(100),
+    )
     .addUserOption((opt) => opt.setName('membre').setDescription('Ne supprimer que les messages de ce membre')),
 
   async execute(interaction) {
@@ -29,7 +35,14 @@ module.exports = {
     }
 
     if (deleted === 0) {
-      return interaction.editReply({ embeds: [errorEmbed(interaction, 'Aucun message supprimé (les messages de plus de 14 jours ne peuvent pas être supprimés en masse).')] });
+      return interaction.editReply({
+        embeds: [
+          errorEmbed(
+            interaction,
+            'Aucun message supprimé (les messages de plus de 14 jours ne peuvent pas être supprimés en masse).',
+          ),
+        ],
+      });
     }
     await logModAction(interaction, {
       emoji: '🧹',
@@ -37,7 +50,9 @@ module.exports = {
       target: target ?? null,
     });
     return interaction.editReply({
-      embeds: [successEmbed(interaction, `🧹 **${deleted}** message(s) supprimé(s)${target ? ` de **${target.tag}**` : ''}.`)],
+      embeds: [
+        successEmbed(interaction, `🧹 **${deleted}** message(s) supprimé(s)${target ? ` de **${target.tag}**` : ''}.`),
+      ],
     });
   },
 };

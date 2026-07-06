@@ -7,22 +7,48 @@ const { getSettings, updateSettings, isModuleEnabled } = require('./settings');
 const P = PermissionFlagsBits;
 const STATS_DENY = [
   // Gestion
-  P.ManageChannels, P.ManageRoles, P.ManageWebhooks,
+  P.ManageChannels,
+  P.ManageRoles,
+  P.ManageWebhooks,
   // Vocal
-  P.Connect, P.Speak, P.Stream, P.UseVAD, P.PrioritySpeaker,
-  P.MuteMembers, P.DeafenMembers, P.MoveMembers,
-  P.UseSoundboard, P.UseExternalSounds,
-  P.SetVoiceChannelStatus, P.RequestToSpeak,
+  P.Connect,
+  P.Speak,
+  P.Stream,
+  P.UseVAD,
+  P.PrioritySpeaker,
+  P.MuteMembers,
+  P.DeafenMembers,
+  P.MoveMembers,
+  P.UseSoundboard,
+  P.UseExternalSounds,
+  P.SetVoiceChannelStatus,
+  P.RequestToSpeak,
   // Chat
-  P.SendMessages, P.SendMessagesInThreads, P.AddReactions, P.EmbedLinks, P.AttachFiles,
-  P.SendTTSMessages, P.SendVoiceMessages, P.SendPolls,
-  P.MentionEveryone, P.ManageMessages, P.ReadMessageHistory,
-  P.UseExternalEmojis, P.UseExternalStickers,
-  P.CreatePublicThreads, P.CreatePrivateThreads, P.ManageThreads,
-  P.PinMessages, P.BypassSlowmode,
+  P.SendMessages,
+  P.SendMessagesInThreads,
+  P.AddReactions,
+  P.EmbedLinks,
+  P.AttachFiles,
+  P.SendTTSMessages,
+  P.SendVoiceMessages,
+  P.SendPolls,
+  P.MentionEveryone,
+  P.ManageMessages,
+  P.ReadMessageHistory,
+  P.UseExternalEmojis,
+  P.UseExternalStickers,
+  P.CreatePublicThreads,
+  P.CreatePrivateThreads,
+  P.ManageThreads,
+  P.PinMessages,
+  P.BypassSlowmode,
   // Divers
-  P.CreateInstantInvite, P.UseApplicationCommands, P.UseEmbeddedActivities, P.UseExternalApps,
-  P.CreateEvents, P.ManageEvents,
+  P.CreateInstantInvite,
+  P.UseApplicationCommands,
+  P.UseEmbeddedActivities,
+  P.UseExternalApps,
+  P.CreateEvents,
+  P.ManageEvents,
 ].filter(Boolean);
 
 // Overwrites de la catégorie : sans rôles d'accès, visible par tous (mais
@@ -65,20 +91,27 @@ async function ensureStatsCategory(guild) {
   const config = getSettings(guild.id).statsConfig;
   let category = config.categoryId && guild.channels.cache.get(config.categoryId);
   if (!category) {
-    category = await guild.channels.create({
-      name: config.categoryName.slice(0, 100),
-      type: ChannelType.GuildCategory,
-      position: 0,
-      permissionOverwrites: buildStatsOverwrites(guild),
-    }).catch(() => null);
-    if (category) updateSettings(guild.id, (s) => { s.statsConfig.categoryId = category.id; });
+    category = await guild.channels
+      .create({
+        name: config.categoryName.slice(0, 100),
+        type: ChannelType.GuildCategory,
+        position: 0,
+        permissionOverwrites: buildStatsOverwrites(guild),
+      })
+      .catch(() => null);
+    if (category)
+      updateSettings(guild.id, (s) => {
+        s.statsConfig.categoryId = category.id;
+      });
   }
   return category;
 }
 
 // Renomme la catégorie (et la mémorise pour les prochains compteurs)
 async function renameStatsCategory(guild, name) {
-  updateSettings(guild.id, (s) => { s.statsConfig.categoryName = name; });
+  updateSettings(guild.id, (s) => {
+    s.statsConfig.categoryName = name;
+  });
   const config = getSettings(guild.id).statsConfig;
   const category = config.categoryId && guild.channels.cache.get(config.categoryId);
   if (category) await category.setName(name.slice(0, 100)).catch(() => {});
@@ -87,20 +120,20 @@ async function renameStatsCategory(guild, name) {
 // Crée le salon vocal compteur dans la catégorie de stats
 async function createCounter(guild, { type, roleId = null }) {
   // Aucun emoji ajouté : nom du rôle tel quel, ou simplement "Membres"
-  const label = type === 'members'
-    ? 'Membres : {n}'
-    : `${guild.roles.cache.get(roleId)?.name ?? 'Rôle'} : {n}`;
+  const label = type === 'members' ? 'Membres : {n}' : `${guild.roles.cache.get(roleId)?.name ?? 'Rôle'} : {n}`;
 
   await guild.members.fetch().catch(() => {});
   const counter = { id: `s${Date.now().toString(36)}`, type, roleId, channelId: null, label };
   const count = countFor(guild, counter);
   const category = await ensureStatsCategory(guild);
 
-  const channel = await guild.channels.create({
-    name: label.replace('{n}', count).slice(0, 100),
-    type: ChannelType.GuildVoice,
-    parent: category?.id ?? null,
-  }).catch(() => null);
+  const channel = await guild.channels
+    .create({
+      name: label.replace('{n}', count).slice(0, 100),
+      type: ChannelType.GuildVoice,
+      parent: category?.id ?? null,
+    })
+    .catch(() => null);
   if (!channel) return null;
 
   // Salon synchronisé avec la catégorie (héritage des permissions)
@@ -118,7 +151,10 @@ async function createCounter(guild, { type, roleId = null }) {
 async function removeCounter(guild, counterId) {
   const counter = getSettings(guild.id).statsConfig.counters.find((c) => c.id === counterId);
   if (counter?.channelId) {
-    await guild.channels.cache.get(counter.channelId)?.delete('Compteur de stats retiré').catch(() => {});
+    await guild.channels.cache
+      .get(counter.channelId)
+      ?.delete('Compteur de stats retiré')
+      .catch(() => {});
   }
   updateSettings(guild.id, (s) => {
     s.statsConfig.counters = s.statsConfig.counters.filter((c) => c.id !== counterId);
@@ -164,4 +200,11 @@ function startStatsWorker(client) {
   scheduleNext4h();
 }
 
-module.exports = { createCounter, removeCounter, updateCounters, renameStatsCategory, applyStatsPermissions, startStatsWorker };
+module.exports = {
+  createCounter,
+  removeCounter,
+  updateCounters,
+  renameStatsCategory,
+  applyStatsPermissions,
+  startStatsWorker,
+};

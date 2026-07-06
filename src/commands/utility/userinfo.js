@@ -5,7 +5,7 @@ module.exports = {
   module: 'utility',
   data: new SlashCommandBuilder()
     .setName('userinfo')
-    .setDescription('Affiche les informations d\'un utilisateur')
+    .setDescription("Affiche les informations d'un utilisateur")
     .addUserOption((opt) => opt.setName('membre').setDescription('Le membre (défaut : toi)')),
 
   async execute(interaction) {
@@ -28,7 +28,11 @@ module.exports = {
         .map((r) => `${r}`)
         .slice(0, 15);
       embed.addFields(
-        { name: '📥 A rejoint', value: member.joinedTimestamp ? `<t:${Math.floor(member.joinedTimestamp / 1000)}:R>` : 'Inconnu', inline: true },
+        {
+          name: '📥 A rejoint',
+          value: member.joinedTimestamp ? `<t:${Math.floor(member.joinedTimestamp / 1000)}:R>` : 'Inconnu',
+          inline: true,
+        },
         { name: `🎭 Rôles (${roles.length})`, value: roles.join(' ') || 'Aucun', inline: false },
       );
     }

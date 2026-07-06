@@ -7,14 +7,18 @@ module.exports = {
     .setName('lock')
     .setDescription('Verrouille ou déverrouille un salon')
     .addStringOption((opt) =>
-      opt.setName('action').setDescription('L\'action à effectuer').setRequired(true)
-        .addChoices(
-          { name: '🔒 Verrouiller', value: 'on' },
-          { name: '🔓 Déverrouiller', value: 'off' },
-        ))
+      opt
+        .setName('action')
+        .setDescription("L'action à effectuer")
+        .setRequired(true)
+        .addChoices({ name: '🔒 Verrouiller', value: 'on' }, { name: '🔓 Déverrouiller', value: 'off' }),
+    )
     .addChannelOption((opt) =>
-      opt.setName('salon').setDescription('Le salon concerné (défaut : salon actuel)')
-        .addChannelTypes(ChannelType.GuildText, ChannelType.GuildVoice)),
+      opt
+        .setName('salon')
+        .setDescription('Le salon concerné (défaut : salon actuel)')
+        .addChannelTypes(ChannelType.GuildText, ChannelType.GuildVoice),
+    ),
 
   async execute(interaction) {
     const lock = interaction.options.getString('action') === 'on';
@@ -28,7 +32,9 @@ module.exports = {
     }
 
     return interaction.reply({
-      embeds: [successEmbed(interaction, lock ? `🔒 ${channel} a été verrouillé.` : `🔓 ${channel} a été déverrouillé.`)],
+      embeds: [
+        successEmbed(interaction, lock ? `🔒 ${channel} a été verrouillé.` : `🔓 ${channel} a été déverrouillé.`),
+      ],
     });
   },
 };

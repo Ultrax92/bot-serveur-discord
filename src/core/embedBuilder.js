@@ -1,9 +1,15 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const {
-  EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle,
-  ModalBuilder, TextInputBuilder, TextInputStyle,
-  MessageFlags, AttachmentBuilder,
+  EmbedBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle,
+  MessageFlags,
+  AttachmentBuilder,
 } = require('discord.js');
 const { getSettings } = require('./settings');
 
@@ -18,8 +24,13 @@ function getSession(guildId, userId) {
   let session = sessions.get(key);
   if (!session || Date.now() - session.createdAt > SESSION_TTL) {
     session = {
-      title: '', description: '', color: null, image: null,
-      buttons: [], target: {}, createdAt: Date.now(),
+      title: '',
+      description: '',
+      color: null,
+      image: null,
+      buttons: [],
+      target: {},
+      createdAt: Date.now(),
     };
     sessions.set(key, session);
   }
@@ -50,10 +61,13 @@ function buildFinalEmbed(guild, session, signer = null) {
 
   const components = [];
   if (session.buttons.length) {
-    components.push(new ActionRowBuilder().addComponents(
-      session.buttons.slice(0, 5).map((b) =>
-        new ButtonBuilder().setLabel(b.label.slice(0, 80)).setURL(b.url).setStyle(ButtonStyle.Link)),
-    ));
+    components.push(
+      new ActionRowBuilder().addComponents(
+        session.buttons
+          .slice(0, 5)
+          .map((b) => new ButtonBuilder().setLabel(b.label.slice(0, 80)).setURL(b.url).setStyle(ButtonStyle.Link)),
+      ),
+    );
   }
 
   return { embed, files, components };
@@ -80,12 +94,18 @@ function builderView(guild, userId) {
     new ButtonBuilder().setCustomId('eb:content').setLabel('📝 Contenu').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId('eb:image').setLabel('🖼️ Image URL').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId('eb:upload').setLabel('📎 Image upload').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId('eb:button').setLabel(`🔗 Bouton lien (${session.buttons.length}/5)`).setStyle(ButtonStyle.Primary)
+    new ButtonBuilder()
+      .setCustomId('eb:button')
+      .setLabel(`🔗 Bouton lien (${session.buttons.length}/5)`)
+      .setStyle(ButtonStyle.Primary)
       .setDisabled(session.buttons.length >= 5),
     new ButtonBuilder().setCustomId('eb:import').setLabel('📥 Importer').setStyle(ButtonStyle.Primary),
   );
   const row2 = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId('eb:send').setLabel('📤 Envoyer').setStyle(ButtonStyle.Success)
+    new ButtonBuilder()
+      .setCustomId('eb:send')
+      .setLabel('📤 Envoyer')
+      .setStyle(ButtonStyle.Success)
       .setDisabled(!session.title && !session.description && !session.image),
     new ButtonBuilder().setCustomId('eb:target').setLabel('🎯 Destination').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId('eb:refresh').setLabel('🔄 Aperçu').setStyle(ButtonStyle.Secondary),
@@ -117,20 +137,34 @@ async function handleEmbedComponent(interaction) {
   if (action === 'content') {
     const modal = new ModalBuilder()
       .setCustomId('eb:modal:content')
-      .setTitle('Contenu de l\'embed')
+      .setTitle("Contenu de l'embed")
       .addComponents(
         new ActionRowBuilder().addComponents(
-          new TextInputBuilder().setCustomId('title').setLabel('Titre (optionnel)')
-            .setValue(session.title).setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(200),
+          new TextInputBuilder()
+            .setCustomId('title')
+            .setLabel('Titre (optionnel)')
+            .setValue(session.title)
+            .setStyle(TextInputStyle.Short)
+            .setRequired(false)
+            .setMaxLength(200),
         ),
         new ActionRowBuilder().addComponents(
-          new TextInputBuilder().setCustomId('description').setLabel('Description')
-            .setValue(session.description).setStyle(TextInputStyle.Paragraph).setRequired(false).setMaxLength(4000),
+          new TextInputBuilder()
+            .setCustomId('description')
+            .setLabel('Description')
+            .setValue(session.description)
+            .setStyle(TextInputStyle.Paragraph)
+            .setRequired(false)
+            .setMaxLength(4000),
         ),
         new ActionRowBuilder().addComponents(
-          new TextInputBuilder().setCustomId('color').setLabel('Couleur hex (optionnel, ex: #C3FF00)')
+          new TextInputBuilder()
+            .setCustomId('color')
+            .setLabel('Couleur hex (optionnel, ex: #C3FF00)')
             .setValue(session.color ? `#${session.color.toString(16).padStart(6, '0').toUpperCase()}` : '')
-            .setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(7),
+            .setStyle(TextInputStyle.Short)
+            .setRequired(false)
+            .setMaxLength(7),
         ),
       );
     return interaction.showModal(modal);
@@ -139,13 +173,19 @@ async function handleEmbedComponent(interaction) {
   if (action === 'image') {
     const modal = new ModalBuilder()
       .setCustomId('eb:modal:image')
-      .setTitle('Image de l\'embed')
-      .addComponents(new ActionRowBuilder().addComponents(
-        new TextInputBuilder().setCustomId('url').setLabel('URL externe (vide = retirer l\'image)')
-          .setPlaceholder('https://i.imgur.com/… (pas de lien Discord, ils expirent)')
-          .setValue(session.image?.startsWith('file:') ? '' : (session.image ?? ''))
-          .setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(500),
-      ));
+      .setTitle("Image de l'embed")
+      .addComponents(
+        new ActionRowBuilder().addComponents(
+          new TextInputBuilder()
+            .setCustomId('url')
+            .setLabel("URL externe (vide = retirer l'image)")
+            .setPlaceholder('https://i.imgur.com/… (pas de lien Discord, ils expirent)')
+            .setValue(session.image?.startsWith('file:') ? '' : (session.image ?? ''))
+            .setStyle(TextInputStyle.Short)
+            .setRequired(false)
+            .setMaxLength(500),
+        ),
+      );
     return interaction.showModal(modal);
   }
 
@@ -153,7 +193,8 @@ async function handleEmbedComponent(interaction) {
     const { requestImageUpload } = require('./customCommands');
     requestImageUpload(interaction, { kind: 'embed' });
     return interaction.reply({
-      content: '📎 **Envoie l\'image dans ce salon** (pièce jointe — stockée sur le serveur). Une fois la confirmation reçue, clique **🔄 Aperçu** sur le panneau. ⏱️ 2 minutes.',
+      content:
+        "📎 **Envoie l'image dans ce salon** (pièce jointe — stockée sur le serveur). Une fois la confirmation reçue, clique **🔄 Aperçu** sur le panneau. ⏱️ 2 minutes.",
       flags: MessageFlags.Ephemeral,
     });
   }
@@ -164,12 +205,21 @@ async function handleEmbedComponent(interaction) {
       .setTitle('Ajouter un bouton lien')
       .addComponents(
         new ActionRowBuilder().addComponents(
-          new TextInputBuilder().setCustomId('label').setLabel('Texte du bouton')
-            .setPlaceholder('🛒 Boutique').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(80),
+          new TextInputBuilder()
+            .setCustomId('label')
+            .setLabel('Texte du bouton')
+            .setPlaceholder('🛒 Boutique')
+            .setStyle(TextInputStyle.Short)
+            .setRequired(true)
+            .setMaxLength(80),
         ),
         new ActionRowBuilder().addComponents(
-          new TextInputBuilder().setCustomId('url').setLabel('Lien (https://…)')
-            .setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(500),
+          new TextInputBuilder()
+            .setCustomId('url')
+            .setLabel('Lien (https://…)')
+            .setStyle(TextInputStyle.Short)
+            .setRequired(true)
+            .setMaxLength(500),
         ),
       );
     return interaction.showModal(modal);
@@ -181,19 +231,31 @@ async function handleEmbedComponent(interaction) {
       .setTitle('Destination (remplis UN seul champ)')
       .addComponents(
         new ActionRowBuilder().addComponents(
-          new TextInputBuilder().setCustomId('channel').setLabel('Salon : ID, mention <#…> ou lien')
+          new TextInputBuilder()
+            .setCustomId('channel')
+            .setLabel('Salon : ID, mention <#…> ou lien')
             .setValue(session.target.channelId ?? '')
-            .setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(100),
+            .setStyle(TextInputStyle.Short)
+            .setRequired(false)
+            .setMaxLength(100),
         ),
         new ActionRowBuilder().addComponents(
-          new TextInputBuilder().setCustomId('user').setLabel('MP à un membre : ID ou mention')
+          new TextInputBuilder()
+            .setCustomId('user')
+            .setLabel('MP à un membre : ID ou mention')
             .setValue(session.target.userId ?? '')
-            .setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(100),
+            .setStyle(TextInputStyle.Short)
+            .setRequired(false)
+            .setMaxLength(100),
         ),
         new ActionRowBuilder().addComponents(
-          new TextInputBuilder().setCustomId('role').setLabel('MP à tout un rôle : ID ou mention')
+          new TextInputBuilder()
+            .setCustomId('role')
+            .setLabel('MP à tout un rôle : ID ou mention')
             .setValue(session.target.roleId ?? '')
-            .setStyle(TextInputStyle.Short).setRequired(false).setMaxLength(100),
+            .setStyle(TextInputStyle.Short)
+            .setRequired(false)
+            .setMaxLength(100),
         ),
       );
     return interaction.showModal(modal);
@@ -203,11 +265,17 @@ async function handleEmbedComponent(interaction) {
     const modal = new ModalBuilder()
       .setCustomId('eb:modal:import')
       .setTitle('Importer un embed existant')
-      .addComponents(new ActionRowBuilder().addComponents(
-        new TextInputBuilder().setCustomId('link').setLabel('Lien du message contenant l\'embed')
-          .setPlaceholder('Clic droit sur le message → Copier le lien')
-          .setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(200),
-      ));
+      .addComponents(
+        new ActionRowBuilder().addComponents(
+          new TextInputBuilder()
+            .setCustomId('link')
+            .setLabel("Lien du message contenant l'embed")
+            .setPlaceholder('Clic droit sur le message → Copier le lien')
+            .setStyle(TextInputStyle.Short)
+            .setRequired(true)
+            .setMaxLength(200),
+        ),
+      );
     return interaction.showModal(modal);
   }
 
@@ -219,16 +287,19 @@ async function handleEmbedComponent(interaction) {
       await guild.members.fetch().catch(() => {});
       const recipients = guild.members.cache.filter((m) => !m.user.bot && m.roles.cache.has(session.target.roleId));
       if (!recipients.size) {
-        return interaction.reply({ content: '❌ Aucun membre (non-bot) n\'a ce rôle.', flags: MessageFlags.Ephemeral });
+        return interaction.reply({ content: "❌ Aucun membre (non-bot) n'a ce rôle.", flags: MessageFlags.Ephemeral });
       }
       const confirm = new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId('eb:confirmsend').setLabel(`✅ Confirmer l'envoi à ${recipients.size} membre(s)`).setStyle(ButtonStyle.Danger),
+        new ButtonBuilder()
+          .setCustomId('eb:confirmsend')
+          .setLabel(`✅ Confirmer l'envoi à ${recipients.size} membre(s)`)
+          .setStyle(ButtonStyle.Danger),
         new ButtonBuilder().setCustomId('eb:refresh').setLabel('❌ Annuler').setStyle(ButtonStyle.Secondary),
       );
       return interaction.update({
         content: [
           `⚠️ **Tu vas envoyer cet embed en MP à ${recipients.size} membre(s)** du rôle <@&${session.target.roleId}>.`,
-          `Envoi espacé (~1,2s/MP, soit ~${Math.ceil(recipients.size * 1.2 / 60)} min). Les MP de masse peuvent être limités par Discord : réserve ça aux petits rôles ou aux occasions importantes.`,
+          `Envoi espacé (~1,2s/MP, soit ~${Math.ceil((recipients.size * 1.2) / 60)} min). Les MP de masse peuvent être limités par Discord : réserve ça aux petits rôles ou aux occasions importantes.`,
         ].join('\n'),
         embeds: [embed],
         files,
@@ -238,22 +309,36 @@ async function handleEmbedComponent(interaction) {
 
     if (session.target.userId) {
       const user = await guild.client.users.fetch(session.target.userId).catch(() => null);
-      const sent = user && await user.send({ embeds: [embed], files, components }).then(() => true).catch(() => false);
+      const sent =
+        user &&
+        (await user
+          .send({ embeds: [embed], files, components })
+          .then(() => true)
+          .catch(() => false));
       resetSession(guild.id, interaction.user.id);
       return interaction.update({
-        content: sent ? `✅ Embed envoyé en MP à ${user}.` : '❌ Impossible d\'envoyer le MP (MPs fermés ?).',
-        embeds: [], components: [], files: [],
+        content: sent ? `✅ Embed envoyé en MP à ${user}.` : "❌ Impossible d'envoyer le MP (MPs fermés ?).",
+        embeds: [],
+        components: [],
+        files: [],
       });
     }
 
-    const channel = session.target.channelId
-      ? guild.channels.cache.get(session.target.channelId)
-      : interaction.channel;
-    const sent = channel && await channel.send({ embeds: [embed], files, components }).then(() => true).catch(() => false);
+    const channel = session.target.channelId ? guild.channels.cache.get(session.target.channelId) : interaction.channel;
+    const sent =
+      channel &&
+      (await channel
+        .send({ embeds: [embed], files, components })
+        .then(() => true)
+        .catch(() => false));
     resetSession(guild.id, interaction.user.id);
     return interaction.update({
-      content: sent ? `✅ Embed publié dans ${channel}.` : '❌ Impossible de publier (salon introuvable ou permissions).',
-      embeds: [], components: [], files: [],
+      content: sent
+        ? `✅ Embed publié dans ${channel}.`
+        : '❌ Impossible de publier (salon introuvable ou permissions).',
+      embeds: [],
+      components: [],
+      files: [],
     });
   }
 
@@ -267,7 +352,9 @@ async function handleEmbedComponent(interaction) {
 
     await interaction.update({
       content: `🚀 Envoi en cours à **${recipients.length}** membre(s)… je te fais un rapport à la fin (ici si possible, sinon en MP).`,
-      embeds: [], components: [], files: [],
+      embeds: [],
+      components: [],
+      files: [],
     });
 
     // Envoi en arrière-plan, espacé pour respecter les limites Discord
@@ -275,13 +362,21 @@ async function handleEmbedComponent(interaction) {
       let sent = 0;
       let failed = 0;
       for (const member of recipients) {
-        const ok = await member.send({ embeds: [embed], files, components }).then(() => true).catch(() => false);
+        const ok = await member
+          .send({ embeds: [embed], files, components })
+          .then(() => true)
+          .catch(() => false);
         if (ok) sent++;
         else failed++;
-        await new Promise((resolve) => { setTimeout(resolve, 1200); });
+        await new Promise((resolve) => {
+          setTimeout(resolve, 1200);
+        });
       }
       const report = `📬 **Envoi terminé** : ${sent} MP envoyé(s), ${failed} échec(s) (MP fermés).`;
-      const updated = await interaction.editReply({ content: report }).then(() => true).catch(() => false);
+      const updated = await interaction
+        .editReply({ content: report })
+        .then(() => true)
+        .catch(() => false);
       if (!updated) await interaction.user.send(report).catch(() => {});
     })().catch((error) => console.error('Erreur envoi MP de masse :', error));
     return;
@@ -294,7 +389,10 @@ async function handleEmbedComponent(interaction) {
     if (kind === 'content') {
       const hex = interaction.fields.getTextInputValue('color').trim().replace(/^#/, '');
       if (hex && !/^[0-9a-f]{6}$/i.test(hex)) {
-        return interaction.reply({ content: '❌ Couleur invalide. Exemple : `#C3FF00`', flags: MessageFlags.Ephemeral });
+        return interaction.reply({
+          content: '❌ Couleur invalide. Exemple : `#C3FF00`',
+          flags: MessageFlags.Ephemeral,
+        });
       }
       session.title = interaction.fields.getTextInputValue('title').trim();
       session.description = interaction.fields.getTextInputValue('description').trim();
@@ -305,10 +403,16 @@ async function handleEmbedComponent(interaction) {
     if (kind === 'image') {
       const url = interaction.fields.getTextInputValue('url').trim();
       if (url && !/^https?:\/\/\S+$/.test(url)) {
-        return interaction.reply({ content: '❌ URL invalide (elle doit commencer par http/https).', flags: MessageFlags.Ephemeral });
+        return interaction.reply({
+          content: '❌ URL invalide (elle doit commencer par http/https).',
+          flags: MessageFlags.Ephemeral,
+        });
       }
       if (url && /(cdn|media)\.discordapp\.(com|net)/.test(url)) {
-        return interaction.reply({ content: '❌ Les liens d\'images Discord expirent — utilise 📎 Image upload à la place.', flags: MessageFlags.Ephemeral });
+        return interaction.reply({
+          content: "❌ Les liens d'images Discord expirent — utilise 📎 Image upload à la place.",
+          flags: MessageFlags.Ephemeral,
+        });
       }
       session.image = url || null;
       return interaction.update(builderView(guild, interaction.user.id));
@@ -317,7 +421,10 @@ async function handleEmbedComponent(interaction) {
     if (kind === 'button') {
       const url = interaction.fields.getTextInputValue('url').trim();
       if (!/^https?:\/\/\S+$/.test(url)) {
-        return interaction.reply({ content: '❌ Lien invalide (il doit commencer par http/https).', flags: MessageFlags.Ephemeral });
+        return interaction.reply({
+          content: '❌ Lien invalide (il doit commencer par http/https).',
+          flags: MessageFlags.Ephemeral,
+        });
       }
       session.buttons.push({ label: interaction.fields.getTextInputValue('label').trim(), url });
       return interaction.update(builderView(guild, interaction.user.id));
@@ -335,13 +442,16 @@ async function handleEmbedComponent(interaction) {
       if (roleId && !guild.roles.cache.has(roleId)) {
         return interaction.reply({ content: '❌ Rôle introuvable sur ce serveur.', flags: MessageFlags.Ephemeral });
       }
-      if (userId && !await guild.members.fetch(userId).catch(() => null)) {
+      if (userId && !(await guild.members.fetch(userId).catch(() => null))) {
         return interaction.reply({ content: '❌ Membre introuvable sur ce serveur.', flags: MessageFlags.Ephemeral });
       }
       if (channelId) {
         const channel = await guild.channels.fetch(channelId).catch(() => null);
         if (!channel || !channel.isTextBased() || channel.isVoiceBased() || channel.isThread()) {
-          return interaction.reply({ content: '❌ Salon textuel introuvable sur ce serveur.', flags: MessageFlags.Ephemeral });
+          return interaction.reply({
+            content: '❌ Salon textuel introuvable sur ce serveur.',
+            flags: MessageFlags.Ephemeral,
+          });
         }
       }
 
@@ -353,14 +463,20 @@ async function handleEmbedComponent(interaction) {
     if (kind === 'import') {
       const ids = String(interaction.fields.getTextInputValue('link')).match(/\d{15,20}/g) ?? [];
       if (ids.length < 2) {
-        return interaction.reply({ content: '❌ Lien invalide. Clic droit sur le message → **Copier le lien**.', flags: MessageFlags.Ephemeral });
+        return interaction.reply({
+          content: '❌ Lien invalide. Clic droit sur le message → **Copier le lien**.',
+          flags: MessageFlags.Ephemeral,
+        });
       }
       const [channelId, messageId] = ids.slice(-2);
       const channel = guild.channels.cache.get(channelId);
-      const message = channel?.isTextBased() && await channel.messages.fetch(messageId).catch(() => null);
+      const message = channel?.isTextBased() && (await channel.messages.fetch(messageId).catch(() => null));
       const source = message?.embeds?.[0];
       if (!source) {
-        return interaction.reply({ content: '❌ Aucun embed trouvé à ce lien (message introuvable ou sans embed).', flags: MessageFlags.Ephemeral });
+        return interaction.reply({
+          content: '❌ Aucun embed trouvé à ce lien (message introuvable ou sans embed).',
+          flags: MessageFlags.Ephemeral,
+        });
       }
       session.title = source.title ?? '';
       session.description = source.description ?? '';

@@ -62,9 +62,7 @@ async function ensureLogsCategory(guild) {
     category = await guild.channels.create({
       name: '📜 Logs',
       type: ChannelType.GuildCategory,
-      permissionOverwrites: [
-        { id: guild.roles.everyone.id, deny: [PermissionFlagsBits.ViewChannel] },
-      ],
+      permissionOverwrites: [{ id: guild.roles.everyone.id, deny: [PermissionFlagsBits.ViewChannel] }],
     });
   }
   return category;
@@ -78,7 +76,9 @@ async function createLogChannel(guild, type) {
     type: ChannelType.GuildText,
     parent: category.id,
   });
-  updateSettings(guild.id, (s) => { s.logsChannels[type] = channel.id; });
+  updateSettings(guild.id, (s) => {
+    s.logsChannels[type] = channel.id;
+  });
   return channel;
 }
 
@@ -94,8 +94,19 @@ async function autoConfigureLogs(guild) {
     created.push(`${meta.emoji} ${channel}`);
   }
 
-  updateSettings(guild.id, (s) => { s.modules.logs = true; });
+  updateSettings(guild.id, (s) => {
+    s.modules.logs = true;
+  });
   return created;
 }
 
-module.exports = { LOG_TYPES, userAuthor, idLine, sendLog, logModAction, ensureLogsCategory, createLogChannel, autoConfigureLogs };
+module.exports = {
+  LOG_TYPES,
+  userAuthor,
+  idLine,
+  sendLog,
+  logModAction,
+  ensureLogsCategory,
+  createLogChannel,
+  autoConfigureLogs,
+};

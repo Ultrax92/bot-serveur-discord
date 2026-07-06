@@ -1,9 +1,14 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const {
-  EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle,
-  StringSelectMenuBuilder, StringSelectMenuOptionBuilder,
-  MessageFlags, AttachmentBuilder,
+  EmbedBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  StringSelectMenuBuilder,
+  StringSelectMenuOptionBuilder,
+  MessageFlags,
+  AttachmentBuilder,
 } = require('discord.js');
 const db = require('./db');
 const { getSettings, saveSettings, updateSettings, isModuleEnabled } = require('./settings');
@@ -11,7 +16,9 @@ const { getSettings, saveSettings, updateSettings, isModuleEnabled } = require('
 const imagesDir = path.join(__dirname, '..', '..', 'data', 'images');
 
 const insertStmt = db.prepare('INSERT INTO backups (guild_id, kind, created_at, data) VALUES (?, ?, ?, ?)');
-const listStmt = db.prepare('SELECT id, kind, created_at, LENGTH(data) AS size FROM backups WHERE guild_id = ? ORDER BY created_at DESC LIMIT 10');
+const listStmt = db.prepare(
+  'SELECT id, kind, created_at, LENGTH(data) AS size FROM backups WHERE guild_id = ? ORDER BY created_at DESC LIMIT 10',
+);
 const getStmt = db.prepare('SELECT * FROM backups WHERE id = ? AND guild_id = ?');
 const deleteStmt = db.prepare('DELETE FROM backups WHERE id = ? AND guild_id = ?');
 const pruneStmt = db.prepare(`
@@ -48,7 +55,9 @@ function restoreImageFiles(files) {
     try {
       fs.writeFileSync(path.join(imagesDir, name), Buffer.from(base64, 'base64'));
       restored++;
-    } catch { /* image ignorée */ }
+    } catch {
+      /* image ignorée */
+    }
   }
   return restored;
 }
@@ -58,11 +67,54 @@ function restoreImageFiles(files) {
 // d'invitations, giveaways en cours, vocaux temporaires suivis
 const TABLE_COLUMNS = {
   sanctions: ['id', 'guild_id', 'user_id', 'moderator_id', 'type', 'reason', 'created_at', 'expires_at', 'active'],
-  tickets: ['id', 'guild_id', 'channel_id', 'user_id', 'number', 'type_id', 'status', 'claimed_by', 'created_at', 'last_activity_at', 'warned_at'],
+  tickets: [
+    'id',
+    'guild_id',
+    'channel_id',
+    'user_id',
+    'number',
+    'type_id',
+    'status',
+    'claimed_by',
+    'created_at',
+    'last_activity_at',
+    'warned_at',
+  ],
   invite_joins: ['guild_id', 'user_id', 'inviter_id', 'code', 'fake', 'has_left', 'joined_at'],
-  giveaways: ['id', 'guild_id', 'channel_id', 'message_id', 'prize', 'winners', 'host_id', 'required_role', 'ends_at', 'ended', 'participants'],
+  giveaways: [
+    'id',
+    'guild_id',
+    'channel_id',
+    'message_id',
+    'prize',
+    'winners',
+    'host_id',
+    'required_role',
+    'ends_at',
+    'ended',
+    'participants',
+  ],
   tempvoc_channels: ['channel_id', 'guild_id', 'owner_id'],
-  ticket_reviews: ['id', 'guild_id', 'user_id', 'ticket_number', 'type_id', 'type_label', 'status', 'stars', 'comment', 'auto', 'dm_channel_id', 'dm_message_id', 'review_channel_id', 'review_message_id', 'deadline', 'transcript', 'image', 'created_at'],
+  ticket_reviews: [
+    'id',
+    'guild_id',
+    'user_id',
+    'ticket_number',
+    'type_id',
+    'type_label',
+    'status',
+    'stars',
+    'comment',
+    'auto',
+    'dm_channel_id',
+    'dm_message_id',
+    'review_channel_id',
+    'review_message_id',
+    'deadline',
+    'transcript',
+    'image',
+    'created_at',
+  ],
 };
 
 function collectDatabase(guildId) {
@@ -80,9 +132,13 @@ function restoreDatabase(guildId, database) {
     const rows = database[table];
     if (!Array.isArray(rows)) continue;
     db.prepare(`DELETE FROM ${table} WHERE guild_id = ?`).run(guildId);
-    const insertWithId = db.prepare(`INSERT INTO ${table} (${columns.join(', ')}) VALUES (${columns.map((c) => `@${c}`).join(', ')})`);
+    const insertWithId = db.prepare(
+      `INSERT INTO ${table} (${columns.join(', ')}) VALUES (${columns.map((c) => `@${c}`).join(', ')})`,
+    );
     const columnsNoId = columns.filter((c) => c !== 'id');
-    const insertNoId = db.prepare(`INSERT INTO ${table} (${columnsNoId.join(', ')}) VALUES (${columnsNoId.map((c) => `@${c}`).join(', ')})`);
+    const insertNoId = db.prepare(
+      `INSERT INTO ${table} (${columnsNoId.join(', ')}) VALUES (${columnsNoId.map((c) => `@${c}`).join(', ')})`,
+    );
     for (const row of rows) {
       const values = {};
       for (const column of columns) values[column] = row[column] ?? null;
@@ -91,7 +147,12 @@ function restoreDatabase(guildId, database) {
         restored++;
       } catch {
         // Conflit d'id (autre serveur) : réinsère avec un nouvel id
-        try { insertNoId.run(values); restored++; } catch { /* ligne ignorée */ }
+        try {
+          insertNoId.run(values);
+          restored++;
+        } catch {
+          /* ligne ignorée */
+        }
       }
     }
   }
@@ -101,16 +162,20 @@ function restoreDatabase(guildId, database) {
 function serialize(guildId) {
   const settings = getSettings(guildId);
   const { getActivityText } = require('./botStatus');
-  return JSON.stringify({
-    bot: 'bot-serveur-discord',
-    version: 2,
-    guildId,
-    createdAt: Date.now(),
-    settings,
-    files: collectImageFiles(settings),
-    database: collectDatabase(guildId),
-    botActivity: getActivityText(),
-  }, null, 2);
+  return JSON.stringify(
+    {
+      bot: 'bot-serveur-discord',
+      version: 2,
+      guildId,
+      createdAt: Date.now(),
+      settings,
+      files: collectImageFiles(settings),
+      database: collectDatabase(guildId),
+      botActivity: getActivityText(),
+    },
+    null,
+    2,
+  );
 }
 
 function createBackup(guildId, kind = 'manuel') {
@@ -139,40 +204,62 @@ function backupPanel(guild, userId) {
   const embed = new EmbedBuilder()
     .setColor(settings.color)
     .setTitle('💾 Backups du bot')
-    .setDescription([
-      'Sauvegarde/restauration **complète et à l\'identique** : toute la configuration (modules, logs, tickets et leurs types, automod, antiraid, commandes custom…), les **images**, et les **données** (casier des sanctions, numérotation des tickets, compteurs d\'invitations, giveaways, statut du bot).',
-      '',
-      `**Backups en base (${rows.length}/15${isModuleEnabled(guild.id, 'backups') ? ', auto quotidien 🟢' : ', auto quotidien 🔴 — active le module 💾'}) :**`,
-      rows.length
-        ? rows.map((r) => `\`#${r.id}\` — <t:${Math.floor(r.created_at / 1000)}:f> · ${r.kind} · ${(r.size / 1024).toFixed(1)} Ko`).join('\n')
-        : '*Aucun backup pour l\'instant.*',
-      `\n📬 **Export en MP au owner :** ${dmExport === 'off' ? '🔴 désactivé' : dmExport === 'weekly' ? '🟢 hebdomadaire (lundi, après le backup auto)' : '🟢 quotidien (après le backup auto)'}`,
-      staged ? `\n📦 **Import prêt à appliquer** : backup du <t:${Math.floor(staged.createdAt / 1000)}:f>${staged.guildId !== guild.id ? ' ⚠️ *provenant d\'un autre serveur*' : ''} → clique ♻️` : '',
-      '',
-      '✅ *Backup complet : config + images + données — l\'import restaure le bot à l\'identique.*',
-    ].filter(Boolean).join('\n'));
+    .setDescription(
+      [
+        "Sauvegarde/restauration **complète et à l'identique** : toute la configuration (modules, logs, tickets et leurs types, automod, antiraid, commandes custom…), les **images**, et les **données** (casier des sanctions, numérotation des tickets, compteurs d'invitations, giveaways, statut du bot).",
+        '',
+        `**Backups en base (${rows.length}/15${isModuleEnabled(guild.id, 'backups') ? ', auto quotidien 🟢' : ', auto quotidien 🔴 — active le module 💾'}) :**`,
+        rows.length
+          ? rows
+              .map(
+                (r) =>
+                  `\`#${r.id}\` — <t:${Math.floor(r.created_at / 1000)}:f> · ${r.kind} · ${(r.size / 1024).toFixed(1)} Ko`,
+              )
+              .join('\n')
+          : "*Aucun backup pour l'instant.*",
+        `\n📬 **Export en MP au owner :** ${dmExport === 'off' ? '🔴 désactivé' : dmExport === 'weekly' ? '🟢 hebdomadaire (lundi, après le backup auto)' : '🟢 quotidien (après le backup auto)'}`,
+        staged
+          ? `\n📦 **Import prêt à appliquer** : backup du <t:${Math.floor(staged.createdAt / 1000)}:f>${staged.guildId !== guild.id ? " ⚠️ *provenant d'un autre serveur*" : ''} → clique ♻️`
+          : '',
+        '',
+        "✅ *Backup complet : config + images + données — l'import restaure le bot à l'identique.*",
+      ]
+        .filter(Boolean)
+        .join('\n'),
+    );
 
   const buttons = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('bk:create').setLabel('💾 Créer un backup').setStyle(ButtonStyle.Success),
     new ButtonBuilder().setCustomId('bk:import').setLabel('📤 Importer un fichier').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId('bk:applyimport').setLabel('♻️ Appliquer l\'import').setStyle(ButtonStyle.Danger)
+    new ButtonBuilder()
+      .setCustomId('bk:applyimport')
+      .setLabel("♻️ Appliquer l'import")
+      .setStyle(ButtonStyle.Danger)
       .setDisabled(!staged),
-    new ButtonBuilder().setCustomId('bk:dmexport').setLabel(`📬 MP : ${DM_EXPORT_LABELS[dmExport]}`)
+    new ButtonBuilder()
+      .setCustomId('bk:dmexport')
+      .setLabel(`📬 MP : ${DM_EXPORT_LABELS[dmExport]}`)
       .setStyle(dmExport === 'off' ? ButtonStyle.Secondary : ButtonStyle.Success),
     new ButtonBuilder().setCustomId('bk:home').setLabel('🔄 Actualiser').setStyle(ButtonStyle.Secondary),
   );
 
   const components = [buttons];
   if (rows.length) {
-    components.unshift(new ActionRowBuilder().addComponents(
-      new StringSelectMenuBuilder()
-        .setCustomId('bk:pick')
-        .setPlaceholder('📂 Ouvrir un backup (télécharger, restaurer, supprimer)…')
-        .addOptions(rows.map((r) => new StringSelectMenuOptionBuilder()
-          .setValue(`${r.id}`)
-          .setLabel(`#${r.id} — ${new Date(r.created_at).toLocaleString('fr-FR')}`)
-          .setDescription(`${r.kind} · ${(r.size / 1024).toFixed(1)} Ko`))),
-    ));
+    components.unshift(
+      new ActionRowBuilder().addComponents(
+        new StringSelectMenuBuilder()
+          .setCustomId('bk:pick')
+          .setPlaceholder('📂 Ouvrir un backup (télécharger, restaurer, supprimer)…')
+          .addOptions(
+            rows.map((r) =>
+              new StringSelectMenuOptionBuilder()
+                .setValue(`${r.id}`)
+                .setLabel(`#${r.id} — ${new Date(r.created_at).toLocaleString('fr-FR')}`)
+                .setDescription(`${r.kind} · ${(r.size / 1024).toFixed(1)} Ko`),
+            ),
+          ),
+      ),
+    );
   }
 
   return { embeds: [embed], components };
@@ -185,13 +272,15 @@ function backupDetail(guild, backupId) {
   const embed = new EmbedBuilder()
     .setColor(getSettings(guild.id).color)
     .setTitle(`💾 Backup #${row.id}`)
-    .setDescription([
-      `**Créé :** <t:${Math.floor(row.created_at / 1000)}:f> (${row.kind})`,
-      `**Taille :** ${(row.data.length / 1024).toFixed(1)} Ko`,
-      '',
-      '📥 **Télécharger** → reçois le fichier .json à garder en local',
-      '♻️ **Restaurer** → remplace la configuration actuelle par celle-ci',
-    ].join('\n'));
+    .setDescription(
+      [
+        `**Créé :** <t:${Math.floor(row.created_at / 1000)}:f> (${row.kind})`,
+        `**Taille :** ${(row.data.length / 1024).toFixed(1)} Ko`,
+        '',
+        '📥 **Télécharger** → reçois le fichier .json à garder en local',
+        '♻️ **Restaurer** → remplace la configuration actuelle par celle-ci',
+      ].join('\n'),
+    );
 
   const buttons = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId(`bk:download:${row.id}`).setLabel('📥 Télécharger').setStyle(ButtonStyle.Primary),
@@ -206,10 +295,12 @@ function confirmView(guild, target, label) {
   const embed = new EmbedBuilder()
     .setColor(0xed4245)
     .setTitle('⚠️ Confirmer la restauration')
-    .setDescription([
-      `Tu vas **remplacer toute la configuration actuelle** du bot par ${label}.`,
-      'Un backup *pré-restauration* de la configuration actuelle sera créé automatiquement avant, au cas où.',
-    ].join('\n'));
+    .setDescription(
+      [
+        `Tu vas **remplacer toute la configuration actuelle** du bot par ${label}.`,
+        'Un backup *pré-restauration* de la configuration actuelle sera créé automatiquement avant, au cas où.',
+      ].join('\n'),
+    );
   const buttons = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId(`bk:confirm:${target}`).setLabel('⚠️ Oui, restaurer').setStyle(ButtonStyle.Danger),
     new ButtonBuilder().setCustomId('bk:home').setLabel('❌ Annuler').setStyle(ButtonStyle.Secondary),
@@ -228,17 +319,25 @@ async function handleBackupComponent(interaction) {
 
   if (action === 'create') {
     const id = createBackup(guild.id, 'manuel');
-    updateSettings(guild.id, (s) => { s.modules.backups = true; }); // active l'auto quotidien
+    updateSettings(guild.id, (s) => {
+      s.modules.backups = true;
+    }); // active l'auto quotidien
     await interaction.update(backupPanel(guild, interaction.user.id));
     const row = getStmt.get(id, guild.id);
-    return interaction.followUp({
-      content: `✅ Backup \`#${id}\` créé et stocké sur le serveur ! Le veux-tu en local ? Le voici :`,
-      files: [backupFile(guild.id, row.data, row.created_at)],
-      flags: MessageFlags.Ephemeral,
-    }).catch(() => interaction.followUp({
-      content: `✅ Backup \`#${id}\` créé et stocké sur le serveur — mais **trop volumineux pour être envoyé sur Discord** (images lourdes). Allège tes images ou récupère \`data/bot.sqlite\` depuis le VPS.`,
-      flags: MessageFlags.Ephemeral,
-    }).catch(() => {}));
+    return interaction
+      .followUp({
+        content: `✅ Backup \`#${id}\` créé et stocké sur le serveur ! Le veux-tu en local ? Le voici :`,
+        files: [backupFile(guild.id, row.data, row.created_at)],
+        flags: MessageFlags.Ephemeral,
+      })
+      .catch(() =>
+        interaction
+          .followUp({
+            content: `✅ Backup \`#${id}\` créé et stocké sur le serveur — mais **trop volumineux pour être envoyé sur Discord** (images lourdes). Allège tes images ou récupère \`data/bot.sqlite\` depuis le VPS.`,
+            flags: MessageFlags.Ephemeral,
+          })
+          .catch(() => {}),
+      );
   }
 
   if (action === 'dmexport') {
@@ -254,7 +353,8 @@ async function handleBackupComponent(interaction) {
   if (action === 'import') {
     pendingImports.set(key, { channelId: interaction.channelId, expires: Date.now() + 120_000 });
     return interaction.reply({
-      content: '📤 **Envoie ton fichier de backup `.json` dans ce salon** (⏱️ 2 minutes). Je le lirai, puis tu cliqueras ♻️ **Appliquer l\'import** sur le panneau (🔄 Actualiser pour le voir apparaître).',
+      content:
+        "📤 **Envoie ton fichier de backup `.json` dans ce salon** (⏱️ 2 minutes). Je le lirai, puis tu cliqueras ♻️ **Appliquer l'import** sur le panneau (🔄 Actualiser pour le voir apparaître).",
       flags: MessageFlags.Ephemeral,
     });
   }
@@ -264,14 +364,20 @@ async function handleBackupComponent(interaction) {
   if (action === 'download') {
     const row = getStmt.get(arg, guild.id);
     if (!row) return interaction.update(backupPanel(guild, interaction.user.id));
-    return interaction.reply({
-      content: `📥 Backup \`#${row.id}\` — garde ce fichier en lieu sûr :`,
-      files: [backupFile(guild.id, row.data, row.created_at)],
-      flags: MessageFlags.Ephemeral,
-    }).catch(() => interaction.reply({
-      content: `❌ Backup \`#${row.id}\` **trop volumineux pour Discord** (images lourdes). Récupère \`data/bot.sqlite\` depuis le VPS, ou allège tes images et recrée un backup.`,
-      flags: MessageFlags.Ephemeral,
-    }).catch(() => {}));
+    return interaction
+      .reply({
+        content: `📥 Backup \`#${row.id}\` — garde ce fichier en lieu sûr :`,
+        files: [backupFile(guild.id, row.data, row.created_at)],
+        flags: MessageFlags.Ephemeral,
+      })
+      .catch(() =>
+        interaction
+          .reply({
+            content: `❌ Backup \`#${row.id}\` **trop volumineux pour Discord** (images lourdes). Récupère \`data/bot.sqlite\` depuis le VPS, ou allège tes images et recrée un backup.`,
+            flags: MessageFlags.Ephemeral,
+          })
+          .catch(() => {}),
+      );
   }
 
   if (action === 'restore') return interaction.update(confirmView(guild, arg, `le backup \`#${arg}\``));
@@ -279,7 +385,13 @@ async function handleBackupComponent(interaction) {
   if (action === 'applyimport') {
     const staged = pendingImports.get(key)?.staged;
     if (!staged) return interaction.update(backupPanel(guild, interaction.user.id));
-    return interaction.update(confirmView(guild, 'staged', `le fichier importé (backup du ${new Date(staged.createdAt).toLocaleString('fr-FR')})`));
+    return interaction.update(
+      confirmView(
+        guild,
+        'staged',
+        `le fichier importé (backup du ${new Date(staged.createdAt).toLocaleString('fr-FR')})`,
+      ),
+    );
   }
 
   if (action === 'confirm') {
@@ -304,7 +416,7 @@ async function handleBackupComponent(interaction) {
     await interaction.update(backupPanel(guild, interaction.user.id));
     return interaction.followUp({
       content: [
-        '♻️ **Bot restauré à l\'identique !**',
+        "♻️ **Bot restauré à l'identique !**",
         `• Configuration complète appliquée${images ? ` • ${images} image(s)` : ''}${rows ? ` • ${rows} donnée(s) : sanctions, tickets, invitations, giveaways` : ''}`,
         'Vérifie dans `/setup` (un backup pré-restauration a été créé au cas où).',
       ].join('\n'),
@@ -347,17 +459,26 @@ async function handlePendingBackupFile(message) {
   const response = await fetch(attachment.url).catch(() => null);
   const text = response?.ok ? await response.text() : null;
   let parsed = null;
-  try { parsed = JSON.parse(text); } catch { /* invalide */ }
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    /* invalide */
+  }
 
   await message.delete().catch(() => {});
-  if (!parsed || parsed.bot !== 'bot-serveur-discord' || ![1, 2].includes(parsed.version) || typeof parsed.settings?.modules !== 'object') {
-    await notice('❌ Ce fichier n\'est pas un backup valide de ce bot.');
+  if (
+    !parsed ||
+    parsed.bot !== 'bot-serveur-discord' ||
+    ![1, 2].includes(parsed.version) ||
+    typeof parsed.settings?.modules !== 'object'
+  ) {
+    await notice("❌ Ce fichier n'est pas un backup valide de ce bot.");
     return true;
   }
 
   pending.staged = parsed;
   pending.expires = Date.now() + 10 * 60_000; // 10 min pour appliquer
-  await notice('✅ Backup lu ! Retourne sur ton panneau `/backup` → **🔄 Actualiser** → **♻️ Appliquer l\'import**.');
+  await notice("✅ Backup lu ! Retourne sur ton panneau `/backup` → **🔄 Actualiser** → **♻️ Appliquer l'import**.");
   return true;
 }
 
@@ -373,7 +494,8 @@ async function sendBackupDM(client, guild, data, createdAt) {
     const light = JSON.parse(data);
     delete light.files;
     file = backupFile(guild.id, JSON.stringify(light, null, 2), createdAt);
-    warning = '\n⚠️ Backup trop volumineux pour Discord : envoyé **sans les images** (elles restent sur le VPS uniquement).';
+    warning =
+      '\n⚠️ Backup trop volumineux pour Discord : envoyé **sans les images** (elles restent sur le VPS uniquement).';
   }
   try {
     const owner = await client.users.fetch(ownerId);
@@ -405,7 +527,10 @@ function startBackupWorker(client) {
     const next = new Date(now);
     next.setHours(4, 30, 0, 0);
     if (next <= now) next.setDate(next.getDate() + 1);
-    setTimeout(() => { tick(); scheduleNext(); }, next.getTime() - now.getTime());
+    setTimeout(() => {
+      tick();
+      scheduleNext();
+    }, next.getTime() - now.getTime());
   };
   scheduleNext();
 }

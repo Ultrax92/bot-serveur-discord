@@ -114,10 +114,30 @@ CREATE INDEX IF NOT EXISTS idx_invite_joins_inviter ON invite_joins (guild_id, i
 `);
 
 // Colonnes ajoutées après coup (ALTER silencieux si la colonne existe déjà)
-try { db.exec('ALTER TABLE ticket_reviews ADD COLUMN review_channel_id TEXT'); } catch { /* déjà présente */ }
-try { db.exec('ALTER TABLE ticket_reviews ADD COLUMN transcript TEXT'); } catch { /* déjà présente */ }
-try { db.exec('ALTER TABLE ticket_reviews ADD COLUMN image TEXT'); } catch { /* déjà présente */ }
-try { db.exec('ALTER TABLE tickets ADD COLUMN last_activity_at INTEGER'); } catch { /* déjà présente */ }
-try { db.exec('ALTER TABLE tickets ADD COLUMN warned_at INTEGER'); } catch { /* déjà présente */ }
+try {
+  db.exec('ALTER TABLE ticket_reviews ADD COLUMN review_channel_id TEXT');
+} catch {
+  /* déjà présente */
+}
+try {
+  db.exec('ALTER TABLE ticket_reviews ADD COLUMN transcript TEXT');
+} catch {
+  /* déjà présente */
+}
+try {
+  db.exec('ALTER TABLE ticket_reviews ADD COLUMN image TEXT');
+} catch {
+  /* déjà présente */
+}
+try {
+  db.exec('ALTER TABLE tickets ADD COLUMN last_activity_at INTEGER');
+} catch {
+  /* déjà présente */
+}
+try {
+  db.exec('ALTER TABLE tickets ADD COLUMN warned_at INTEGER');
+} catch {
+  /* déjà présente */
+}
 
 module.exports = db;

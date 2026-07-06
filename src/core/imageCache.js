@@ -3,9 +3,9 @@ const { getSettings, isModuleEnabled } = require('./settings');
 // Cache mémoire des images vues dans les salons : quand un message est supprimé,
 // Discord efface aussi ses pièces jointes du CDN — pour pouvoir montrer le visuel
 // dans les logs, il faut l'avoir sauvegardé AVANT la suppression.
-const TTL_MS = 60 * 60_000;             // une image reste 1h en cache
-const MAX_IMAGE_BYTES = 8 * 1024 * 1024;   // au-delà de 8 Mo, on ne cache pas
-const MAX_TOTAL_BYTES = 50 * 1024 * 1024;  // budget mémoire global
+const TTL_MS = 60 * 60_000; // une image reste 1h en cache
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024; // au-delà de 8 Mo, on ne cache pas
+const MAX_TOTAL_BYTES = 50 * 1024 * 1024; // budget mémoire global
 const MAX_ENTRIES = 300;
 
 const cache = new Map(); // attachmentId → { buffer, name, expires }

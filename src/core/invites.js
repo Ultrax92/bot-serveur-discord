@@ -105,4 +105,13 @@ function leaderboard(guildId) {
   return leaderboardStmt.all(guildId);
 }
 
-module.exports = { initInvites, cacheGuildInvites, onInviteCreate, onInviteDelete, recordJoin, recordLeave, getStats, leaderboard };
+module.exports = {
+  initInvites,
+  cacheGuildInvites,
+  onInviteCreate,
+  onInviteDelete,
+  recordJoin,
+  recordLeave,
+  getStats,
+  leaderboard,
+};

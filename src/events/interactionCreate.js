@@ -21,11 +21,13 @@ function logCommand(interaction, status) {
   const embed = new EmbedBuilder()
     .setColor(style.color)
     .setAuthor(userAuthor(interaction.user))
-    .setDescription([
-      `${style.label} **dans** ${interaction.channel}`,
-      idLine(interaction.user),
-      `\`${interaction.toString().slice(0, 1000)}\``,
-    ].join('\n'))
+    .setDescription(
+      [
+        `${style.label} **dans** ${interaction.channel}`,
+        idLine(interaction.user),
+        `\`${interaction.toString().slice(0, 1000)}\``,
+      ].join('\n'),
+    )
     .setTimestamp();
   sendLog(interaction.guild, 'command', embed).catch(() => {});
 }
@@ -40,7 +42,9 @@ module.exports = {
         await handleVerifyButton(interaction);
       } catch (error) {
         console.error('Erreur sur le bouton de vérification :', error);
-        await interaction.reply({ content: 'Une erreur est survenue, réessaie.', flags: MessageFlags.Ephemeral }).catch(() => {});
+        await interaction
+          .reply({ content: 'Une erreur est survenue, réessaie.', flags: MessageFlags.Ephemeral })
+          .catch(() => {});
       }
       return;
     }
@@ -52,7 +56,9 @@ module.exports = {
         await handleTicketComponent(interaction);
       } catch (error) {
         console.error('Erreur sur le système de tickets :', error);
-        await interaction.reply({ content: 'Une erreur est survenue, réessaie.', flags: MessageFlags.Ephemeral }).catch(() => {});
+        await interaction
+          .reply({ content: 'Une erreur est survenue, réessaie.', flags: MessageFlags.Ephemeral })
+          .catch(() => {});
       }
       return;
     }
@@ -64,7 +70,9 @@ module.exports = {
         await handleReviewComponent(interaction);
       } catch (error) {
         console.error('Erreur sur la notation des tickets :', error);
-        await interaction.reply({ content: 'Une erreur est survenue, réessaie.', flags: MessageFlags.Ephemeral }).catch(() => {});
+        await interaction
+          .reply({ content: 'Une erreur est survenue, réessaie.', flags: MessageFlags.Ephemeral })
+          .catch(() => {});
       }
       return;
     }
@@ -76,7 +84,9 @@ module.exports = {
         await handleGiveawayComponent(interaction);
       } catch (error) {
         console.error('Erreur sur les giveaways :', error);
-        await interaction.reply({ content: 'Une erreur est survenue, réessaie.', flags: MessageFlags.Ephemeral }).catch(() => {});
+        await interaction
+          .reply({ content: 'Une erreur est survenue, réessaie.', flags: MessageFlags.Ephemeral })
+          .catch(() => {});
       }
       return;
     }
@@ -89,7 +99,9 @@ module.exports = {
         await handleBackupComponent(interaction);
       } catch (error) {
         console.error('Erreur sur les backups :', error);
-        await interaction.reply({ content: 'Une erreur est survenue, réessaie.', flags: MessageFlags.Ephemeral }).catch(() => {});
+        await interaction
+          .reply({ content: 'Une erreur est survenue, réessaie.', flags: MessageFlags.Ephemeral })
+          .catch(() => {});
       }
       return;
     }
@@ -101,8 +113,10 @@ module.exports = {
         const { handleEmbedComponent } = require('../core/embedBuilder');
         await handleEmbedComponent(interaction);
       } catch (error) {
-        console.error('Erreur sur le générateur d\'embeds :', error);
-        await interaction.reply({ content: 'Une erreur est survenue, réessaie.', flags: MessageFlags.Ephemeral }).catch(() => {});
+        console.error("Erreur sur le générateur d'embeds :", error);
+        await interaction
+          .reply({ content: 'Une erreur est survenue, réessaie.', flags: MessageFlags.Ephemeral })
+          .catch(() => {});
       }
       return;
     }
@@ -114,30 +128,42 @@ module.exports = {
         await handleTempvocComponent(interaction);
       } catch (error) {
         console.error('Erreur sur les vocaux temporaires :', error);
-        await interaction.reply({ content: 'Une erreur est survenue, réessaie.', flags: MessageFlags.Ephemeral }).catch(() => {});
+        await interaction
+          .reply({ content: 'Une erreur est survenue, réessaie.', flags: MessageFlags.Ephemeral })
+          .catch(() => {});
       }
       return;
     }
 
     // Interactions du panneau /setup (boutons, menus et formulaires)
-    if ((interaction.isButton() || interaction.isAnySelectMenu() || interaction.isModalSubmit())
-      && interaction.customId.startsWith('setup:')) {
+    if (
+      (interaction.isButton() || interaction.isAnySelectMenu() || interaction.isModalSubmit()) &&
+      interaction.customId.startsWith('setup:')
+    ) {
       if (!interaction.inGuild()) return;
       if (!canManageAdmins(interaction)) {
-        return interaction.reply({ content: 'Seul le propriétaire peut utiliser ce panneau.', flags: MessageFlags.Ephemeral });
+        return interaction.reply({
+          content: 'Seul le propriétaire peut utiliser ce panneau.',
+          flags: MessageFlags.Ephemeral,
+        });
       }
       try {
         await handleSetupComponent(interaction);
       } catch (error) {
         console.error('Erreur sur le panneau setup :', error);
-        await interaction.followUp({ content: 'Une erreur est survenue.', flags: MessageFlags.Ephemeral }).catch(() => {});
+        await interaction
+          .followUp({ content: 'Une erreur est survenue.', flags: MessageFlags.Ephemeral })
+          .catch(() => {});
       }
       return;
     }
 
     if (!interaction.isChatInputCommand()) return;
     if (!interaction.inGuild()) {
-      return interaction.reply({ content: 'Les commandes ne sont utilisables que sur un serveur.', flags: MessageFlags.Ephemeral });
+      return interaction.reply({
+        content: 'Les commandes ne sont utilisables que sur un serveur.',
+        flags: MessageFlags.Ephemeral,
+      });
     }
 
     const command = interaction.client.commands.get(interaction.commandName);
@@ -148,7 +174,7 @@ module.exports = {
     if (!command.public && !isBotAdmin(interaction)) {
       logCommand(interaction, 'denied');
       return interaction.reply({
-        content: 'Tu n\'as pas accès aux commandes de ce bot. Seuls les admins du bot peuvent les utiliser.',
+        content: "Tu n'as pas accès aux commandes de ce bot. Seuls les admins du bot peuvent les utiliser.",
         flags: MessageFlags.Ephemeral,
       });
     }
@@ -168,7 +194,10 @@ module.exports = {
     } catch (error) {
       console.error(`Erreur sur /${interaction.commandName} :`, error);
       logCommand(interaction, 'error');
-      const payload = { content: 'Une erreur est survenue pendant l\'exécution de la commande.', flags: MessageFlags.Ephemeral };
+      const payload = {
+        content: "Une erreur est survenue pendant l'exécution de la commande.",
+        flags: MessageFlags.Ephemeral,
+      };
       if (interaction.replied || interaction.deferred) await interaction.followUp(payload).catch(() => {});
       else await interaction.reply(payload).catch(() => {});
     }

@@ -12,7 +12,11 @@ module.exports = {
     .setName('mute')
     .setDescription('Mute un membre (timeout Discord)')
     .addUserOption((opt) => opt.setName('membre').setDescription('Le membre à mute').setRequired(true))
-    .addStringOption((opt) => opt.setName('durée').setDescription('Ex: 30m, 1h, 2j — max 28j (limite Discord). Vide = durée par défaut du /setup'))
+    .addStringOption((opt) =>
+      opt
+        .setName('durée')
+        .setDescription('Ex: 30m, 1h, 2j — max 28j (limite Discord). Vide = durée par défaut du /setup'),
+    )
     .addStringOption((opt) => opt.setName('raison').setDescription('La raison du mute')),
 
   async execute(interaction) {
@@ -21,7 +25,10 @@ module.exports = {
     const reason = interaction.options.getString('raison') ?? 'Aucune raison précisée';
 
     if (!member) {
-      return interaction.reply({ embeds: [errorEmbed(interaction, 'Membre introuvable sur ce serveur.')], flags: MessageFlags.Ephemeral });
+      return interaction.reply({
+        embeds: [errorEmbed(interaction, 'Membre introuvable sur ce serveur.')],
+        flags: MessageFlags.Ephemeral,
+      });
     }
     const hierarchyError = checkHierarchy(interaction, member);
     if (hierarchyError) {
@@ -33,14 +40,19 @@ module.exports = {
     if (durationInput) {
       duration = parseDuration(durationInput);
       if (!duration) {
-        return interaction.reply({ embeds: [errorEmbed(interaction, 'Durée invalide. Exemples : `30m`, `1h`, `2j`, `1j12h`.')], flags: MessageFlags.Ephemeral });
+        return interaction.reply({
+          embeds: [errorEmbed(interaction, 'Durée invalide. Exemples : `30m`, `1h`, `2j`, `1j12h`.')],
+          flags: MessageFlags.Ephemeral,
+        });
       }
       if (duration > MAX_TIMEOUT_MS) duration = MAX_TIMEOUT_MS;
     }
 
     await member.timeout(duration, `${reason} (par ${interaction.user.tag})`);
     if (getSettings(interaction.guildId).moderationConfig.dmOnSanction) {
-      await member.send(`🔇 Tu as été mute sur **${interaction.guild.name}** pour **${formatDuration(duration)}** : ${reason}`).catch(() => {});
+      await member
+        .send(`🔇 Tu as été mute sur **${interaction.guild.name}** pour **${formatDuration(duration)}** : ${reason}`)
+        .catch(() => {});
     }
     addSanction({
       guildId: interaction.guildId,
@@ -51,9 +63,20 @@ module.exports = {
       expiresAt: Date.now() + duration,
     });
 
-    await logModAction(interaction, { emoji: '🔇', action: 'Mute', target: member.user, reason, duration: formatDuration(duration) });
+    await logModAction(interaction, {
+      emoji: '🔇',
+      action: 'Mute',
+      target: member.user,
+      reason,
+      duration: formatDuration(duration),
+    });
     return interaction.reply({
-      embeds: [successEmbed(interaction, `🔇 **${member.user.tag}** a été mute pour **${formatDuration(duration)}**.\n**Raison :** ${reason}`)],
+      embeds: [
+        successEmbed(
+          interaction,
+          `🔇 **${member.user.tag}** a été mute pour **${formatDuration(duration)}**.\n**Raison :** ${reason}`,
+        ),
+      ],
     });
   },
 };

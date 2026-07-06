@@ -2,7 +2,9 @@ const { ActivityType } = require('discord.js');
 const db = require('./db');
 
 const getStmt = db.prepare('SELECT value FROM kv WHERE key = ?');
-const setStmt = db.prepare('INSERT INTO kv (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value');
+const setStmt = db.prepare(
+  'INSERT INTO kv (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+);
 
 // Statut affiché sous le nom du bot (global, persistant). Vide = aucun statut.
 function getActivityText() {

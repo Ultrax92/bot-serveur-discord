@@ -10,14 +10,17 @@ module.exports = {
     .setName('warn')
     .setDescription('Avertit un membre')
     .addUserOption((opt) => opt.setName('membre').setDescription('Le membre à avertir').setRequired(true))
-    .addStringOption((opt) => opt.setName('raison').setDescription('La raison de l\'avertissement')),
+    .addStringOption((opt) => opt.setName('raison').setDescription("La raison de l'avertissement")),
 
   async execute(interaction) {
     const member = interaction.options.getMember('membre');
     const reason = interaction.options.getString('raison') ?? 'Aucune raison précisée';
 
     if (!member) {
-      return interaction.reply({ embeds: [errorEmbed(interaction, 'Membre introuvable sur ce serveur.')], flags: MessageFlags.Ephemeral });
+      return interaction.reply({
+        embeds: [errorEmbed(interaction, 'Membre introuvable sur ce serveur.')],
+        flags: MessageFlags.Ephemeral,
+      });
     }
     // Un warn n'exécute aucune action Discord : pas besoin que le bot soit au-dessus
     const hierarchyError = checkHierarchy(interaction, member, { needsBotAbove: false });
@@ -42,6 +45,13 @@ module.exports = {
     const { checkStrikes } = require('../../core/strikes');
     const strikeNote = await checkStrikes(interaction.guild, member).catch(() => null);
 
-    return interaction.reply({ embeds: [successEmbed(interaction, `**${member.user.tag}** a été averti.\n**Raison :** ${reason}${strikeNote ? `\n${strikeNote}` : ''}`)] });
+    return interaction.reply({
+      embeds: [
+        successEmbed(
+          interaction,
+          `**${member.user.tag}** a été averti.\n**Raison :** ${reason}${strikeNote ? `\n${strikeNote}` : ''}`,
+        ),
+      ],
+    });
   },
 };

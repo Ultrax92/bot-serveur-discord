@@ -30,7 +30,7 @@ const rest = new REST().setToken(process.env.DISCORD_TOKEN);
       console.log('✅ Commandes enregistrées globalement.');
     }
   } catch (error) {
-    console.error('Erreur lors de l\'enregistrement :', error);
+    console.error("Erreur lors de l'enregistrement :", error);
     process.exitCode = 1;
   }
 })();

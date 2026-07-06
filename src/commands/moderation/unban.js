@@ -7,7 +7,9 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName('unban')
     .setDescription('Débannit un utilisateur')
-    .addStringOption((opt) => opt.setName('utilisateur').setDescription('L\'ID de l\'utilisateur à débannir').setRequired(true)),
+    .addStringOption((opt) =>
+      opt.setName('utilisateur').setDescription("L'ID de l'utilisateur à débannir").setRequired(true),
+    ),
 
   async execute(interaction) {
     const userId = interaction.options.getString('utilisateur').trim();
@@ -16,7 +18,10 @@ module.exports = {
       await logModAction(interaction, { emoji: '🔓', action: 'Unban', target: user ?? userId });
       return interaction.reply({ embeds: [successEmbed(interaction, `**${user?.tag ?? userId}** a été débanni.`)] });
     } catch {
-      return interaction.reply({ embeds: [errorEmbed(interaction, 'Utilisateur introuvable dans la liste des bannis (vérifie l\'ID).')], flags: MessageFlags.Ephemeral });
+      return interaction.reply({
+        embeds: [errorEmbed(interaction, "Utilisateur introuvable dans la liste des bannis (vérifie l'ID).")],
+        flags: MessageFlags.Ephemeral,
+      });
     }
   },
 };

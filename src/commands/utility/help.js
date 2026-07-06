@@ -4,9 +4,7 @@ const { baseEmbed } = require('../../core/utils');
 
 module.exports = {
   module: 'core',
-  data: new SlashCommandBuilder()
-    .setName('help')
-    .setDescription('Affiche la liste des commandes disponibles'),
+  data: new SlashCommandBuilder().setName('help').setDescription('Affiche la liste des commandes disponibles'),
 
   async execute(interaction) {
     const settings = getSettings(interaction.guildId);
@@ -22,7 +20,9 @@ module.exports = {
 
     const embed = baseEmbed(interaction)
       .setTitle('📖 Aide')
-      .setDescription('Voici les commandes disponibles, regroupées par module.\nToute la configuration se fait via le panneau interactif `/setup`.');
+      .setDescription(
+        'Voici les commandes disponibles, regroupées par module.\nToute la configuration se fait via le panneau interactif `/setup`.',
+      );
 
     const coreFirst = ['core', ...Object.keys(MODULES)];
     for (const key of coreFirst) {
