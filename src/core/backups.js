@@ -426,6 +426,15 @@ async function applyRestore(interaction, payload, mode) {
     require('./botStatus').setActivityText(interaction.client, payload.botActivity);
   }
 
+  // 4. Les membres déjà présents récupèrent leurs rôles mémorisés (ceux qui
+  // rejoindront plus tard les recevront à leur arrivée)
+  let reassigned = null;
+  if (mode !== 'config' && payload.server) {
+    await progress('🎭 Réattribution des rôles aux membres présents…');
+    const { reassignRolesForPresentMembers } = require('./serverBackup');
+    reassigned = await reassignRolesForPresentMembers(guild);
+  }
+
   const summary = [
     mode === 'rebuild'
       ? "🏗️ **Serveur reconstruit à l'identique !**"
@@ -436,6 +445,9 @@ async function applyRestore(interaction, payload, mode) {
       ? `• Structure : ${structure.createdRoles} rôle(s) et ${structure.createdChannels} salon(s) ${mode === 'rebuild' ? 'recréés' : 'recréés/réparés'}, permissions réappliquées`
       : null,
     `• Configuration complète appliquée${images ? ` • ${images} image(s)` : ''}${rows ? ` • ${rows} donnée(s) : sanctions, tickets, invitations, giveaways, rôles des membres` : ''}`,
+    reassigned?.members
+      ? `• 🎭 ${reassigned.roles} rôle(s) remis à ${reassigned.members} membre(s) présent(s)`
+      : null,
     structure ? '• Les membres qui (re)joignent récupèrent automatiquement leurs rôles mémorisés' : null,
     'Vérifie dans `/setup` (un backup pré-restauration a été créé au cas où).',
   ]

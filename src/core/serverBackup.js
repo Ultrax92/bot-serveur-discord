@@ -295,10 +295,11 @@ function remapMemberRoles(guildId, idMap) {
   write();
 }
 
-// ── Retour d'un membre : ses rôles d'avant lui sont remis ─────────────────────
+// ── Réattribution des rôles mémorisés ─────────────────────────────────────────
 
-async function reassignRolesOnJoin(member) {
-  if (member.user.bot || !isModuleEnabled(member.guild.id, 'backups')) return 0;
+// Remet à un membre les rôles qui lui manquent parmi ceux mémorisés au dernier
+// backup. Retourne le nombre de rôles ajoutés.
+async function applySavedRoles(member, reason) {
   const row = getMemberRolesStmt.get(member.guild.id, member.id);
   if (!row) return 0;
   let saved = [];
@@ -310,10 +311,37 @@ async function reassignRolesOnJoin(member) {
   const me = member.guild.members.me;
   const roles = saved
     .map((id) => member.guild.roles.cache.get(id))
-    .filter((role) => role && !role.managed && me.roles.highest.comparePositionTo(role) > 0);
+    .filter(
+      (role) =>
+        role && !role.managed && !member.roles.cache.has(role.id) && me.roles.highest.comparePositionTo(role) > 0,
+    );
   if (!roles.length) return 0;
-  await member.roles.add(roles, 'Retour sur le serveur : rôles restaurés depuis le backup').catch(() => {});
+  await member.roles.add(roles, reason).catch(() => {});
   return roles.length;
+}
+
+// Retour d'un membre : ses rôles d'avant lui sont remis
+async function reassignRolesOnJoin(member) {
+  if (member.user.bot || !isModuleEnabled(member.guild.id, 'backups')) return 0;
+  return applySavedRoles(member, 'Retour sur le serveur : rôles restaurés depuis le backup');
+}
+
+// Après une réparation/reconstruction : les membres DÉJÀ présents récupèrent
+// aussi leurs rôles (aucun événement "join" ne se déclenche pour eux)
+async function reassignRolesForPresentMembers(guild) {
+  const members = await guild.members.fetch().catch(() => null);
+  if (!members) return { members: 0, roles: 0 };
+  let touched = 0;
+  let total = 0;
+  for (const member of members.values()) {
+    if (member.user.bot) continue;
+    const added = await applySavedRoles(member, 'Restauration du backup : rôles remis aux membres présents');
+    if (added) {
+      touched++;
+      total += added;
+    }
+  }
+  return { members: touched, roles: total };
 }
 
 module.exports = {
@@ -324,4 +352,5 @@ module.exports = {
   remapIdsInText,
   remapMemberRoles,
   reassignRolesOnJoin,
+  reassignRolesForPresentMembers,
 };
