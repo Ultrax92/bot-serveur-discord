@@ -72,7 +72,8 @@ CREATE TABLE IF NOT EXISTS scheduled_messages (
   name TEXT NOT NULL,                    -- petit nom affiché dans le panneau /schedule
   title TEXT,                            -- titre de l'embed (optionnel)
   message TEXT NOT NULL,
-  mention TEXT,                          -- @everyone, @here ou id de rôle, envoyé hors embed
+  mention TEXT,                          -- @everyone, @here, ids de rôles (|| = caché), envoyé hors embed
+  buttons TEXT,                          -- boutons-liens JSON [{ label, url }] sous l'embed
   interval_ms INTEGER NOT NULL,
   next_run INTEGER NOT NULL,
   enabled INTEGER NOT NULL DEFAULT 0,
@@ -164,6 +165,11 @@ try {
 }
 try {
   db.exec('ALTER TABLE tickets ADD COLUMN closed_at INTEGER');
+} catch {
+  /* déjà présente */
+}
+try {
+  db.exec('ALTER TABLE scheduled_messages ADD COLUMN buttons TEXT');
 } catch {
   /* déjà présente */
 }

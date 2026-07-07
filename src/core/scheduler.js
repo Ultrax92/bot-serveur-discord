@@ -35,14 +35,43 @@ const deleteStmt = db.prepare('DELETE FROM scheduled_messages WHERE id = ? AND g
 const dueStmt = db.prepare('SELECT * FROM scheduled_messages WHERE enabled = 1 AND next_run <= ?');
 
 // Mentions combinables : '@everyone', '@here' et autant de rôles que voulu
-// (IDs ou mentions <@&…>, séparés par espaces/virgules) → ping hors embed
+// (IDs ou mentions <@&…>, séparés par espaces/virgules) → ping hors embed.
+// Des || dans le champ = mention cachée en spoiler (le ping part quand même).
 function mentionContent(raw) {
   if (!raw) return null;
   const parts = [];
   if (raw.includes('@everyone')) parts.push('@everyone');
   if (raw.includes('@here')) parts.push('@here');
   for (const id of raw.match(/\d{15,20}/g) ?? []) parts.push(`<@&${id}>`);
-  return parts.length ? [...new Set(parts)].join(' ') : null;
+  if (!parts.length) return null;
+  const content = [...new Set(parts)].join(' ');
+  return raw.includes('||') ? `||${content}||` : content;
+}
+
+// 'Texte | https://lien' (un bouton par ligne, 5 max) → [{ label, url }] ou null si invalide
+function parseButtonLines(text) {
+  const buttons = [];
+  const lines = text
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean);
+  if (lines.length > 5) return null;
+  for (const line of lines) {
+    const [label, ...rest] = line.split('|');
+    const url = rest.join('|').trim();
+    if (!label.trim() || !/^https?:\/\/\S+$/.test(url)) return null;
+    buttons.push({ label: label.trim().slice(0, 80), url });
+  }
+  return buttons;
+}
+
+function parseStoredButtons(row) {
+  try {
+    const buttons = JSON.parse(row.buttons ?? '[]');
+    return Array.isArray(buttons) ? buttons.slice(0, 5) : [];
+  } catch {
+    return [];
+  }
 }
 
 // 'JJ/MM/AAAA HH:MM', 'JJ/MM HH:MM' ou 'HH:MM' (passé = demain) → timestamp futur
@@ -77,8 +106,16 @@ async function sendScheduledMessage(client, row) {
     .setTimestamp();
   if (row.title) embed.setTitle(row.title.slice(0, 256));
   const content = mentionContent(row.mention);
+  const buttons = parseStoredButtons(row);
+  const components = buttons.length
+    ? [
+        new ActionRowBuilder().addComponents(
+          buttons.map((b) => new ButtonBuilder().setStyle(ButtonStyle.Link).setLabel(b.label).setURL(b.url)),
+        ),
+      ]
+    : [];
   return channel
-    .send({ ...(content ? { content } : {}), embeds: [embed] })
+    .send({ ...(content ? { content } : {}), embeds: [embed], components })
     .then(() => true)
     .catch(() => false);
 }
@@ -164,6 +201,13 @@ function scheduleEditView(guild, id) {
         `${row.enabled ? '🟢 **Actif**' : '🔴 **En pause**'} — ${channel ? `dans ${channel}` : "⚠️ **choisis un salon** ci-dessous pour l'activer"}`,
         `🔁 **Intervalle :** toutes les ${formatDuration(row.interval_ms)} — ⏭️ **prochain envoi :** <t:${Math.floor(row.next_run / 1000)}:f> (<t:${Math.floor(row.next_run / 1000)}:R>)`,
         `📣 **Mention :** ${mentionContent(row.mention) ?? '*aucune*'}`,
+        `🔗 **Boutons :** ${
+          parseStoredButtons(row).length
+            ? parseStoredButtons(row)
+                .map((b) => `[${b.label}]`)
+                .join(' ')
+            : '*aucun*'
+        }`,
         '',
         `**Aperçu :**${row.title ? `\n> **${row.title}**` : ''}`,
         `> ${row.message.slice(0, 800).replace(/\n/g, '\n> ')}`,
@@ -200,6 +244,7 @@ function scheduleEditView(guild, id) {
       .setCustomId(`sch:chanid:${row.id}`)
       .setLabel('🆔 Salon par ID ou lien')
       .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId(`sch:buttons:${row.id}`).setLabel('🔗 Boutons-liens').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId(`sch:del:${row.id}`).setLabel('🗑️ Supprimer').setStyle(ButtonStyle.Danger),
   );
 
@@ -360,6 +405,46 @@ async function handleScheduleComponent(interaction) {
     updateSettings(guild.id, (s) => {
       s.modules.scheduler = true;
     });
+    return interaction.update(scheduleEditView(guild, arg));
+  }
+
+  if (action === 'buttons') {
+    const row = getStmt.get(arg, guild.id);
+    if (!row) return interaction.update(schedulePanel(guild));
+    const modal = new ModalBuilder()
+      .setCustomId(`sch:mbuttons:${arg}`)
+      .setTitle("Boutons-liens sous l'embed")
+      .addComponents(
+        new ActionRowBuilder().addComponents(
+          new TextInputBuilder()
+            .setCustomId('lines')
+            .setLabel('Un par ligne : Texte | https://lien (5 max)')
+            .setValue(
+              parseStoredButtons(row)
+                .map((b) => `${b.label} | ${b.url}`)
+                .join('\n'),
+            )
+            .setPlaceholder('🛒 Boutique | https://exemple.com\n⭐ Avis | https://discord.gg/…')
+            .setStyle(TextInputStyle.Paragraph)
+            .setRequired(false)
+            .setMaxLength(1000),
+        ),
+      );
+    return interaction.showModal(modal);
+  }
+
+  if (action === 'mbuttons') {
+    const buttons = parseButtonLines(interaction.fields.getTextInputValue('lines'));
+    if (!buttons) {
+      return interaction.reply({
+        content: '❌ Format invalide : une ligne par bouton, `Texte | https://lien`, 5 boutons maximum.',
+        flags: MessageFlags.Ephemeral,
+      });
+    }
+    db.prepare('UPDATE scheduled_messages SET buttons = ? WHERE id = ?').run(
+      buttons.length ? JSON.stringify(buttons) : null,
+      arg,
+    );
     return interaction.update(scheduleEditView(guild, arg));
   }
 

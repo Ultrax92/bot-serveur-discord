@@ -104,6 +104,7 @@ const TABLE_COLUMNS = {
     'title',
     'message',
     'mention',
+    'buttons',
     'interval_ms',
     'next_run',
     'enabled',
