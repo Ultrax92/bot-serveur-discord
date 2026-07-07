@@ -488,8 +488,10 @@ async function handleScheduleComponent(interaction) {
   if (action === 'send') {
     const row = getStmt.get(arg, guild.id);
     if (!row) return interaction.update(schedulePanel(guild));
+    // Acquittée AVANT l'envoi : un salon rate-limité peut dépasser la fenêtre de 3 s
+    await interaction.deferUpdate();
     const ok = await sendScheduledMessage(interaction.client, row);
-    await interaction.update(scheduleEditView(guild, arg));
+    await interaction.editReply(scheduleEditView(guild, arg));
     return interaction.followUp({
       content: ok
         ? `📤 Message envoyé dans <#${row.channel_id}> (test — le planning n'est pas modifié).`
