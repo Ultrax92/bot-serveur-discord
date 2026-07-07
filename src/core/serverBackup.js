@@ -40,6 +40,14 @@ async function fetchAllMembers(guild) {
   }
 }
 
+// Photo tenue à jour en continu : appelé à chaque arrivée et changement de
+// rôles, en plus de la photo complète prise à chaque backup
+function trackMemberRoles(member) {
+  if (member.user.bot || !isModuleEnabled(member.guild.id, 'backups')) return;
+  const roles = member.roles.cache.filter((r) => r.id !== member.guild.id && !r.managed).map((r) => r.id);
+  upsertMemberRolesStmt.run(member.guild.id, member.id, JSON.stringify(roles), Date.now());
+}
+
 // Photographie les rôles de chaque membre (pour les lui remettre s'il revient)
 async function snapshotMemberRoles(guild) {
   const members = await fetchAllMembers(guild);
@@ -381,6 +389,7 @@ async function reassignRolesForPresentMembers(guild) {
 
 module.exports = {
   fetchAllMembers,
+  trackMemberRoles,
   snapshotMemberRoles,
   captureServer,
   repairServer,

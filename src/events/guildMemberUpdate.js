@@ -27,6 +27,13 @@ module.exports = {
     const added = newMember.roles.cache.filter((r) => !oldMember.roles.cache.has(r.id));
     const removed = oldMember.roles.cache.filter((r) => !newMember.roles.cache.has(r.id));
     if (added.size || removed.size) {
+      // Photo des rôles tenue à jour en continu (restauration au retour du membre)
+      const { trackMemberRoles } = require('../core/serverBackup');
+      try {
+        trackMemberRoles(newMember);
+      } catch (error) {
+        console.error('Erreur photo des rôles (memberUpdate) :', error);
+      }
       const lines = ['🎭 **Rôles modifiés**', idLine(newMember)];
       if (added.size)
         lines.push(

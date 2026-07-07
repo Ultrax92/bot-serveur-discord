@@ -14,6 +14,13 @@ module.exports = {
       console.error('Erreur restauration des rôles (memberAdd) :', error);
       return 0;
     });
+    // Nouveau membre : entre immédiatement dans la photo (les changements de
+    // rôles la tiendront à jour ensuite)
+    try {
+      require('../core/serverBackup').trackMemberRoles(member);
+    } catch (error) {
+      console.error('Erreur photo des rôles (memberAdd) :', error);
+    }
 
     const inviteInfo = await recordJoin(member).catch((error) => {
       console.error('Erreur invite tracker :', error);

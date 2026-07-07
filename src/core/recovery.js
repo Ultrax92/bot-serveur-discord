@@ -112,7 +112,7 @@ function campaignModal(target) {
       new ActionRowBuilder().addComponents(
         new TextInputBuilder()
           .setCustomId('invite')
-          .setLabel("Lien d'invitation (vide = généré automatiquement)")
+          .setLabel("Lien d'invitation (vide = généré auto)")
           .setPlaceholder('https://discord.gg/…')
           .setStyle(TextInputStyle.Short)
           .setRequired(false)
