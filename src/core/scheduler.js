@@ -34,13 +34,15 @@ const setNextRunStmt = db.prepare('UPDATE scheduled_messages SET next_run = ? WH
 const deleteStmt = db.prepare('DELETE FROM scheduled_messages WHERE id = ? AND guild_id = ?');
 const dueStmt = db.prepare('SELECT * FROM scheduled_messages WHERE enabled = 1 AND next_run <= ?');
 
-// '@everyone', '@here' ou un rôle (id/mention) → contenu de ping hors embed
+// Mentions combinables : '@everyone', '@here' et autant de rôles que voulu
+// (IDs ou mentions <@&…>, séparés par espaces/virgules) → ping hors embed
 function mentionContent(raw) {
   if (!raw) return null;
-  const trimmed = raw.trim();
-  if (trimmed === '@everyone' || trimmed === '@here') return trimmed;
-  const id = trimmed.match(/\d{15,20}/)?.[0];
-  return id ? `<@&${id}>` : null;
+  const parts = [];
+  if (raw.includes('@everyone')) parts.push('@everyone');
+  if (raw.includes('@here')) parts.push('@here');
+  for (const id of raw.match(/\d{15,20}/g) ?? []) parts.push(`<@&${id}>`);
+  return parts.length ? [...new Set(parts)].join(' ') : null;
 }
 
 // 'JJ/MM/AAAA HH:MM', 'JJ/MM HH:MM' ou 'HH:MM' (passé = demain) → timestamp futur
@@ -252,7 +254,7 @@ function contentModal(row) {
       new ActionRowBuilder().addComponents(
         new TextInputBuilder()
           .setCustomId('mention')
-          .setLabel('Mention (@everyone, @here ou ID de rôle)')
+          .setLabel('Mentions (@everyone, @here, IDs de rôles)')
           .setValue(row?.mention ?? '')
           .setStyle(TextInputStyle.Short)
           .setRequired(false)
