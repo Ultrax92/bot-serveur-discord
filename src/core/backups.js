@@ -96,6 +96,19 @@ const TABLE_COLUMNS = {
   ],
   tempvoc_channels: ['channel_id', 'guild_id', 'owner_id'],
   member_roles: ['guild_id', 'user_id', 'roles', 'updated_at'],
+  scheduled_messages: [
+    'id',
+    'guild_id',
+    'channel_id',
+    'name',
+    'title',
+    'message',
+    'mention',
+    'interval_ms',
+    'next_run',
+    'enabled',
+    'created_at',
+  ],
   ticket_reviews: [
     'id',
     'guild_id',
@@ -418,7 +431,7 @@ async function applyRestore(interaction, payload, mode) {
   }
 
   // 2. Config du bot, remappée vers les nouveaux ids de rôles/salons si besoin
-  const { remapIdsInText, remapMemberRoles } = require('./serverBackup');
+  const { remapIdsInText, remapStoredIds } = require('./serverBackup');
   let settings = payload.settings;
   if (idMap) settings = JSON.parse(remapIdsInText(JSON.stringify(settings), idMap));
   saveSettings(guild.id, settings);
@@ -426,7 +439,7 @@ async function applyRestore(interaction, payload, mode) {
   // 3. Images, données vivantes, rôles mémorisés des membres, statut
   const images = restoreImageFiles(payload.files);
   const rows = restoreDatabase(guild.id, payload.database);
-  if (idMap) remapMemberRoles(guild.id, idMap);
+  if (idMap) remapStoredIds(guild.id, idMap);
   if (typeof payload.botActivity === 'string') {
     require('./botStatus').setActivityText(interaction.client, payload.botActivity);
   }

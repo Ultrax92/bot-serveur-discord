@@ -32,7 +32,7 @@ const byChannelStmt = db.prepare('SELECT * FROM tickets WHERE channel_id = ?');
 const openByUserStmt = db.prepare("SELECT * FROM tickets WHERE guild_id = ? AND user_id = ? AND status = 'open'");
 const openByGuildStmt = db.prepare("SELECT * FROM tickets WHERE guild_id = ? AND status = 'open'");
 const claimStmt = db.prepare('UPDATE tickets SET claimed_by = ? WHERE channel_id = ?');
-const closeStmt = db.prepare("UPDATE tickets SET status = 'closed' WHERE channel_id = ?");
+const closeStmt = db.prepare("UPDATE tickets SET status = 'closed', closed_at = ? WHERE channel_id = ?");
 const setActivityStmt = db.prepare('UPDATE tickets SET last_activity_at = ?, warned_at = NULL WHERE channel_id = ?');
 const setWarnedStmt = db.prepare('UPDATE tickets SET warned_at = ? WHERE channel_id = ?');
 
@@ -235,7 +235,7 @@ async function buildTranscript(channel) {
 // Fermeture générique : transcript, log, MP, suppression du salon.
 // reason distingue les fermetures automatiques : 'leave' (membre parti) | 'inactivity'
 async function closeTicketChannel(channel, row, closedBy, reason = 'leave') {
-  closeStmt.run(channel.id);
+  closeStmt.run(Date.now(), channel.id);
   const guild = channel.guild;
   const tc = getSettings(guild.id).ticketsConfig;
   const type = tc.types.find((t) => t.id === row.type_id);
@@ -311,7 +311,7 @@ async function closeTicketsForMember(member) {
   for (const row of openByUserStmt.all(member.guild.id, member.id)) {
     const channel = member.guild.channels.cache.get(row.channel_id);
     if (channel) await closeTicketChannel(channel, row, null).catch(() => {});
-    else closeStmt.run(row.channel_id);
+    else closeStmt.run(Date.now(), row.channel_id);
   }
 }
 
@@ -354,7 +354,7 @@ function startTicketInactivityWorker(client) {
         }
         const channel = guild.channels.cache.get(row.channel_id);
         if (!channel) {
-          closeStmt.run(row.channel_id); // salon supprimé à la main
+          closeStmt.run(Date.now(), row.channel_id); // salon supprimé à la main
           continue;
         }
         if (row.warned_at) {

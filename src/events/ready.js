@@ -14,6 +14,9 @@ module.exports = {
   execute(client) {
     console.log(`Connecté en tant que ${client.user.tag} (${client.guilds.cache.size} serveur(s))`);
     initErrorReporter(client); // les erreurs des modules remontent dans 🚨 logs-erreurs
+    // Avant notifyIfUpdated : la détection de crash lit le drapeau pendingUpdate avant sa consommation
+    const { initCrashNotify } = require('../core/crashNotify');
+    initCrashNotify(client);
     applyActivity(client);
     // Confirme la mise à jour dans le salon d'origine si on vient d'être redémarré par /update
     notifyIfUpdated(client).catch((error) => console.error('Erreur notification update :', error));
@@ -23,5 +26,6 @@ module.exports = {
     startBackupWorker(client);
     startReviewWorker(client);
     startTicketInactivityWorker(client);
+    require('../core/scheduler').startSchedulerWorker(client);
   },
 };

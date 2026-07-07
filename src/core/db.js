@@ -65,6 +65,21 @@ CREATE TABLE IF NOT EXISTS ticket_reviews (
 );
 CREATE INDEX IF NOT EXISTS idx_ticket_reviews_pending ON ticket_reviews (status, deadline);
 
+CREATE TABLE IF NOT EXISTS scheduled_messages (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  guild_id TEXT NOT NULL,
+  channel_id TEXT,                       -- salon de destination (requis pour activer)
+  name TEXT NOT NULL,                    -- petit nom affiché dans le panneau /schedule
+  title TEXT,                            -- titre de l'embed (optionnel)
+  message TEXT NOT NULL,
+  mention TEXT,                          -- @everyone, @here ou id de rôle, envoyé hors embed
+  interval_ms INTEGER NOT NULL,
+  next_run INTEGER NOT NULL,
+  enabled INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_scheduled_due ON scheduled_messages (enabled, next_run);
+
 CREATE TABLE IF NOT EXISTS member_roles (
   guild_id TEXT NOT NULL,
   user_id TEXT NOT NULL,
@@ -144,6 +159,11 @@ try {
 }
 try {
   db.exec('ALTER TABLE tickets ADD COLUMN warned_at INTEGER');
+} catch {
+  /* déjà présente */
+}
+try {
+  db.exec('ALTER TABLE tickets ADD COLUMN closed_at INTEGER');
 } catch {
   /* déjà présente */
 }

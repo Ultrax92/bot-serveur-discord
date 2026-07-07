@@ -117,7 +117,7 @@ function hubView(guild) {
       `🔊 **Vocaux temporaires** — générateur ${settings.tempvocConfig.generatorChannel ? '🟢' : '🔴'}`,
       `🎉 **Giveaways** — ${require('./giveaways').activeGiveaways(guild.id).length} en cours | rôle requis ${settings.giveawaysConfig.requiredRole ? '🟢' : '🔴 aucun'}`,
       '',
-      'Choisis une section dans le menu · outils : `/embed` `/backup` `/update`',
+      'Choisis une section dans le menu · outils : `/embed` `/backup` `/schedule` `/recovery` `/update`',
     ].join('\n'),
   );
 

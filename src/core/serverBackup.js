@@ -331,10 +331,17 @@ function remapIdsInText(text, idMap) {
   return out;
 }
 
-function remapMemberRoles(guildId, idMap) {
+// Après une reconstruction : les données stockées hors settings (rôles mémorisés
+// des membres, salons des messages programmés) suivent aussi les nouveaux ids
+function remapStoredIds(guildId, idMap) {
   const rows = allMemberRolesStmt.all(guildId);
+  const scheduled = db.prepare('SELECT id, channel_id FROM scheduled_messages WHERE guild_id = ?').all(guildId);
+  const setScheduledChannel = db.prepare('UPDATE scheduled_messages SET channel_id = ? WHERE id = ?');
   const write = db.transaction(() => {
     for (const row of rows) setMemberRolesStmt.run(remapIdsInText(row.roles, idMap), guildId, row.user_id);
+    for (const row of scheduled) {
+      if (row.channel_id && idMap[row.channel_id]) setScheduledChannel.run(idMap[row.channel_id], row.id);
+    }
   });
   write();
 }
@@ -395,7 +402,7 @@ module.exports = {
   repairServer,
   rebuildServer,
   remapIdsInText,
-  remapMemberRoles,
+  remapStoredIds,
   reassignRolesOnJoin,
   reassignRolesForPresentMembers,
 };

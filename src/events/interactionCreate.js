@@ -122,6 +122,24 @@ module.exports = {
       return;
     }
 
+    // Messages programmés (panneau éphémère de /schedule, admins uniquement)
+    if (
+      (interaction.isButton() || interaction.isAnySelectMenu() || interaction.isModalSubmit()) &&
+      interaction.customId.startsWith('sch:')
+    ) {
+      if (!interaction.inGuild() || !isBotAdmin(interaction)) return;
+      try {
+        const { handleScheduleComponent } = require('../core/scheduler');
+        await handleScheduleComponent(interaction);
+      } catch (error) {
+        console.error('Erreur sur les messages programmés :', error);
+        await interaction
+          .reply({ content: 'Une erreur est survenue, réessaie.', flags: MessageFlags.Ephemeral })
+          .catch(() => {});
+      }
+      return;
+    }
+
     // Générateur d'embeds (panneau éphémère de /embed, admins uniquement)
     if ((interaction.isButton() || interaction.isModalSubmit()) && interaction.customId.startsWith('eb:')) {
       if (!interaction.inGuild() || !isBotAdmin(interaction)) return;

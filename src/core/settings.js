@@ -35,6 +35,11 @@ const MODULES = {
     description: 'commandes à préfixe (+regles, !boutique…) créées via /custom',
   },
   utility: { label: 'Utilitaire', emoji: '🧰', description: 'serverinfo, userinfo, /embed…' },
+  scheduler: {
+    label: 'Messages programmés',
+    emoji: '⏰',
+    description: 'annonces récurrentes automatiques (/schedule)',
+  },
   backups: { label: 'Backups', emoji: '💾', description: 'sauvegarde auto des settings + export/import via /backup' },
 };
 
@@ -54,6 +59,7 @@ const DEFAULT_SETTINGS = {
     giveaways: false,
     custom: false,
     utility: true,
+    scheduler: false,
     backups: false,
   },
   // Chaque module range ses options sous sa propre clé (remplies au fur et à mesure).
