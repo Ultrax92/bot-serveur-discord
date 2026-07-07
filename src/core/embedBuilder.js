@@ -12,6 +12,7 @@ const {
   AttachmentBuilder,
 } = require('discord.js');
 const { getSettings } = require('./settings');
+const { mentionContent, parseButtonLines } = require('./scheduler');
 
 const imagesDir = path.join(__dirname, '..', '..', 'data', 'images');
 
@@ -29,6 +30,7 @@ function getSession(guildId, userId) {
       color: null,
       image: null,
       buttons: [],
+      mention: '', // ping au-dessus de l'embed (envois en salon uniquement, || = caché)
       target: {},
       createdAt: Date.now(),
     };
@@ -89,6 +91,7 @@ function builderView(guild, userId) {
       : session.target.channelId
         ? `dans <#${session.target.channelId}>`
         : 'ici (salon courant)';
+  const mentionPreview = mentionContent(session.mention);
 
   const row1 = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('eb:content').setLabel('📝 Contenu').setStyle(ButtonStyle.Primary),
@@ -96,9 +99,8 @@ function builderView(guild, userId) {
     new ButtonBuilder().setCustomId('eb:upload').setLabel('📎 Image upload').setStyle(ButtonStyle.Primary),
     new ButtonBuilder()
       .setCustomId('eb:button')
-      .setLabel(`🔗 Bouton lien (${session.buttons.length}/5)`)
-      .setStyle(ButtonStyle.Primary)
-      .setDisabled(session.buttons.length >= 5),
+      .setLabel(`🔗 Boutons (${session.buttons.length}/5)`)
+      .setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId('eb:import').setLabel('📥 Importer').setStyle(ButtonStyle.Primary),
   );
   const row2 = new ActionRowBuilder().addComponents(
@@ -108,12 +110,13 @@ function builderView(guild, userId) {
       .setStyle(ButtonStyle.Success)
       .setDisabled(!session.title && !session.description && !session.image),
     new ButtonBuilder().setCustomId('eb:target').setLabel('🎯 Destination').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('eb:mention').setLabel('📣 Mention').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId('eb:refresh').setLabel('🔄 Aperçu').setStyle(ButtonStyle.Secondary),
     new ButtonBuilder().setCustomId('eb:reset').setLabel('🧹 Réinitialiser').setStyle(ButtonStyle.Danger),
   );
 
   return {
-    content: `🎯 **Destination :** ${target} — panneau visible par toi seul`,
+    content: `🎯 **Destination :** ${target}${mentionPreview ? ` — 📣 mention : \`${mentionPreview}\`` : ''} — panneau visible par toi seul`,
     embeds: [embed],
     files,
     components: [row1, ...components, row2],
@@ -201,25 +204,37 @@ async function handleEmbedComponent(interaction) {
 
   if (action === 'button') {
     const modal = new ModalBuilder()
-      .setCustomId('eb:modal:button')
-      .setTitle('Ajouter un bouton lien')
+      .setCustomId('eb:modal:buttons')
+      .setTitle("Boutons-liens sous l'embed")
       .addComponents(
         new ActionRowBuilder().addComponents(
           new TextInputBuilder()
-            .setCustomId('label')
-            .setLabel('Texte du bouton')
-            .setPlaceholder('🛒 Boutique')
-            .setStyle(TextInputStyle.Short)
-            .setRequired(true)
-            .setMaxLength(80),
+            .setCustomId('lines')
+            .setLabel('Un par ligne : Texte | https://lien (5 max)')
+            .setValue(session.buttons.map((b) => `${b.label} | ${b.url}`).join('\n'))
+            .setPlaceholder('🛒 Boutique | https://exemple.com\n⭐ Avis | https://discord.gg/…')
+            .setStyle(TextInputStyle.Paragraph)
+            .setRequired(false)
+            .setMaxLength(1000),
         ),
+      );
+    return interaction.showModal(modal);
+  }
+
+  if (action === 'mention') {
+    const modal = new ModalBuilder()
+      .setCustomId('eb:modal:mention')
+      .setTitle("Mention au-dessus de l'embed")
+      .addComponents(
         new ActionRowBuilder().addComponents(
           new TextInputBuilder()
-            .setCustomId('url')
-            .setLabel('Lien (https://…)')
+            .setCustomId('mention')
+            .setLabel('@everyone, @here, IDs de rôles (||=caché)')
+            .setValue(session.mention ?? '')
+            .setPlaceholder('||@everyone|| ou 123456789012345678 — vide = aucune')
             .setStyle(TextInputStyle.Short)
-            .setRequired(true)
-            .setMaxLength(500),
+            .setRequired(false)
+            .setMaxLength(300),
         ),
       );
     return interaction.showModal(modal);
@@ -324,11 +339,13 @@ async function handleEmbedComponent(interaction) {
       });
     }
 
+    // La mention ne s'applique qu'aux envois en salon (aucun ping possible en MP)
+    const mention = mentionContent(session.mention);
     const channel = session.target.channelId ? guild.channels.cache.get(session.target.channelId) : interaction.channel;
     const sent =
       channel &&
       (await channel
-        .send({ embeds: [embed], files, components })
+        .send({ ...(mention ? { content: mention } : {}), embeds: [embed], files, components })
         .then(() => true)
         .catch(() => false));
     resetSession(guild.id, interaction.user.id);
@@ -418,15 +435,20 @@ async function handleEmbedComponent(interaction) {
       return interaction.update(builderView(guild, interaction.user.id));
     }
 
-    if (kind === 'button') {
-      const url = interaction.fields.getTextInputValue('url').trim();
-      if (!/^https?:\/\/\S+$/.test(url)) {
+    if (kind === 'buttons') {
+      const buttons = parseButtonLines(interaction.fields.getTextInputValue('lines'));
+      if (!buttons) {
         return interaction.reply({
-          content: '❌ Lien invalide (il doit commencer par http/https).',
+          content: '❌ Format invalide : une ligne par bouton, `Texte | https://lien`, 5 boutons maximum.',
           flags: MessageFlags.Ephemeral,
         });
       }
-      session.buttons.push({ label: interaction.fields.getTextInputValue('label').trim(), url });
+      session.buttons = buttons;
+      return interaction.update(builderView(guild, interaction.user.id));
+    }
+
+    if (kind === 'mention') {
+      session.mention = interaction.fields.getTextInputValue('mention').trim();
       return interaction.update(builderView(guild, interaction.user.id));
     }
 
