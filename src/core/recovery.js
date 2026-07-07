@@ -11,7 +11,7 @@ const {
 } = require('discord.js');
 const db = require('./db');
 const { getSettings } = require('./settings');
-const { fetchAllMembers } = require('./serverBackup');
+const { fetchAllMembers, snapshotMemberRoles } = require('./serverBackup');
 
 // Rappel des membres par MP : envoie l'invitation du serveur aux membres connus
 // de la photo des backups (table member_roles). Envoi volontairement lent
@@ -21,6 +21,7 @@ const SEND_INTERVAL_MS = 2500;
 
 const knownMembersStmt = db.prepare('SELECT user_id FROM member_roles WHERE guild_id = ?');
 const lastSnapshotStmt = db.prepare('SELECT MAX(updated_at) AS at FROM member_roles WHERE guild_id = ?');
+const clearMembersStmt = db.prepare('DELETE FROM member_roles WHERE guild_id = ?');
 
 // Brouillons de campagne : "guildId:userId" → { target, message, invite, targets, expires }
 const pendingCampaigns = new Map();
@@ -56,7 +57,7 @@ async function recoveryPanel(guild) {
       [
         "Envoie en MP l'invitation de **ce serveur** aux membres connus de la photo des backups. Tu écris le message, tu colles un lien d'invitation (ou je le génère), et j'envoie lentement (1 MP / 2,5 s) pour rester sous les radars anti-spam de Discord.",
         '',
-        `👥 **Membres connus :** ${known.length}${snapshot ? ` (photo du <t:${Math.floor(snapshot / 1000)}:f>)` : ''}`,
+        `👥 **Membres connus :** ${known.length}${snapshot ? ` (photo du <t:${Math.floor(snapshot / 1000)}:f>)` : ''} — *la photo n'oublie jamais les partis (backups et imports s'y accumulent), c'est elle qui permet de les rappeler*`,
         `📤 **Absents de ce serveur :** ${absent.length} — ✅ **déjà présents :** ${known.length - absent.length}`,
         running
           ? `\n⏳ **Campagne en cours** : ${running.sent} envoyé(s), ${running.failed} échec(s) — suivi dans tes MP.`
@@ -82,6 +83,11 @@ async function recoveryPanel(guild) {
       .setLabel(`📨 MP à tous (${known.length})`)
       .setStyle(ButtonStyle.Primary)
       .setDisabled(!known.length || Boolean(running)),
+    new ButtonBuilder()
+      .setCustomId('rc:reset')
+      .setLabel('🧹 Réinitialiser la photo')
+      .setStyle(ButtonStyle.Danger)
+      .setDisabled(Boolean(running)),
     new ButtonBuilder().setCustomId('rc:home').setLabel('🔄 Actualiser').setStyle(ButtonStyle.Secondary),
   );
   return { embeds: [embed], components: [buttons] };
@@ -202,6 +208,30 @@ async function handleRecoveryComponent(interaction) {
   const key = `${guild.id}:${interaction.user.id}`;
 
   if (action === 'home') return interaction.update(await recoveryPanel(guild));
+
+  if (action === 'reset') {
+    const embed = new EmbedBuilder()
+      .setColor(0xed4245)
+      .setTitle('🧹 Réinitialiser la photo des membres')
+      .setDescription(
+        [
+          'La photo repartira des **membres actuellement présents** sur ce serveur.',
+          '⚠️ Les membres partis seront **oubliés** : plus contactables par une campagne, et leurs rôles ne seront plus restaurés à leur retour.',
+        ].join('\n'),
+      );
+    const buttons = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId('rc:reset2').setLabel('🧹 Oui, réinitialiser').setStyle(ButtonStyle.Danger),
+      new ButtonBuilder().setCustomId('rc:home').setLabel('❌ Annuler').setStyle(ButtonStyle.Secondary),
+    );
+    return interaction.update({ embeds: [embed], components: [buttons] });
+  }
+
+  if (action === 'reset2') {
+    await interaction.deferUpdate();
+    clearMembersStmt.run(guild.id);
+    await snapshotMemberRoles(guild).catch(() => {});
+    return interaction.editReply(await recoveryPanel(guild));
+  }
 
   if (action === 'start') return interaction.showModal(campaignModal(arg));
 
