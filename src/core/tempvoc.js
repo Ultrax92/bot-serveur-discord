@@ -136,7 +136,8 @@ function controlPanel(member) {
       [
         `Ce salon t'appartient, ${member} ! Il sera **supprimé dès qu'il sera vide**.`,
         '',
-        '✏️ **Renommer** · 🔒 **Verrouiller/ouvrir** · 👥 **Limite de places**',
+        '✏️ **Renommer** · 🔒 **Verrouiller** · 🙈 **Cacher** · 👥 **Limite de places**',
+        '*Verrouiller/cacher épargne toujours le staff et les membres déjà présents.*',
         '*(Discord limite les renommages à 2 par 10 minutes)*',
       ].join('\n'),
     );
@@ -147,34 +148,56 @@ function controlPanel(member) {
       .setLabel('Verrouiller / Ouvrir')
       .setEmoji('🔒')
       .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder()
+      .setCustomId('tv:hide')
+      .setLabel('Cacher / Afficher')
+      .setEmoji('🙈')
+      .setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId('tv:limit').setLabel('Limite').setEmoji('👥').setStyle(ButtonStyle.Primary),
   );
   return { embeds: [embed], components: [buttons] };
 }
 
-// Un salon temporaire est-il verrouillé ? On regarde les rôles d'accès (Connect
-// deny = verrouillé) s'il y en a, sinon @everyone. Détection fiable même quand
-// @everyone est déjà en deny-all permanent pour la visibilité.
-function tempvocLocked(channel, config) {
+// Restriction d'un salon temporaire sur une permission (Connect pour verrouiller,
+// ViewChannel pour cacher). Vu que @everyone n'a aucun accès de base et que ce
+// sont les rôles « membre » (rôles d'accès) qui donnent l'accès, on agit sur ces
+// rôles — sinon leur allow écraserait un deny sur @everyone.
+const RESTRICTION = {
+  lock: { flag: PermissionFlagsBits.Connect, name: 'Connect', on: 'Salon vocal verrouillé', off: 'Salon vocal ouvert' },
+  hide: {
+    flag: PermissionFlagsBits.ViewChannel,
+    name: 'ViewChannel',
+    on: 'Salon vocal caché',
+    off: 'Salon vocal affiché',
+  },
+};
+
+function restrictionTargets(channel, config) {
   const accessRoles = (config.accessRoles ?? []).filter((id) => channel.guild.roles.cache.has(id));
-  if (accessRoles.length) {
-    return accessRoles.some((id) => channel.permissionOverwrites.cache.get(id)?.deny.has(PermissionFlagsBits.Connect));
-  }
-  return Boolean(
-    channel.permissionOverwrites.cache.get(channel.guild.roles.everyone.id)?.deny.has(PermissionFlagsBits.Connect),
-  );
+  return accessRoles.length ? accessRoles : [channel.guild.roles.everyone.id];
 }
 
-// Verrouille/ouvre un salon temporaire en retirant/rendant Connect aux rôles qui
-// donnent l'accès (rôles d'accès configurés, sinon @everyone). Le propriétaire
-// (overwrite individuel) et le rôle admin gardent toujours leur accès.
-async function setTempvocLock(channel, config, locked) {
-  const guild = channel.guild;
-  const accessRoles = (config.accessRoles ?? []).filter((id) => guild.roles.cache.has(id));
-  const reason = locked ? 'Salon vocal verrouillé' : 'Salon vocal ouvert';
-  const targets = accessRoles.length ? accessRoles : [guild.roles.everyone.id];
-  for (const id of targets) {
-    await channel.permissionOverwrites.edit(id, { Connect: locked ? false : true }, { reason }).catch(() => {});
+// Le salon est-il déjà restreint pour cette action ? (au moins un rôle d'accès en deny)
+function tempvocRestricted(channel, config, kind) {
+  const { flag } = RESTRICTION[kind];
+  return restrictionTargets(channel, config).some((id) => channel.permissionOverwrites.cache.get(id)?.deny.has(flag));
+}
+
+// Applique/retire la restriction. À l'activation, les membres actuellement dans
+// le vocal reçoivent un overwrite individuel pour GARDER l'accès (ils pourront
+// revenir). Propriétaire (overwrite permanent) et rôle admin ne sont jamais touchés.
+async function setTempvocRestriction(channel, config, kind, restrict) {
+  const { name, on, off } = RESTRICTION[kind];
+  const reason = restrict ? on : off;
+
+  if (restrict) {
+    for (const member of channel.members.values()) {
+      if (member.user.bot) continue;
+      await channel.permissionOverwrites.edit(member.id, { [name]: true }, { reason }).catch(() => {});
+    }
+  }
+  for (const id of restrictionTargets(channel, config)) {
+    await channel.permissionOverwrites.edit(id, { [name]: restrict ? false : true }, { reason }).catch(() => {});
   }
 }
 
@@ -366,12 +389,24 @@ async function handleTempvocComponent(interaction) {
 
   if (action === 'lock') {
     const config = getSettings(interaction.guild.id).tempvocConfig;
-    const locked = tempvocLocked(channel, config);
-    await setTempvocLock(channel, config, !locked);
+    const locked = tempvocRestricted(channel, config, 'lock');
+    await setTempvocRestriction(channel, config, 'lock', !locked);
     return interaction.reply({
       content: locked
         ? '🔓 Salon ouvert : tout le monde peut de nouveau entrer.'
-        : "🔒 Salon verrouillé : plus personne ne peut entrer (toi et le staff gardez l'accès).",
+        : '🔒 Salon verrouillé : plus personne ne peut entrer, sauf le staff et les membres déjà présents.',
+      flags: MessageFlags.Ephemeral,
+    });
+  }
+
+  if (action === 'hide') {
+    const config = getSettings(interaction.guild.id).tempvocConfig;
+    const hidden = tempvocRestricted(channel, config, 'hide');
+    await setTempvocRestriction(channel, config, 'hide', !hidden);
+    return interaction.reply({
+      content: hidden
+        ? '👁️ Salon affiché : tout le monde le voit de nouveau.'
+        : '🙈 Salon caché : invisible pour tous, sauf le staff et les membres déjà présents.',
       flags: MessageFlags.Ephemeral,
     });
   }
