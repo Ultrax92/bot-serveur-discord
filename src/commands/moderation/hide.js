@@ -1,5 +1,5 @@
 const { SlashCommandBuilder, ChannelType } = require('discord.js');
-const { successEmbed } = require('../../core/utils');
+const { successEmbed, restrictChannel } = require('../../core/utils');
 
 module.exports = {
   module: 'moderation',
@@ -24,7 +24,11 @@ module.exports = {
     const hide = interaction.options.getString('action') === 'on';
     const channel = interaction.options.getChannel('salon') ?? interaction.channel;
 
-    await channel.permissionOverwrites.edit(interaction.guild.roles.everyone, { ViewChannel: hide ? false : null });
+    // Rôle-conscient : les rôles qui voient le salon sont aussi cachés, sinon leur
+    // allow ViewChannel écraserait le deny de @everyone et le salon resterait visible
+    await restrictChannel(channel, ['ViewChannel'], hide, {
+      reason: `Salon ${hide ? 'caché' : 'affiché'} par ${interaction.user.tag}`,
+    });
 
     return interaction.reply({
       embeds: [

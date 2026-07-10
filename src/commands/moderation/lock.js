@@ -1,5 +1,5 @@
 const { SlashCommandBuilder, ChannelType } = require('discord.js');
-const { successEmbed } = require('../../core/utils');
+const { successEmbed, restrictChannel } = require('../../core/utils');
 
 module.exports = {
   module: 'moderation',
@@ -23,13 +23,13 @@ module.exports = {
   async execute(interaction) {
     const lock = interaction.options.getString('action') === 'on';
     const channel = interaction.options.getChannel('salon') ?? interaction.channel;
-    const everyone = interaction.guild.roles.everyone;
 
-    if (channel.type === ChannelType.GuildVoice) {
-      await channel.permissionOverwrites.edit(everyone, { Connect: lock ? false : null, Speak: lock ? false : null });
-    } else {
-      await channel.permissionOverwrites.edit(everyone, { SendMessages: lock ? false : null });
-    }
+    // Rôle-conscient : les rôles autorisés (ex. « membre ») sont aussi restreints,
+    // sinon leur allow écraserait le deny de @everyone et le verrou n'aurait aucun effet
+    const permNames = channel.type === ChannelType.GuildVoice ? ['Connect', 'Speak'] : ['SendMessages'];
+    await restrictChannel(channel, permNames, lock, {
+      reason: `Salon ${lock ? 'verrouillé' : 'déverrouillé'} par ${interaction.user.tag}`,
+    });
 
     return interaction.reply({
       embeds: [

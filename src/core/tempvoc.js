@@ -152,6 +152,32 @@ function controlPanel(member) {
   return { embeds: [embed], components: [buttons] };
 }
 
+// Un salon temporaire est-il verrouillé ? On regarde les rôles d'accès (Connect
+// deny = verrouillé) s'il y en a, sinon @everyone. Détection fiable même quand
+// @everyone est déjà en deny-all permanent pour la visibilité.
+function tempvocLocked(channel, config) {
+  const accessRoles = (config.accessRoles ?? []).filter((id) => channel.guild.roles.cache.has(id));
+  if (accessRoles.length) {
+    return accessRoles.some((id) => channel.permissionOverwrites.cache.get(id)?.deny.has(PermissionFlagsBits.Connect));
+  }
+  return Boolean(
+    channel.permissionOverwrites.cache.get(channel.guild.roles.everyone.id)?.deny.has(PermissionFlagsBits.Connect),
+  );
+}
+
+// Verrouille/ouvre un salon temporaire en retirant/rendant Connect aux rôles qui
+// donnent l'accès (rôles d'accès configurés, sinon @everyone). Le propriétaire
+// (overwrite individuel) et le rôle admin gardent toujours leur accès.
+async function setTempvocLock(channel, config, locked) {
+  const guild = channel.guild;
+  const accessRoles = (config.accessRoles ?? []).filter((id) => guild.roles.cache.has(id));
+  const reason = locked ? 'Salon vocal verrouillé' : 'Salon vocal ouvert';
+  const targets = accessRoles.length ? accessRoles : [guild.roles.everyone.id];
+  for (const id of targets) {
+    await channel.permissionOverwrites.edit(id, { Connect: locked ? false : true }, { reason }).catch(() => {});
+  }
+}
+
 // Verrouille le salon générateur : chat/parole/stream bloqués pour tous (c'est un
 // salon de passage), et visibilité restreinte aux rôles d'accès s'il y en a
 async function applyGeneratorPermissions(guild) {
@@ -339,14 +365,13 @@ async function handleTempvocComponent(interaction) {
   }
 
   if (action === 'lock') {
-    const everyone = interaction.guild.roles.everyone;
-    const current = channel.permissionOverwrites.cache.get(everyone.id);
-    const locked = current?.deny.has(PermissionFlagsBits.Connect);
-    await channel.permissionOverwrites.edit(everyone, { Connect: locked ? null : false });
+    const config = getSettings(interaction.guild.id).tempvocConfig;
+    const locked = tempvocLocked(channel, config);
+    await setTempvocLock(channel, config, !locked);
     return interaction.reply({
       content: locked
-        ? '🔓 Salon ouvert à tout le monde.'
-        : '🔒 Salon verrouillé : seuls les membres déjà présents peuvent y entrer.',
+        ? '🔓 Salon ouvert : tout le monde peut de nouveau entrer.'
+        : "🔒 Salon verrouillé : plus personne ne peut entrer (toi et le staff gardez l'accès).",
       flags: MessageFlags.Ephemeral,
     });
   }

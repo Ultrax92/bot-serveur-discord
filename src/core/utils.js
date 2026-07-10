@@ -1,4 +1,4 @@
-const { EmbedBuilder } = require('discord.js');
+const { EmbedBuilder, PermissionFlagsBits } = require('discord.js');
 const { getSettings } = require('./settings');
 
 // Parse une durée du type "1j2h30m", "45m", "2h", "7d" → millisecondes (null si invalide)
@@ -84,4 +84,42 @@ function extractId(input) {
   return matches ? matches[matches.length - 1] : null;
 }
 
-module.exports = { parseDuration, formatDuration, baseEmbed, successEmbed, errorEmbed, checkHierarchy, extractId };
+// Verrouille (restrict=true) ou déverrouille/affiche (false) un salon en tenant
+// compte des rôles ayant un allow explicite : sans ça, un rôle « membre »/« client »
+// autorisé écraserait le deny de @everyone et la restriction n'aurait aucun effet
+// (cas typique des salons vocaux temporaires).
+// Au verrouillage : @everyone passe en deny, et les rôles qui AUTORISAIENT la perm
+// sont neutralisés (allow → null) pour hériter de ce deny. On ne force jamais de deny
+// sur un rôle, donc un rôle « Muet » (deny volontaire) n'est jamais touché.
+// Au déverrouillage : rétablir @everyone (null) suffit, les rôles neutralisés
+// héritent de l'ouverture. Les overwrites de MEMBRES ne sont jamais modifiés
+// (le propriétaire d'un salon garde son accès). `exceptRoleIds` : rôles épargnés
+// (ex. le rôle admin des vocaux, pour que le staff entre toujours).
+async function restrictChannel(channel, permNames, restrict, { reason, exceptRoleIds = [] } = {}) {
+  const everyone = channel.guild.roles.everyone;
+  const everyonePatch = Object.fromEntries(permNames.map((name) => [name, restrict ? false : null]));
+  await channel.permissionOverwrites.edit(everyone, everyonePatch, { reason }).catch(() => {});
+  if (!restrict) return; // rétablir @everyone suffit ; les rôles neutralisés héritent de l'ouverture
+
+  for (const overwrite of [...channel.permissionOverwrites.cache.values()]) {
+    if (overwrite.type !== 0 || overwrite.id === everyone.id || exceptRoleIds.includes(overwrite.id)) continue;
+    const patch = {};
+    for (const name of permNames) {
+      if (overwrite.allow.has(PermissionFlagsBits[name])) patch[name] = null;
+    }
+    if (Object.keys(patch).length) {
+      await channel.permissionOverwrites.edit(overwrite.id, patch, { reason }).catch(() => {});
+    }
+  }
+}
+
+module.exports = {
+  parseDuration,
+  formatDuration,
+  baseEmbed,
+  successEmbed,
+  errorEmbed,
+  checkHierarchy,
+  extractId,
+  restrictChannel,
+};
