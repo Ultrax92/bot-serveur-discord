@@ -32,7 +32,12 @@ const byChannelStmt = db.prepare('SELECT * FROM tickets WHERE channel_id = ?');
 const openByUserStmt = db.prepare("SELECT * FROM tickets WHERE guild_id = ? AND user_id = ? AND status = 'open'");
 const openByGuildStmt = db.prepare("SELECT * FROM tickets WHERE guild_id = ? AND status = 'open'");
 const claimStmt = db.prepare('UPDATE tickets SET claimed_by = ? WHERE channel_id = ?');
-const closeStmt = db.prepare("UPDATE tickets SET status = 'closed', closed_at = ? WHERE channel_id = ?");
+// Fermeture atomique : ne réussit (changes > 0) que sur un ticket encore ouvert.
+// Empêche un ticket fermé deux fois (double event de départ, process concurrent)
+// de générer deux transcripts / deux demandes d'avis.
+const closeStmt = db.prepare(
+  "UPDATE tickets SET status = 'closed', closed_at = ? WHERE channel_id = ? AND status = 'open'",
+);
 const setActivityStmt = db.prepare('UPDATE tickets SET last_activity_at = ?, warned_at = NULL WHERE channel_id = ?');
 const setWarnedStmt = db.prepare('UPDATE tickets SET warned_at = ? WHERE channel_id = ?');
 
@@ -235,7 +240,8 @@ async function buildTranscript(channel) {
 // Fermeture générique : transcript, log, MP, suppression du salon.
 // reason distingue les fermetures automatiques : 'leave' (membre parti) | 'inactivity'
 async function closeTicketChannel(channel, row, closedBy, reason = 'leave') {
-  closeStmt.run(Date.now(), channel.id);
+  // Un seul appel gagne la fermeture ; les autres (event dupliqué, concurrence) s'arrêtent ici
+  if (closeStmt.run(Date.now(), channel.id).changes === 0) return;
   const guild = channel.guild;
   const tc = getSettings(guild.id).ticketsConfig;
   const type = tc.types.find((t) => t.id === row.type_id);
