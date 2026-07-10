@@ -48,12 +48,17 @@ const setStarsStmt = db.prepare('UPDATE ticket_reviews SET stars = ? WHERE id = 
 const setCommentStmt = db.prepare('UPDATE ticket_reviews SET comment = ? WHERE id = ?');
 const setImageStmt = db.prepare('UPDATE ticket_reviews SET image = ? WHERE id = ?');
 const setStatusStmt = db.prepare('UPDATE ticket_reviews SET status = ? WHERE id = ?');
+// Transition atomique : ne réussit (changes > 0) que si le statut est encore
+// celui attendu — un seul déclencheur peut publier/valider un avis donné,
+// même en cas de double-clic, worker relancé ou process concurrent
+const claimStatusStmt = db.prepare('UPDATE ticket_reviews SET status = ? WHERE id = ? AND status = ?');
 const setValidationMsgStmt = db.prepare(
   'UPDATE ticket_reviews SET review_channel_id = ?, review_message_id = ? WHERE id = ?',
 );
-// L'avis auto est générique : il n'embarque jamais le brouillon (image comprise) du client
+// L'avis auto est générique : il n'embarque jamais le brouillon (image comprise) du client.
+// Le AND status='pending' garantit qu'un seul déclencheur le publie.
 const publishAutoStmt = db.prepare(
-  "UPDATE ticket_reviews SET status = 'published', stars = 5, comment = ?, auto = 1, image = NULL WHERE id = ?",
+  "UPDATE ticket_reviews SET status = 'published', stars = 5, comment = ?, auto = 1, image = NULL WHERE id = ? AND status = 'pending'",
 );
 // Une fois l'avis traité, le transcript ne sert plus : purgé pour garder la base et les backups légers
 const clearTranscriptStmt = db.prepare('UPDATE ticket_reviews SET transcript = NULL WHERE id = ?');
@@ -130,9 +135,11 @@ async function publishReview(client, review) {
 
 // Avis 5⭐ générique : client parti (immédiat) ou sans réponse sous 7 jours
 async function publishAutoReview(client, reviewId) {
-  deleteReviewImage(getStmt.get(reviewId)); // brouillon jamais envoyé : son image ne doit pas fuiter
+  const before = getStmt.get(reviewId); // lu avant le claim, qui met image = NULL
   const text = AUTO_REVIEW_TEXTS[Math.floor(Math.random() * AUTO_REVIEW_TEXTS.length)];
-  publishAutoStmt.run(text, reviewId);
+  // Claim atomique pending → published : un seul déclencheur publie cet avis
+  if (publishAutoStmt.run(text, reviewId).changes === 0) return false;
+  deleteReviewImage(before); // brouillon jamais envoyé : son image ne doit pas fuiter
   const review = getStmt.get(reviewId);
   const ok = await publishReview(client, review);
   if (!ok)
@@ -397,7 +404,10 @@ async function handleReviewComponent(interaction) {
 
       // Un 5⭐ sans commentaire ni image ne présente aucun risque : publié directement
       if (review.stars === 5 && !review.comment && !review.image) {
-        setStatusStmt.run('published', reviewId);
+        // Claim atomique pending → published : un double-clic ne publie pas deux fois
+        if (claimStatusStmt.run('published', reviewId, 'pending').changes === 0) {
+          return interaction.reply({ content: '⚠️ Ton avis a déjà été envoyé.', flags: MessageFlags.Ephemeral });
+        }
         const ok = await publishReview(interaction.client, getStmt.get(reviewId));
         if (!ok) {
           setStatusStmt.run('pending', reviewId);
@@ -411,7 +421,10 @@ async function handleReviewComponent(interaction) {
       }
 
       // Sinon : validation par le staff (salon configuré, ou MP au owner)
-      setStatusStmt.run('awaiting', reviewId);
+      // Claim atomique pending → awaiting : une seule demande de validation
+      if (claimStatusStmt.run('awaiting', reviewId, 'pending').changes === 0) {
+        return interaction.reply({ content: '⚠️ Ton avis a déjà été envoyé.', flags: MessageFlags.Ephemeral });
+      }
       await submitForValidation(interaction.client, getStmt.get(reviewId));
       return interaction.update(
         sentView(review, "Ton avis a été transmis, il sera publié après vérification par l'équipe. Merci ! 🙏"),
@@ -435,7 +448,10 @@ async function handleReviewComponent(interaction) {
     }
 
     if (action === 'reject') {
-      setStatusStmt.run('rejected', reviewId);
+      // Claim atomique awaiting → rejected : un double-clic ne traite qu'une fois
+      if (claimStatusStmt.run('rejected', reviewId, 'awaiting').changes === 0) {
+        return interaction.reply({ content: '⚠️ Cet avis a déjà été traité.', flags: MessageFlags.Ephemeral });
+      }
       clearTranscriptStmt.run(reviewId);
       deleteReviewImage(review);
       const embed = EmbedBuilder.from(interaction.message.embeds[0])
@@ -446,7 +462,10 @@ async function handleReviewComponent(interaction) {
       return interaction.update({ embeds: [embed], components: [] });
     }
 
-    setStatusStmt.run('published', reviewId);
+    // Claim atomique awaiting → published : un double-clic ne publie qu'une fois
+    if (claimStatusStmt.run('published', reviewId, 'awaiting').changes === 0) {
+      return interaction.reply({ content: '⚠️ Cet avis a déjà été traité.', flags: MessageFlags.Ephemeral });
+    }
     const ok = await publishReview(interaction.client, getStmt.get(reviewId));
     if (!ok) {
       setStatusStmt.run('awaiting', reviewId);
