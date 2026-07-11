@@ -128,31 +128,38 @@ const byChannelStmt = db.prepare('SELECT * FROM tempvoc_channels WHERE channel_i
 const deleteStmt = db.prepare('DELETE FROM tempvoc_channels WHERE channel_id = ?');
 const allStmt = db.prepare('SELECT * FROM tempvoc_channels');
 
-function controlPanel(member) {
+function controlPanel(channel, config, ownerMention) {
+  const locked = tempvocRestricted(channel, config, 'lock');
+  const hidden = tempvocRestricted(channel, config, 'hide');
+  const limit = channel.userLimit;
+
   const embed = new EmbedBuilder()
-    .setColor(getSettings(member.guild.id).color)
+    .setColor(getSettings(channel.guild.id).color)
     .setTitle('🔊 Ton salon vocal')
     .setDescription(
       [
-        `Ce salon t'appartient, ${member} ! Il sera **supprimé dès qu'il sera vide**.`,
+        `Ce salon appartient à ${ownerMention} ! Il sera **supprimé dès qu'il sera vide**.`,
         '',
-        '✏️ **Renommer** · 🔒 **Verrouiller** · 🙈 **Cacher** · 👥 **Limite de places**',
+        '**État actuel :**',
+        locked ? '🔒 **Verrouillé** — personne ne peut entrer' : '🔓 **Ouvert** — tout le monde peut entrer',
+        hidden ? '🙈 **Caché** — invisible pour les autres' : '👁️ **Visible**',
+        `👥 **Limite :** ${limit ? `${limit} place(s)` : 'illimitée'}`,
+        '',
         '*Verrouiller/cacher épargne toujours le staff et les membres déjà présents.*',
-        '*(Discord limite les renommages à 2 par 10 minutes)*',
       ].join('\n'),
     );
   const buttons = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('tv:rename').setLabel('Renommer').setEmoji('✏️').setStyle(ButtonStyle.Primary),
     new ButtonBuilder()
       .setCustomId('tv:lock')
-      .setLabel('Verrouiller / Ouvrir')
-      .setEmoji('🔒')
-      .setStyle(ButtonStyle.Primary),
+      .setLabel(locked ? 'Ouvrir' : 'Verrouiller')
+      .setEmoji(locked ? '🔓' : '🔒')
+      .setStyle(locked ? ButtonStyle.Success : ButtonStyle.Danger),
     new ButtonBuilder()
       .setCustomId('tv:hide')
-      .setLabel('Cacher / Afficher')
-      .setEmoji('🙈')
-      .setStyle(ButtonStyle.Primary),
+      .setLabel(hidden ? 'Afficher' : 'Cacher')
+      .setEmoji(hidden ? '👁️' : '🙈')
+      .setStyle(hidden ? ButtonStyle.Success : ButtonStyle.Danger),
     new ButtonBuilder().setCustomId('tv:limit').setLabel('Limite').setEmoji('👥').setStyle(ButtonStyle.Primary),
   );
   return { embeds: [embed], components: [buttons] };
@@ -288,7 +295,7 @@ async function handleVoiceState(oldState, newState) {
 
     insertStmt.run(channel.id, guild.id, member.id);
     await member.voice.setChannel(channel).catch(() => {});
-    await channel.send({ content: `${member}`, ...controlPanel(member) }).catch(() => {});
+    await channel.send({ content: `${member}`, ...controlPanel(channel, config, `${member}`) }).catch(() => {});
   }
 
   // Un salon temporaire quitté et vide → suppression
@@ -387,28 +394,20 @@ async function handleTempvocComponent(interaction) {
     return interaction.showModal(modal);
   }
 
-  if (action === 'lock') {
+  if (action === 'lock' || action === 'hide') {
     const config = getSettings(interaction.guild.id).tempvocConfig;
-    const locked = tempvocRestricted(channel, config, 'lock');
-    await setTempvocRestriction(channel, config, 'lock', !locked);
-    return interaction.reply({
-      content: locked
+    const active = tempvocRestricted(channel, config, action);
+    await setTempvocRestriction(channel, config, action, !active);
+    const messages = {
+      lock: active
         ? '🔓 Salon ouvert : tout le monde peut de nouveau entrer.'
         : '🔒 Salon verrouillé : plus personne ne peut entrer, sauf le staff et les membres déjà présents.',
-      flags: MessageFlags.Ephemeral,
-    });
-  }
-
-  if (action === 'hide') {
-    const config = getSettings(interaction.guild.id).tempvocConfig;
-    const hidden = tempvocRestricted(channel, config, 'hide');
-    await setTempvocRestriction(channel, config, 'hide', !hidden);
-    return interaction.reply({
-      content: hidden
+      hide: active
         ? '👁️ Salon affiché : tout le monde le voit de nouveau.'
         : '🙈 Salon caché : invisible pour tous, sauf le staff et les membres déjà présents.',
-      flags: MessageFlags.Ephemeral,
-    });
+    };
+    await interaction.update(controlPanel(channel, config, `<@${row.owner_id}>`));
+    return interaction.followUp({ content: messages[action], flags: MessageFlags.Ephemeral });
   }
 
   if (action === 'modal') {
@@ -430,7 +429,9 @@ async function handleTempvocComponent(interaction) {
         });
       }
       await channel.setUserLimit(limit).catch(() => {});
-      return interaction.reply({
+      const config = getSettings(interaction.guild.id).tempvocConfig;
+      await interaction.update(controlPanel(channel, config, `<@${row.owner_id}>`));
+      return interaction.followUp({
         content: limit ? `👥 Limite fixée à **${limit}** place(s).` : '👥 Limite retirée (places illimitées).',
         flags: MessageFlags.Ephemeral,
       });
