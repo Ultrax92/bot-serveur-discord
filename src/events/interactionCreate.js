@@ -35,6 +35,11 @@ function logCommand(interaction, status) {
 module.exports = {
   name: 'interactionCreate',
   async execute(interaction) {
+    // Garde anti-doublon : une interaction n'est traitée qu'une fois, même si une
+    // seconde instance du bot tourne (Discord la délivrerait alors aux deux)
+    const { claimInteraction } = require('../core/interactionLock');
+    if (!claimInteraction(interaction.id)) return;
+
     // Bouton public de vérification (ouvert à tous les membres, pas de gate admin)
     if (interaction.isButton() && interaction.customId === 'verify:go') {
       if (!interaction.inGuild()) return;

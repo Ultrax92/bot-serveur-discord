@@ -322,6 +322,11 @@ async function handleEmbedComponent(interaction) {
       });
     }
 
+    // Envoi réel (salon ou MP direct) : verrou anti-double-clic (deux clics avant
+    // que le panneau ne se ferme liraient le même brouillon → deux envois)
+    if (session.sending) return interaction.deferUpdate().catch(() => {});
+    session.sending = true;
+
     if (session.target.userId) {
       const user = await guild.client.users.fetch(session.target.userId).catch(() => null);
       const sent =
@@ -362,6 +367,8 @@ async function handleEmbedComponent(interaction) {
   if (action === 'confirmsend') {
     const roleId = session.target.roleId;
     if (!roleId) return interaction.update(builderView(guild, interaction.user.id));
+    if (session.sending) return interaction.deferUpdate().catch(() => {});
+    session.sending = true;
     const { embed, files, components } = buildFinalEmbed(guild, session, interaction.user);
     await guild.members.fetch().catch(() => {});
     const recipients = [...guild.members.cache.filter((m) => !m.user.bot && m.roles.cache.has(roleId)).values()];

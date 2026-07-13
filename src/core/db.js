@@ -43,6 +43,11 @@ CREATE TABLE IF NOT EXISTS tickets (
 );
 CREATE INDEX IF NOT EXISTS idx_tickets_guild_user ON tickets (guild_id, user_id, status);
 
+CREATE TABLE IF NOT EXISTS processed_interactions (
+  id TEXT PRIMARY KEY,                    -- id d'interaction déjà traité (garde anti-doublon, multi-instance)
+  created_at INTEGER NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS ticket_reviews (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   guild_id TEXT NOT NULL,
