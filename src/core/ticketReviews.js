@@ -313,6 +313,19 @@ function draftView(review) {
   return { embeds: [embed], components: [actions, back] };
 }
 
+// Écran d'attente : la publication (envoi, fetch du membre, rôle) prend parfois
+// une dizaine de secondes. Sans lui, le client garde un brouillon cliquable sous
+// les yeux et croit que son clic n'a rien fait.
+function sendingView(review) {
+  const embed = new EmbedBuilder()
+    .setColor(getSettings(review.guild_id).color)
+    .setTitle('⏳ Envoi de ton avis…')
+    .setDescription(
+      [`**${starsLine(review.stars)}** — ${ticketLabel(review)}`, 'Encore quelques secondes, ne ferme pas.'].join('\n'),
+    );
+  return { embeds: [embed], components: [] };
+}
+
 function sentView(review, message) {
   const embed = new EmbedBuilder()
     .setColor(0x57f287)
@@ -577,8 +590,10 @@ async function handleReviewComponent(interaction) {
         });
       }
       pendingReviewImages.delete(interaction.user.id);
-      // Acquitté tout de suite : la publication qui suit peut dépasser les 3 s
-      await ack(interaction);
+      // Acquitte ET retire les boutons dans le même appel : la publication qui
+      // suit peut prendre une dizaine de secondes, le client ne doit ni pouvoir
+      // recliquer ni se demander si son clic est passé
+      await interaction.update(sendingView(review)).catch(() => {});
 
       // Un 5⭐ sans commentaire ni image ne présente aucun risque : publié directement
       if (review.stars === 5 && !review.comment && !review.image) {
@@ -589,6 +604,8 @@ async function handleReviewComponent(interaction) {
         const ok = await publishReview(interaction.client, getStmt.get(reviewId));
         if (!ok) {
           setStatusStmt.run('pending', reviewId);
+          // Les boutons ont été retirés à l'acquittement : on rend la main
+          await edit(interaction, draftView(getStmt.get(reviewId)));
           return respond(interaction, '❌ Impossible de publier ton avis pour le moment, réessaie plus tard.');
         }
         clearTranscriptStmt.run(reviewId);
@@ -622,8 +639,10 @@ async function handleReviewComponent(interaction) {
     if (review.status !== 'awaiting') {
       return interaction.reply({ content: '⚠️ Cet avis a déjà été traité.', flags: MessageFlags.Ephemeral });
     }
-    // Acquitté tout de suite : la publication qui suit peut dépasser les 3 s
-    await ack(interaction);
+    // Acquitte ET retire les boutons dans le même appel : la publication qui suit
+    // peut prendre plusieurs secondes, le staff ne doit pas recliquer entre-temps
+    const staffButtons = interaction.message.components;
+    await interaction.update({ components: [] }).catch(() => {});
 
     if (action === 'reject') {
       // Claim atomique awaiting → rejected : un double-clic ne traite qu'une fois
@@ -647,6 +666,8 @@ async function handleReviewComponent(interaction) {
     const ok = await publishReview(interaction.client, getStmt.get(reviewId));
     if (!ok) {
       setStatusStmt.run('awaiting', reviewId);
+      // Les boutons ont été retirés à l'acquittement : on les rend pour réessayer
+      await edit(interaction, { components: staffButtons });
       return respond(
         interaction,
         "❌ Impossible de publier dans le salon de feedback (vérifie qu'il existe et mes permissions).",
