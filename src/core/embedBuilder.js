@@ -354,10 +354,20 @@ async function handleEmbedComponent(interaction) {
     // La mention ne s'applique qu'aux envois en salon (aucun ping possible en MP)
     const mention = mentionContent(session.mention);
     const channel = session.target.channelId ? guild.channels.cache.get(session.target.channelId) : interaction.channel;
+    // nonce + enforceNonce : si le réseau coupe pendant l'envoi, @discordjs/rest
+    // rejoue la requête alors que Discord a peut-être déjà créé le message.
+    // Le nonce est lié au clic : le rejeu retombe sur le message existant.
     const sent =
       channel &&
       (await channel
-        .send({ ...(mention ? { content: mention } : {}), embeds: [embed], files, components })
+        .send({
+          ...(mention ? { content: mention } : {}),
+          embeds: [embed],
+          files,
+          components,
+          nonce: `eb-${interaction.id}`.slice(0, 25),
+          enforceNonce: true,
+        })
         .then(() => true)
         .catch(() => false));
     resetSession(guild.id, interaction.user.id);

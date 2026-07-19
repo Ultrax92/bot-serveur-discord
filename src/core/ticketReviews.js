@@ -122,7 +122,13 @@ async function publishReview(client, review) {
     embed.setImage(`attachment://${review.image}`);
   }
 
-  const sent = await channel.send({ embeds: [embed], files }).catch(() => null);
+  // nonce + enforceNonce : si le réseau coupe pendant l'envoi, @discordjs/rest
+  // rejoue la requête (jusqu'à 3 fois) alors que Discord a peut-être déjà créé
+  // le message → deux avis identiques à la même seconde. Avec un nonce stable,
+  // Discord renvoie le message existant au lieu d'en créer un second.
+  const sent = await channel
+    .send({ embeds: [embed], files, nonce: `rv-pub-${review.id}`, enforceNonce: true })
+    .catch(() => null);
   if (!sent) return false;
 
   // Rôle client à la publication (si configuré et si le membre est encore là)
@@ -357,6 +363,10 @@ async function submitForValidation(client, review) {
     );
   }
 
+  // Même protection anti-rejeu que la publication : une seule demande de validation
+  view.nonce = `rv-val-${review.id}`;
+  view.enforceNonce = true;
+
   const staffChannel = tc.reviewChannel && guild.channels.cache.get(tc.reviewChannel);
   let sent = staffChannel ? await staffChannel.send(view).catch(() => null) : null;
   if (!sent && process.env.OWNER_ID) {
@@ -401,7 +411,8 @@ async function notifyDeclined(client, review) {
     .setTimestamp();
   if (user) embed.setAuthor(userAuthor(user));
 
-  const payload = { embeds: [embed], files: [] };
+  // Même protection anti-rejeu : un seul signalement de refus
+  const payload = { embeds: [embed], files: [], nonce: `rv-dec-${review.id}`, enforceNonce: true };
   if (review.transcript && Buffer.byteLength(review.transcript, 'utf8') < 9 * 1024 * 1024) {
     payload.files.push(
       new AttachmentBuilder(Buffer.from(review.transcript, 'utf8'), {
