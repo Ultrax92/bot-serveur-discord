@@ -184,12 +184,24 @@ async function requestReview(guild, ticketRow, closedBy, transcript = null) {
   }
 
   const review = getStmt.get(reviewId);
+  const opener = await guild.client.users.fetch(ticketRow.user_id).catch(() => null);
+  const sent = opener && (await opener.send(starsView(review, guild.name)).catch(() => null));
+  // MP fermés : la ligne reste en pending → avis 5⭐ auto à J+7 comme sans réponse
+  if (sent) setDmMessageStmt.run(sent.channelId, sent.id, reviewId);
+}
+
+// ── Brouillon d'avis en MP (note + commentaire + image, envoi par 📤) ────────
+
+// Étape 1 : le choix de la note. Une fois la note choisie on bascule sur le
+// brouillon (étape 2) pour ne pas laisser traîner à l'écran des boutons qui ne
+// concernent plus le client — il peut y revenir avec ↩️ Modifier ma note.
+function starsView(review, guildName) {
   const embed = new EmbedBuilder()
-    .setColor(getSettings(guild.id).color)
+    .setColor(getSettings(review.guild_id).color)
     .setTitle('⭐ Ton avis compte !')
     .setDescription(
       [
-        `Ton ${ticketLabel(review)} sur **${guild.name}** vient d'être fermé.`,
+        `Ton ${ticketLabel(review)}${guildName ? ` sur **${guildName}**` : ''} vient d'être fermé.`,
         '',
         "Note ton expérience de 1 à 5 étoiles — tu pourras ensuite ajouter un commentaire et/ou une image (facultatif) avant d'envoyer ton avis.",
         '',
@@ -197,16 +209,8 @@ async function requestReview(guild, ticketRow, closedBy, transcript = null) {
         "🚫 *Tu n'es pas obligé de laisser un avis : le bouton ci-dessous annule la demande pour de bon, et aucun avis — pas même l'automatique — ne sera publié.*",
       ].join('\n'),
     );
-
-  const opener = await guild.client.users.fetch(ticketRow.user_id).catch(() => null);
-  const sent =
-    opener &&
-    (await opener.send({ embeds: [embed], components: [...starsRow(review), declineRow(review)] }).catch(() => null));
-  // MP fermés : la ligne reste en pending → avis 5⭐ auto à J+7 comme sans réponse
-  if (sent) setDmMessageStmt.run(sent.channelId, sent.id, reviewId);
+  return { embeds: [embed], components: [...starsRow(review), declineRow(review)] };
 }
-
-// ── Brouillon d'avis en MP (note + commentaire + image, envoi par 📤) ────────
 
 function starsRow(review) {
   return [
@@ -280,7 +284,7 @@ function draftView(review) {
         '',
         'Quand tout est prêt, clique **📤 Envoyer mon avis**.',
         '⏳ *Sans envoi de ta part sous 7 jours, un avis 5⭐ sera publié automatiquement en ton nom, et **il ne pourra plus être retiré**.*',
-        '🚫 *Tu peux aussi refuser de laisser un avis : rien ne sera publié, ni maintenant ni dans 7 jours.*',
+        '↩️ *Pour changer ta note — ou refuser de laisser un avis — reviens en arrière avec **Modifier ma note**.*',
       ].join('\n'),
     );
 
@@ -299,7 +303,14 @@ function draftView(review) {
       .setStyle(ButtonStyle.Success)
       .setDisabled(!review.stars),
   );
-  return { embeds: [embed], components: [...starsRow(review), actions, declineRow(review)] };
+  // Retour à l'étape 1 : c'est là que vivent le choix des étoiles et le refus
+  const back = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`rv:back:${review.id}`)
+      .setLabel('↩️ Modifier ma note')
+      .setStyle(ButtonStyle.Secondary),
+  );
+  return { embeds: [embed], components: [actions, back] };
 }
 
 function sentView(review, message) {
@@ -476,7 +487,8 @@ async function handleReviewComponent(interaction) {
     action === 'modal' ||
     action === 'decline' ||
     action === 'declineok' ||
-    action === 'cancel'
+    action === 'cancel' ||
+    action === 'back'
   ) {
     if (interaction.user.id !== review.user_id) return;
     if (review.status !== 'pending') {
@@ -489,9 +501,15 @@ async function handleReviewComponent(interaction) {
       });
     }
 
+    // Retour à l'étape 1 (choix de la note + refus), depuis le brouillon ou
+    // depuis la confirmation de refus
+    if (action === 'back' || action === 'cancel') {
+      const guildName = interaction.client.guilds.cache.get(review.guild_id)?.name;
+      return interaction.update(starsView(review, guildName));
+    }
+
     // Refus : confirmation, puis annulation définitive de la demande d'avis
     if (action === 'decline') return interaction.update(declineConfirmView(review));
-    if (action === 'cancel') return interaction.update(draftView(review));
 
     if (action === 'declineok') {
       // Acquitté tout de suite : le message au staff peut dépasser les 3 s
