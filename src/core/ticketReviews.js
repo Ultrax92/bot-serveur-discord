@@ -193,8 +193,8 @@ async function requestReview(guild, ticketRow, closedBy, transcript = null) {
         '',
         "Note ton expérience de 1 à 5 étoiles — tu pourras ensuite ajouter un commentaire et/ou une image (facultatif) avant d'envoyer ton avis.",
         '',
-        '⏳ *Sans avis de ta part sous 7 jours, un avis 5⭐ sera publié automatiquement.*',
-        "🚫 *Tu n'es pas obligé : le bouton ci-dessous annule définitivement cette demande, aucun avis ne sera publié.*",
+        "⏳ *Sans action de ta part sous 7 jours, un avis 5⭐ sera publié automatiquement en ton nom. **C'est définitif : tu ne pourras plus le modifier ni le retirer ensuite.***",
+        "🚫 *Tu n'es pas obligé de laisser un avis : le bouton ci-dessous annule la demande pour de bon, et aucun avis — pas même l'automatique — ne sera publié.*",
       ].join('\n'),
     );
 
@@ -279,7 +279,8 @@ function draftView(review) {
         `**Image :** ${review.image ? '🟢 ajoutée' : '*aucune (facultatif)*'}`,
         '',
         'Quand tout est prêt, clique **📤 Envoyer mon avis**.',
-        '⏳ *Sans envoi de ta part sous 7 jours, un avis 5⭐ sera publié automatiquement.*',
+        '⏳ *Sans envoi de ta part sous 7 jours, un avis 5⭐ sera publié automatiquement en ton nom, et **il ne pourra plus être retiré**.*',
+        '🚫 *Tu peux aussi refuser de laisser un avis : rien ne sera publié, ni maintenant ni dans 7 jours.*',
       ].join('\n'),
     );
 
