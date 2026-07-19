@@ -188,11 +188,14 @@ async function requestReview(guild, ticketRow, closedBy, transcript = null) {
         "Note ton expérience de 1 à 5 étoiles — tu pourras ensuite ajouter un commentaire et/ou une image (facultatif) avant d'envoyer ton avis.",
         '',
         '⏳ *Sans avis de ta part sous 7 jours, un avis 5⭐ sera publié automatiquement.*',
+        "🚫 *Tu n'es pas obligé : le bouton ci-dessous annule définitivement cette demande, aucun avis ne sera publié.*",
       ].join('\n'),
     );
 
   const opener = await guild.client.users.fetch(ticketRow.user_id).catch(() => null);
-  const sent = opener && (await opener.send({ embeds: [embed], components: starsRow(review) }).catch(() => null));
+  const sent =
+    opener &&
+    (await opener.send({ embeds: [embed], components: [...starsRow(review), declineRow(review)] }).catch(() => null));
   // MP fermés : la ligne reste en pending → avis 5⭐ auto à J+7 comme sans réponse
   if (sent) setDmMessageStmt.run(sent.channelId, sent.id, reviewId);
 }
@@ -210,6 +213,53 @@ function starsRow(review) {
       ),
     ),
   ];
+}
+
+// Refuser de laisser un avis : le client n'est jamais forcé, et rien (pas même
+// l'avis 5⭐ automatique à J+7) ne sera publié en son nom s'il clique ici
+function declineRow(review) {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`rv:decline:${review.id}`)
+      .setLabel("🚫 Je ne souhaite pas laisser d'avis")
+      .setStyle(ButtonStyle.Secondary),
+  );
+}
+
+// Second clic obligatoire : le refus est définitif, on évite le clic accidentel
+function declineConfirmView(review) {
+  const embed = new EmbedBuilder()
+    .setColor(0xfaa61a)
+    .setTitle('🚫 Refuser de laisser un avis ?')
+    .setDescription(
+      [
+        `Tu es sur le point de refuser de laisser un avis pour ton ${ticketLabel(review)}.`,
+        '',
+        '**Aucun avis ne sera publié en ton nom**, ni maintenant, ni automatiquement dans 7 jours. Cette décision est définitive : tu ne pourras plus noter ce ticket.',
+      ].join('\n'),
+    );
+  const buttons = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`rv:declineok:${review.id}`)
+      .setLabel('🚫 Confirmer le refus')
+      .setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId(`rv:cancel:${review.id}`).setLabel('↩️ Annuler').setStyle(ButtonStyle.Secondary),
+  );
+  return { embeds: [embed], components: [buttons] };
+}
+
+function declinedView(review) {
+  const embed = new EmbedBuilder()
+    .setColor(0x99aab5)
+    .setTitle('🚫 Demande annulée')
+    .setDescription(
+      [
+        `C'est noté : aucun avis ne sera publié pour ton ${ticketLabel(review)}.`,
+        '',
+        'Merci quand même pour ta confiance, et à bientôt !',
+      ].join('\n'),
+    );
+  return { embeds: [embed], components: [] };
 }
 
 function draftView(review) {
@@ -242,7 +292,7 @@ function draftView(review) {
       .setStyle(ButtonStyle.Success)
       .setDisabled(!review.stars),
   );
-  return { embeds: [embed], components: [...starsRow(review), actions] };
+  return { embeds: [embed], components: [...starsRow(review), actions, declineRow(review)] };
 }
 
 function sentView(review, message) {
@@ -330,6 +380,50 @@ async function submitForValidation(client, review) {
   return sent;
 }
 
+// Refus d'avis : le staff est informé dans le même salon que les avis à valider,
+// mais sans boutons — il n'y a rien à valider, c'est une simple trace
+async function notifyDeclined(client, review) {
+  const guild = client.guilds.cache.get(review.guild_id);
+  if (!guild) return null;
+  const tc = getSettings(guild.id).ticketsConfig;
+  const user = await client.users.fetch(review.user_id).catch(() => null);
+
+  const embed = new EmbedBuilder()
+    .setColor(0x99aab5)
+    .setDescription(
+      [
+        `🚫 **Refus d'avis** — ${ticketLabel(review)}`,
+        `${user ? `**${user.tag}**` : `<@${review.user_id}>`} a cliqué sur le bouton pour refuser de laisser un avis.`,
+        idLine(review.user_id),
+        '*Aucun avis ne sera publié pour ce ticket, ni maintenant ni automatiquement à J+7.*',
+      ].join('\n'),
+    )
+    .setTimestamp();
+  if (user) embed.setAuthor(userAuthor(user));
+
+  const payload = { embeds: [embed], files: [] };
+  if (review.transcript && Buffer.byteLength(review.transcript, 'utf8') < 9 * 1024 * 1024) {
+    payload.files.push(
+      new AttachmentBuilder(Buffer.from(review.transcript, 'utf8'), {
+        name: `transcript-ticket-${review.ticket_number}.txt`,
+      }),
+    );
+  }
+
+  const staffChannel = tc.reviewChannel && guild.channels.cache.get(tc.reviewChannel);
+  let sent = staffChannel ? await staffChannel.send(payload).catch(() => null) : null;
+  if (!sent && process.env.OWNER_ID) {
+    const owner = await client.users.fetch(process.env.OWNER_ID).catch(() => null);
+    sent =
+      owner &&
+      (await owner.send({ content: `🚫 **Refus d'avis** sur **${guild.name}** :`, ...payload }).catch(() => null));
+  }
+  if (!sent) {
+    console.error(`[reviews] Avis #${review.id} : refus impossible à signaler au staff.`);
+  }
+  return sent;
+}
+
 // ── Interactions (customId "rv:...") ──────────────────────────────────────────
 
 // Discord n'accorde que 3 s pour acquitter une interaction. Publier un avis
@@ -362,13 +456,43 @@ async function handleReviewComponent(interaction) {
   }
 
   // ── Côté client, en MP : brouillon (étoiles, commentaire, image, envoi) ──
-  if (action === 'star' || action === 'comment' || action === 'image' || action === 'send' || action === 'modal') {
+  if (
+    action === 'star' ||
+    action === 'comment' ||
+    action === 'image' ||
+    action === 'send' ||
+    action === 'modal' ||
+    action === 'decline' ||
+    action === 'declineok' ||
+    action === 'cancel'
+  ) {
     if (interaction.user.id !== review.user_id) return;
     if (review.status !== 'pending') {
       return interaction.reply({
-        content: '⚠️ Ton avis a déjà été envoyé (ou le délai de 7 jours est passé).',
+        content:
+          review.status === 'declined'
+            ? '⚠️ Tu as refusé de laisser un avis pour ce ticket.'
+            : '⚠️ Ton avis a déjà été envoyé (ou le délai de 7 jours est passé).',
         flags: MessageFlags.Ephemeral,
       });
+    }
+
+    // Refus : confirmation, puis annulation définitive de la demande d'avis
+    if (action === 'decline') return interaction.update(declineConfirmView(review));
+    if (action === 'cancel') return interaction.update(draftView(review));
+
+    if (action === 'declineok') {
+      // Acquitté tout de suite : le message au staff peut dépasser les 3 s
+      await ack(interaction);
+      // Claim atomique pending → declined : un double-clic ne prévient le staff qu'une fois
+      if (claimStatusStmt.run('declined', reviewId, 'pending').changes === 0) {
+        return respond(interaction, '⚠️ Cette demande a déjà été traitée.');
+      }
+      pendingReviewImages.delete(interaction.user.id);
+      await notifyDeclined(interaction.client, getStmt.get(reviewId));
+      clearTranscriptStmt.run(reviewId);
+      deleteReviewImage(review); // brouillon abandonné : son image ne doit pas rester sur le disque
+      return edit(interaction, declinedView(review));
     }
 
     if (action === 'star') {

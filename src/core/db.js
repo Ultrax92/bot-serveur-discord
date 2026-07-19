@@ -55,7 +55,7 @@ CREATE TABLE IF NOT EXISTS ticket_reviews (
   ticket_number INTEGER NOT NULL,
   type_id TEXT,
   type_label TEXT,
-  status TEXT NOT NULL DEFAULT 'pending',  -- pending (attend le client) | awaiting (attend le staff) | published | rejected
+  status TEXT NOT NULL DEFAULT 'pending',  -- pending (attend le client) | awaiting (attend le staff) | published | rejected | declined (le client a refusé de noter)
   stars INTEGER,
   comment TEXT,
   auto INTEGER NOT NULL DEFAULT 0,         -- 1 = avis 5⭐ générique publié automatiquement
