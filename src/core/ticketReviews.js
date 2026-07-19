@@ -332,6 +332,28 @@ async function submitForValidation(client, review) {
 
 // ── Interactions (customId "rv:...") ──────────────────────────────────────────
 
+// Discord n'accorde que 3 s pour acquitter une interaction. Publier un avis
+// (envoi dans le salon feedback, fetch du membre, ajout du rôle) ou demander une
+// validation (upload du transcript) dépasse parfois ce délai : on acquitte AVANT
+// avec deferUpdate, puis on édite le message via editReply.
+function ack(interaction) {
+  if (interaction.deferred || interaction.replied) return Promise.resolve();
+  return interaction.deferUpdate().catch(() => {});
+}
+
+// Message éphémère, que l'interaction ait déjà été acquittée ou non
+function respond(interaction, content) {
+  const payload = { content, flags: MessageFlags.Ephemeral };
+  const send = interaction.deferred || interaction.replied ? interaction.followUp(payload) : interaction.reply(payload);
+  return send.catch(() => {});
+}
+
+// Édite le message porteur des boutons, que l'interaction ait été deferred ou non
+function edit(interaction, view) {
+  const send = interaction.deferred || interaction.replied ? interaction.editReply(view) : interaction.update(view);
+  return send.catch(() => {});
+}
+
 async function handleReviewComponent(interaction) {
   const [, action, reviewId, extra] = interaction.customId.split(':');
   const review = getStmt.get(reviewId);
@@ -401,32 +423,32 @@ async function handleReviewComponent(interaction) {
         });
       }
       pendingReviewImages.delete(interaction.user.id);
+      // Acquitté tout de suite : la publication qui suit peut dépasser les 3 s
+      await ack(interaction);
 
       // Un 5⭐ sans commentaire ni image ne présente aucun risque : publié directement
       if (review.stars === 5 && !review.comment && !review.image) {
         // Claim atomique pending → published : un double-clic ne publie pas deux fois
         if (claimStatusStmt.run('published', reviewId, 'pending').changes === 0) {
-          return interaction.reply({ content: '⚠️ Ton avis a déjà été envoyé.', flags: MessageFlags.Ephemeral });
+          return respond(interaction, '⚠️ Ton avis a déjà été envoyé.');
         }
         const ok = await publishReview(interaction.client, getStmt.get(reviewId));
         if (!ok) {
           setStatusStmt.run('pending', reviewId);
-          return interaction.reply({
-            content: '❌ Impossible de publier ton avis pour le moment, réessaie plus tard.',
-            flags: MessageFlags.Ephemeral,
-          });
+          return respond(interaction, '❌ Impossible de publier ton avis pour le moment, réessaie plus tard.');
         }
         clearTranscriptStmt.run(reviewId);
-        return interaction.update(sentView(review, 'Ton avis est **publié**, merci beaucoup ! 🙏'));
+        return edit(interaction, sentView(review, 'Ton avis est **publié**, merci beaucoup ! 🙏'));
       }
 
       // Sinon : validation par le staff (salon configuré, ou MP au owner)
       // Claim atomique pending → awaiting : une seule demande de validation
       if (claimStatusStmt.run('awaiting', reviewId, 'pending').changes === 0) {
-        return interaction.reply({ content: '⚠️ Ton avis a déjà été envoyé.', flags: MessageFlags.Ephemeral });
+        return respond(interaction, '⚠️ Ton avis a déjà été envoyé.');
       }
       await submitForValidation(interaction.client, getStmt.get(reviewId));
-      return interaction.update(
+      return edit(
+        interaction,
         sentView(review, "Ton avis a été transmis, il sera publié après vérification par l'équipe. Merci ! 🙏"),
       );
     }
@@ -446,11 +468,13 @@ async function handleReviewComponent(interaction) {
     if (review.status !== 'awaiting') {
       return interaction.reply({ content: '⚠️ Cet avis a déjà été traité.', flags: MessageFlags.Ephemeral });
     }
+    // Acquitté tout de suite : la publication qui suit peut dépasser les 3 s
+    await ack(interaction);
 
     if (action === 'reject') {
       // Claim atomique awaiting → rejected : un double-clic ne traite qu'une fois
       if (claimStatusStmt.run('rejected', reviewId, 'awaiting').changes === 0) {
-        return interaction.reply({ content: '⚠️ Cet avis a déjà été traité.', flags: MessageFlags.Ephemeral });
+        return respond(interaction, '⚠️ Cet avis a déjà été traité.');
       }
       clearTranscriptStmt.run(reviewId);
       deleteReviewImage(review);
@@ -459,20 +483,20 @@ async function handleReviewComponent(interaction) {
         .setDescription(
           `❌ **Avis rejeté** par ${interaction.user} — ${ticketLabel(review)} (${starsLine(review.stars)})`,
         );
-      return interaction.update({ embeds: [embed], components: [] });
+      return edit(interaction, { embeds: [embed], components: [] });
     }
 
     // Claim atomique awaiting → published : un double-clic ne publie qu'une fois
     if (claimStatusStmt.run('published', reviewId, 'awaiting').changes === 0) {
-      return interaction.reply({ content: '⚠️ Cet avis a déjà été traité.', flags: MessageFlags.Ephemeral });
+      return respond(interaction, '⚠️ Cet avis a déjà été traité.');
     }
     const ok = await publishReview(interaction.client, getStmt.get(reviewId));
     if (!ok) {
       setStatusStmt.run('awaiting', reviewId);
-      return interaction.reply({
-        content: "❌ Impossible de publier dans le salon de feedback (vérifie qu'il existe et mes permissions).",
-        flags: MessageFlags.Ephemeral,
-      });
+      return respond(
+        interaction,
+        "❌ Impossible de publier dans le salon de feedback (vérifie qu'il existe et mes permissions).",
+      );
     }
     clearTranscriptStmt.run(reviewId);
     deleteReviewImage(review); // l'image vit désormais sur le message publié
@@ -481,7 +505,7 @@ async function handleReviewComponent(interaction) {
       .setDescription(
         `✅ **Avis publié** par ${interaction.user} — ${ticketLabel(review)} (${starsLine(review.stars)})`,
       );
-    return interaction.update({ embeds: [embed], components: [] });
+    return edit(interaction, { embeds: [embed], components: [] });
   }
 }
 

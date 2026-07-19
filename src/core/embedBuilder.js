@@ -299,10 +299,15 @@ async function handleEmbedComponent(interaction) {
 
     // Envoi de masse à un rôle : confirmation obligatoire avec le nombre exact
     if (session.target.roleId) {
+      // Le fetch de tous les membres dépasse les 3 s accordées par Discord : on acquitte avant
+      await interaction.deferUpdate().catch(() => {});
       await guild.members.fetch().catch(() => {});
       const recipients = guild.members.cache.filter((m) => !m.user.bot && m.roles.cache.has(session.target.roleId));
       if (!recipients.size) {
-        return interaction.reply({ content: "❌ Aucun membre (non-bot) n'a ce rôle.", flags: MessageFlags.Ephemeral });
+        return interaction.followUp({
+          content: "❌ Aucun membre (non-bot) n'a ce rôle.",
+          flags: MessageFlags.Ephemeral,
+        });
       }
       const confirm = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
@@ -311,7 +316,7 @@ async function handleEmbedComponent(interaction) {
           .setStyle(ButtonStyle.Danger),
         new ButtonBuilder().setCustomId('eb:refresh').setLabel('❌ Annuler').setStyle(ButtonStyle.Secondary),
       );
-      return interaction.update({
+      return interaction.editReply({
         content: [
           `⚠️ **Tu vas envoyer cet embed en MP à ${recipients.size} membre(s)** du rôle <@&${session.target.roleId}>.`,
           `Envoi espacé (~1,2s/MP, soit ~${Math.ceil((recipients.size * 1.2) / 60)} min). Les MP de masse peuvent être limités par Discord : réserve ça aux petits rôles ou aux occasions importantes.`,
@@ -326,6 +331,8 @@ async function handleEmbedComponent(interaction) {
     // que le panneau ne se ferme liraient le même brouillon → deux envois)
     if (session.sending) return interaction.deferUpdate().catch(() => {});
     session.sending = true;
+    // L'envoi (fetch + send, éventuellement avec image) peut dépasser les 3 s : on acquitte avant
+    await interaction.deferUpdate().catch(() => {});
 
     if (session.target.userId) {
       const user = await guild.client.users.fetch(session.target.userId).catch(() => null);
@@ -336,7 +343,7 @@ async function handleEmbedComponent(interaction) {
           .then(() => true)
           .catch(() => false));
       resetSession(guild.id, interaction.user.id);
-      return interaction.update({
+      return interaction.editReply({
         content: sent ? `✅ Embed envoyé en MP à ${user}.` : "❌ Impossible d'envoyer le MP (MPs fermés ?).",
         embeds: [],
         components: [],
@@ -354,7 +361,7 @@ async function handleEmbedComponent(interaction) {
         .then(() => true)
         .catch(() => false));
     resetSession(guild.id, interaction.user.id);
-    return interaction.update({
+    return interaction.editReply({
       content: sent
         ? `✅ Embed publié dans ${channel}.`
         : '❌ Impossible de publier (salon introuvable ou permissions).',
@@ -369,12 +376,14 @@ async function handleEmbedComponent(interaction) {
     if (!roleId) return interaction.update(builderView(guild, interaction.user.id));
     if (session.sending) return interaction.deferUpdate().catch(() => {});
     session.sending = true;
+    // Le fetch de tous les membres dépasse les 3 s accordées par Discord : on acquitte avant
+    await interaction.deferUpdate().catch(() => {});
     const { embed, files, components } = buildFinalEmbed(guild, session, interaction.user);
     await guild.members.fetch().catch(() => {});
     const recipients = [...guild.members.cache.filter((m) => !m.user.bot && m.roles.cache.has(roleId)).values()];
     resetSession(guild.id, interaction.user.id);
 
-    await interaction.update({
+    await interaction.editReply({
       content: `🚀 Envoi en cours à **${recipients.length}** membre(s)… je te fais un rapport à la fin (ici si possible, sinon en MP).`,
       embeds: [],
       components: [],
