@@ -31,6 +31,11 @@ const updateContentStmt = db.prepare(
 const setChannelStmt = db.prepare('UPDATE scheduled_messages SET channel_id = ?, enabled = 1 WHERE id = ?');
 const setEnabledStmt = db.prepare('UPDATE scheduled_messages SET enabled = ? WHERE id = ?');
 const setNextRunStmt = db.prepare('UPDATE scheduled_messages SET next_run = ? WHERE id = ?');
+// Claim atomique d'une occurrence : ne réussit (changes > 0) que si next_run n'a
+// pas bougé — un seul tick envoie, même si le précédent traîne encore (envoi lent)
+const claimRunStmt = db.prepare(
+  'UPDATE scheduled_messages SET next_run = ? WHERE id = ? AND next_run = ? AND enabled = 1',
+);
 const deleteStmt = db.prepare('DELETE FROM scheduled_messages WHERE id = ? AND guild_id = ?');
 const dueStmt = db.prepare('SELECT * FROM scheduled_messages WHERE enabled = 1 AND next_run <= ?');
 
@@ -114,8 +119,17 @@ async function sendScheduledMessage(client, row) {
         ),
       ]
     : [];
+  // nonce + enforceNonce : si le réseau coupe pendant l'envoi, @discordjs/rest
+  // rejoue la requête alors que Discord a peut-être déjà créé le message. Le
+  // nonce est lié à l'occurrence (next_run) : le rejeu retombe sur l'existant.
   return channel
-    .send({ ...(content ? { content } : {}), embeds: [embed], components })
+    .send({
+      ...(content ? { content } : {}),
+      embeds: [embed],
+      components,
+      nonce: `sch-${row.id}-${row.next_run}`.slice(0, 25),
+      enforceNonce: true,
+    })
     .then(() => true)
     .catch(() => false);
 }
@@ -124,18 +138,19 @@ function startSchedulerWorker(client) {
   setInterval(async () => {
     for (const row of dueStmt.all(Date.now())) {
       if (!isModuleEnabled(row.guild_id, 'scheduler')) continue;
+      // Rattrapage sans spam : si le bot était éteint plusieurs cycles, un seul envoi
+      let next = row.next_run + row.interval_ms;
+      if (next <= Date.now()) next = Date.now() + row.interval_ms;
+      // Claim AVANT l'envoi : si un envoi lent chevauche le tick suivant, la
+      // ligne relue serait encore due → sans claim, double envoi
+      if (claimRunStmt.run(next, row.id, row.next_run).changes === 0) continue;
       const ok = await sendScheduledMessage(client, row).catch(() => false);
       if (!ok) {
         setEnabledStmt.run(0, row.id);
         console.error(
           `[scheduler] Message programmé #${row.id} (${row.name}) désactivé : salon introuvable ou envoi refusé.`,
         );
-        continue;
       }
-      // Rattrapage sans spam : si le bot était éteint plusieurs cycles, un seul envoi
-      let next = row.next_run + row.interval_ms;
-      if (next <= Date.now()) next = Date.now() + row.interval_ms;
-      setNextRunStmt.run(next, row.id);
     }
   }, 60_000);
 }
