@@ -131,10 +131,11 @@ async function publishReview(client, review) {
     .catch(() => null);
   if (!sent) return false;
 
-  // Rôle client à la publication (si configuré et si le membre est encore là)
-  if (tc.reviewRole && guild.roles.cache.has(tc.reviewRole)) {
+  // Rôles client à la publication (si configurés et si le membre est encore là)
+  const roles = tc.reviewRoles.filter((id) => guild.roles.cache.has(id));
+  if (roles.length) {
     const member = await guild.members.fetch(review.user_id).catch(() => null);
-    if (member) await member.roles.add(tc.reviewRole, 'Avis client publié').catch(() => {});
+    if (member) await member.roles.add(roles, 'Avis client publié').catch(() => {});
   }
   return true;
 }

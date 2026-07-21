@@ -102,7 +102,7 @@ const DEFAULT_SETTINGS = {
     types: [], // { id, emoji, label, description, categoryId, mentionRoles, accessRoles, openMessage }
     feedbackChannel: null, // salon où les avis clients sont publiés — le configurer active la notation
     reviewChannel: null, // salon staff où les avis attendent validation (vide = publication directe)
-    reviewRole: null, // rôle donné au client à la publication de son avis
+    reviewRoles: [], // rôles donnés au client à la publication de son avis (ex: feedback + client)
   },
   automodConfig: {
     antispam: { enabled: false, messages: 5, seconds: 5 }, // X messages en Y secondes
@@ -169,7 +169,14 @@ function deepMerge(base, override) {
 function getSettings(guildId) {
   const row = getStmt.get(guildId);
   const stored = row ? JSON.parse(row.settings) : {};
-  return deepMerge(DEFAULT_SETTINGS, stored);
+  const settings = deepMerge(DEFAULT_SETTINGS, stored);
+  // Migration : reviewRole (unique, ancien format) → reviewRoles (liste).
+  // En mémoire seulement ; les handlers du setup remettent reviewRole à null
+  // quand ils écrivent la liste, ce qui achève la migration en base.
+  if (settings.ticketsConfig.reviewRole && !settings.ticketsConfig.reviewRoles.length) {
+    settings.ticketsConfig.reviewRoles = [settings.ticketsConfig.reviewRole];
+  }
+  return settings;
 }
 
 function saveSettings(guildId, settings) {

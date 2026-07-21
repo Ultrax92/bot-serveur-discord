@@ -718,7 +718,7 @@ function ticketReviewsView(guild) {
   const tc = getSettings(guild.id).ticketsConfig;
   const feedback = tc.feedbackChannel && guild.channels.cache.get(tc.feedbackChannel);
   const review = tc.reviewChannel && guild.channels.cache.get(tc.reviewChannel);
-  const role = tc.reviewRole && guild.roles.cache.get(tc.reviewRole);
+  const roles = tc.reviewRoles.map((id) => guild.roles.cache.get(id)).filter(Boolean);
 
   const embed = panelEmbed(
     guild,
@@ -728,7 +728,7 @@ function ticketReviewsView(guild) {
       '',
       `⭐ **Salon des avis publiés** — ${feedback ? `${feedback}` : '🔴 non configuré'}`,
       `🛃 **Salon staff de validation** — ${review ? `${review}` : '📬 aucun : les avis arrivent en MP au owner pour validation'}`,
-      `🎁 **Rôle donné au client** à la publication — ${role ? `${role}` : '*aucun*'}`,
+      `🎁 **Rôles donnés au client** à la publication — ${roles.length ? roles.join(' ') : '*aucun*'}`,
       '',
       "**Fonctionnement :** à la fermeture d'un ticket, l'ouvreur reçoit en MP une demande d'avis : note 1 à 5 ⭐, commentaire et image facultatifs, envoi par bouton 📤. Un **5⭐ sans commentaire ni image** est publié directement ; tout autre avis est validé (✅ / ❌, transcript joint) dans le salon de validation, ou en MP au owner si aucun n'est configuré.",
       '*Sans envoi sous 7 jours, ou si le membre est parti, un avis 5⭐ générique est publié automatiquement.*',
@@ -751,10 +751,10 @@ function ticketReviewsView(guild) {
 
   const roleSelect = new RoleSelectMenuBuilder()
     .setCustomId('setup:tk:fbrole')
-    .setPlaceholder('🎁 Rôle donné au client à la publication (vide = aucun)…')
+    .setPlaceholder('🎁 Rôles donnés au client à la publication (vide = aucun)…')
     .setMinValues(0)
-    .setMaxValues(1);
-  if (role) roleSelect.setDefaultRoles([role.id]);
+    .setMaxValues(10);
+  if (roles.length) roleSelect.setDefaultRoles(roles.map((r) => r.id));
 
   const idButtons = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId('setup:tk:fbchanid').setLabel('🆔 Salon avis par ID').setStyle(ButtonStyle.Primary),
@@ -762,7 +762,7 @@ function ticketReviewsView(guild) {
       .setCustomId('setup:tk:rvchanid')
       .setLabel('🆔 Salon validation par ID')
       .setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId('setup:tk:fbroleid').setLabel('🆔 Rôle par ID').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId('setup:tk:fbroleid').setLabel('🆔 Rôles par ID').setStyle(ButtonStyle.Primary),
   );
 
   const buttons = new ActionRowBuilder().addComponents(
@@ -1796,15 +1796,20 @@ async function handleSetupComponent(interaction) {
 
       if (args[0] === 'tkfbroleid') {
         const raw = interaction.fields.getTextInputValue('id').trim();
-        const id = extractId(raw);
-        if (raw && (!id || !guild.roles.cache.has(id))) {
-          return interaction.reply({
-            content: '❌ Aucun rôle trouvé sur ce serveur avec cet ID.',
-            flags: MessageFlags.Ephemeral,
-          });
+        const ids = [];
+        for (const part of raw.split(/[\s,]+/).filter(Boolean)) {
+          const id = extractId(part);
+          if (!id || !guild.roles.cache.has(id)) {
+            return interaction.reply({
+              content: `❌ Aucun rôle trouvé sur ce serveur avec l'ID \`${part}\`.`,
+              flags: MessageFlags.Ephemeral,
+            });
+          }
+          if (!ids.includes(id)) ids.push(id);
         }
         updateSettings(guild.id, (s) => {
-          s.ticketsConfig.reviewRole = id ?? null;
+          s.ticketsConfig.reviewRoles = ids;
+          s.ticketsConfig.reviewRole = null; // ancien format : migration terminée
         });
         return interaction.update(ticketReviewsView(guild));
       }
@@ -2270,7 +2275,8 @@ async function handleSetupComponent(interaction) {
 
       if (sub === 'fbrole') {
         updateSettings(guild.id, (s) => {
-          s.ticketsConfig.reviewRole = interaction.values[0] ?? null;
+          s.ticketsConfig.reviewRoles = interaction.values;
+          s.ticketsConfig.reviewRole = null; // ancien format : migration terminée
         });
         return interaction.update(ticketReviewsView(guild));
       }
@@ -2307,16 +2313,17 @@ async function handleSetupComponent(interaction) {
       if (sub === 'fbroleid') {
         const modal = new ModalBuilder()
           .setCustomId('setup:modal:tkfbroleid')
-          .setTitle('Rôle donné au client')
+          .setTitle('Rôles donnés au client')
           .addComponents(
             new ActionRowBuilder().addComponents(
               new TextInputBuilder()
                 .setCustomId('id')
-                .setLabel('ID ou mention du rôle (vide = aucun)')
-                .setValue(getSettings(guild.id).ticketsConfig.reviewRole ?? '')
+                .setLabel('IDs/mentions, séparés par espaces (vide=0)')
+                .setPlaceholder('1234567890123456789 <@&9876543210987654321>')
+                .setValue(getSettings(guild.id).ticketsConfig.reviewRoles.join(' '))
                 .setStyle(TextInputStyle.Short)
                 .setRequired(false)
-                .setMaxLength(100),
+                .setMaxLength(300),
             ),
           );
         return interaction.showModal(modal);
