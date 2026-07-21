@@ -217,9 +217,26 @@ async function handleCustomCommand(message) {
     } else if (command.response.image) {
       embed.setImage(command.response.image);
     }
-    await message.channel.send({ content: mention, embeds: [embed], files, allowedMentions }).catch(() => {});
+    // nonce lié au message déclencheur : un rejeu réseau ne double pas la réponse
+    await message.channel
+      .send({
+        content: mention,
+        embeds: [embed],
+        files,
+        allowedMentions,
+        nonce: `cc-${message.id}`.slice(0, 25),
+        enforceNonce: true,
+      })
+      .catch(() => {});
   } else {
-    await message.channel.send({ content: responseText.slice(0, 2000), allowedMentions }).catch(() => {});
+    await message.channel
+      .send({
+        content: responseText.slice(0, 2000),
+        allowedMentions,
+        nonce: `cc-${message.id}`.slice(0, 25),
+        enforceNonce: true,
+      })
+      .catch(() => {});
   }
 
   const logEmbed = new EmbedBuilder()

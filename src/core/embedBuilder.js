@@ -339,7 +339,7 @@ async function handleEmbedComponent(interaction) {
       const sent =
         user &&
         (await user
-          .send({ embeds: [embed], files, components })
+          .send({ embeds: [embed], files, components, nonce: `eb-${interaction.id}`, enforceNonce: true })
           .then(() => true)
           .catch(() => false));
       resetSession(guild.id, interaction.user.id);
@@ -404,9 +404,13 @@ async function handleEmbedComponent(interaction) {
     (async () => {
       let sent = 0;
       let failed = 0;
+      let i = 0;
       for (const member of recipients) {
+        // Nonce distinct par destinataire : le rejeu réseau d'UN MP ne le double
+        // pas, sans risquer de dédupliquer les MP des autres membres
+        const nonce = `e${i++}-${interaction.id}`.slice(0, 25);
         const ok = await member
-          .send({ embeds: [embed], files, components })
+          .send({ embeds: [embed], files, components, nonce, enforceNonce: true })
           .then(() => true)
           .catch(() => false);
         if (ok) sent++;

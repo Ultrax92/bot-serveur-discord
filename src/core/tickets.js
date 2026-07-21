@@ -178,7 +178,16 @@ async function openTicket(interaction) {
     new ButtonBuilder().setCustomId('ticket:claim').setLabel('🙋 Claim').setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId('ticket:close').setLabel('🔒 Fermer').setStyle(ButtonStyle.Danger),
   );
-  await channel.send({ content: mentions, embeds: [embed], components: [buttons] }).catch(() => {});
+  // nonce + enforceNonce : un rejeu réseau ne duplique pas le message d'accueil
+  await channel
+    .send({
+      content: mentions,
+      embeds: [embed],
+      components: [buttons],
+      nonce: `tk-open-${channel.id}`.slice(0, 25),
+      enforceNonce: true,
+    })
+    .catch(() => {});
 
   const logEmbed = new EmbedBuilder()
     .setColor(0x57f287)
@@ -376,7 +385,15 @@ function startTicketInactivityWorker(client) {
                 `Sans message de <@${row.user_id}> dans les **24 heures**, il sera fermé automatiquement.`,
               ].join('\n'),
             );
-          const warning = await channel.send({ content: `<@${row.user_id}>`, embeds: [embed] }).catch(() => null);
+          // nonce + enforceNonce : un rejeu réseau ne double pas l'avertissement (et son ping)
+          const warning = await channel
+            .send({
+              content: `<@${row.user_id}>`,
+              embeds: [embed],
+              nonce: `tk-warn-${row.channel_id}`.slice(0, 25),
+              enforceNonce: true,
+            })
+            .catch(() => null);
           if (warning) setWarnedStmt.run(now, row.channel_id);
         }
       }

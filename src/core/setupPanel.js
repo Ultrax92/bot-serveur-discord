@@ -2437,7 +2437,10 @@ async function handleSetupComponent(interaction) {
             flags: MessageFlags.Ephemeral,
           });
         }
-        const sent = await channel.send(buildTicketPanel(guild, interaction.user)).catch(() => null);
+        // nonce anti-rejeu : un timeout réseau ne publie pas deux panneaux
+        const sent = await channel
+          .send({ ...buildTicketPanel(guild, interaction.user), nonce: `tp-${interaction.id}`, enforceNonce: true })
+          .catch(() => null);
         if (!sent) {
           return interaction.reply({
             content: `❌ Impossible de publier dans ${channel} (vérifie mes permissions).`,
@@ -3179,7 +3182,10 @@ async function handleSetupComponent(interaction) {
             flags: MessageFlags.Ephemeral,
           });
         }
-        const sent = await channel.send(buildVerifyPanel(guild, interaction.user)).catch(() => null);
+        // nonce anti-rejeu : un timeout réseau ne publie pas deux panneaux
+        const sent = await channel
+          .send({ ...buildVerifyPanel(guild, interaction.user), nonce: `vp-${interaction.id}`, enforceNonce: true })
+          .catch(() => null);
         if (!sent) {
           return interaction.reply({
             content: `❌ Impossible de publier dans ${channel} (vérifie mes permissions).`,

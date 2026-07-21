@@ -185,7 +185,12 @@ async function requestReview(guild, ticketRow, closedBy, transcript = null) {
 
   const review = getStmt.get(reviewId);
   const opener = await guild.client.users.fetch(ticketRow.user_id).catch(() => null);
-  const sent = opener && (await opener.send(starsView(review, guild.name)).catch(() => null));
+  // nonce + enforceNonce : un rejeu réseau ne double pas la demande d'avis en MP
+  const sent =
+    opener &&
+    (await opener
+      .send({ ...starsView(review, guild.name), nonce: `rv-ask-${review.id}`, enforceNonce: true })
+      .catch(() => null));
   // MP fermés : la ligne reste en pending → avis 5⭐ auto à J+7 comme sans réponse
   if (sent) setDmMessageStmt.run(sent.channelId, sent.id, reviewId);
 }

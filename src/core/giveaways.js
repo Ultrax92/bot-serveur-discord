@@ -11,7 +11,10 @@ const insertStmt = db.prepare(`
 const byIdStmt = db.prepare('SELECT * FROM giveaways WHERE id = ?');
 const setMessageStmt = db.prepare('UPDATE giveaways SET message_id = ? WHERE id = ?');
 const setParticipantsStmt = db.prepare('UPDATE giveaways SET participants = ? WHERE id = ?');
-const markEndedStmt = db.prepare('UPDATE giveaways SET ended = 1 WHERE id = ?');
+// Claim atomique : ne réussit (changes > 0) que si le giveaway est encore actif.
+// Un seul déclencheur fait le tirage — bouton ⏹️ et worker peuvent se chevaucher
+// à l'échéance, et deux tirages annonceraient des gagnants différents.
+const markEndedStmt = db.prepare('UPDATE giveaways SET ended = 1 WHERE id = ? AND ended = 0');
 const dueStmt = db.prepare('SELECT * FROM giveaways WHERE ended = 0 AND ends_at <= ?');
 const activeOfGuildStmt = db.prepare('SELECT * FROM giveaways WHERE guild_id = ? AND ended = 0 ORDER BY ends_at');
 
@@ -86,10 +89,14 @@ async function createGiveaway(interaction, { prize, durationMs, winners }) {
   );
   const row = byIdStmt.get(info.lastInsertRowid);
 
+  // nonce + enforceNonce : un rejeu réseau de l'envoi retombe sur le message
+  // déjà créé au lieu de publier un second giveaway (cf. scheduler/avis)
   const message = await interaction.channel
     .send({
       embeds: [buildActiveEmbed(row, settings.color)],
       components: [activeButtons(row.id)],
+      nonce: `gw-new-${row.id}`,
+      enforceNonce: true,
     })
     .catch(() => null);
   if (!message) return null;
@@ -102,7 +109,7 @@ async function createGiveaway(interaction, { prize, durationMs, winners }) {
 }
 
 async function endGiveaway(client, row, { reroll = false } = {}) {
-  if (!reroll) markEndedStmt.run(row.id);
+  if (!reroll && markEndedStmt.run(row.id).changes === 0) return; // déjà tiré par un autre déclencheur
   const channel = await client.channels.fetch(row.channel_id).catch(() => null);
   if (!channel) return;
 
@@ -122,15 +129,28 @@ async function endGiveaway(client, row, { reroll = false } = {}) {
     }
   }
 
+  // Fin : nonce lié au giveaway (une seule annonce possible). Reroll : chaque
+  // tirage est légitime, le nonce est donc horodaté — il ne bloque que le rejeu
+  // réseau de CE reroll, pas un reroll suivant.
+  const nonce = reroll ? `gw-rr-${row.id}-${Date.now()}`.slice(0, 25) : `gw-end-${row.id}`;
   if (winnerIds.length) {
     await channel
-      .send(
-        `🎉 ${reroll ? '**Reroll !** Nouveau tirage : félicitations' : 'Félicitations'} ${winnerIds.map((id) => `<@${id}>`).join(' ')} ! ` +
+      .send({
+        content:
+          `🎉 ${reroll ? '**Reroll !** Nouveau tirage : félicitations' : 'Félicitations'} ${winnerIds.map((id) => `<@${id}>`).join(' ')} ! ` +
           `Vous remportez **${row.prize}** ! (organisé par <@${row.host_id}>)`,
-      )
+        nonce,
+        enforceNonce: true,
+      })
       .catch(() => {});
   } else {
-    await channel.send(`😢 Personne n'a participé au giveaway **${row.prize}**, pas de gagnant.`).catch(() => {});
+    await channel
+      .send({
+        content: `😢 Personne n'a participé au giveaway **${row.prize}**, pas de gagnant.`,
+        nonce,
+        enforceNonce: true,
+      })
+      .catch(() => {});
   }
 }
 
