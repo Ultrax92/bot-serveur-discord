@@ -32,6 +32,27 @@ function logCommand(interaction, status) {
   sendLog(interaction.guild, 'command', embed).catch(() => {});
 }
 
+// Courses bénignes, pas des bugs : salon ou message supprimé sous l'interaction
+// (double-clic sur Fermer pendant la suppression du ticket, panneau republié…),
+// interaction expirée ou déjà acquittée. Impossible d'y répondre, rien à corriger :
+// simple warn, sans remonter dans le salon d'erreurs.
+const BENIGN_ERROR_CODES = new Set([
+  10003, // Unknown Channel
+  10008, // Unknown Message
+  10062, // Unknown interaction (token expiré)
+  40060, // Interaction déjà acquittée
+]);
+
+async function reportComponentError(scope, interaction, error, { followUp = false } = {}) {
+  if (BENIGN_ERROR_CODES.has(error?.code)) {
+    console.warn(`[interactions] ${scope} : interaction ignorée (${error.code}, salon/message disparu ou expirée).`);
+    return;
+  }
+  console.error(`Erreur sur ${scope} :`, error);
+  const payload = { content: 'Une erreur est survenue, réessaie.', flags: MessageFlags.Ephemeral };
+  await (followUp ? interaction.followUp(payload) : interaction.reply(payload)).catch(() => {});
+}
+
 module.exports = {
   name: 'interactionCreate',
   async execute(interaction) {
@@ -46,10 +67,7 @@ module.exports = {
       try {
         await handleVerifyButton(interaction);
       } catch (error) {
-        console.error('Erreur sur le bouton de vérification :', error);
-        await interaction
-          .reply({ content: 'Une erreur est survenue, réessaie.', flags: MessageFlags.Ephemeral })
-          .catch(() => {});
+        await reportComponentError('le bouton de vérification', interaction, error);
       }
       return;
     }
@@ -60,10 +78,7 @@ module.exports = {
       try {
         await handleTicketComponent(interaction);
       } catch (error) {
-        console.error('Erreur sur le système de tickets :', error);
-        await interaction
-          .reply({ content: 'Une erreur est survenue, réessaie.', flags: MessageFlags.Ephemeral })
-          .catch(() => {});
+        await reportComponentError('le système de tickets', interaction, error);
       }
       return;
     }
@@ -74,10 +89,7 @@ module.exports = {
         const { handleReviewComponent } = require('../core/ticketReviews');
         await handleReviewComponent(interaction);
       } catch (error) {
-        console.error('Erreur sur la notation des tickets :', error);
-        await interaction
-          .reply({ content: 'Une erreur est survenue, réessaie.', flags: MessageFlags.Ephemeral })
-          .catch(() => {});
+        await reportComponentError('la notation des tickets', interaction, error);
       }
       return;
     }
@@ -88,10 +100,7 @@ module.exports = {
       try {
         await handleGiveawayComponent(interaction);
       } catch (error) {
-        console.error('Erreur sur les giveaways :', error);
-        await interaction
-          .reply({ content: 'Une erreur est survenue, réessaie.', flags: MessageFlags.Ephemeral })
-          .catch(() => {});
+        await reportComponentError('les giveaways', interaction, error);
       }
       return;
     }
@@ -103,10 +112,7 @@ module.exports = {
         const { handleBackupComponent } = require('../core/backups');
         await handleBackupComponent(interaction);
       } catch (error) {
-        console.error('Erreur sur les backups :', error);
-        await interaction
-          .reply({ content: 'Une erreur est survenue, réessaie.', flags: MessageFlags.Ephemeral })
-          .catch(() => {});
+        await reportComponentError('les backups', interaction, error);
       }
       return;
     }
@@ -119,10 +125,7 @@ module.exports = {
         const { handleRecoveryComponent } = require('../core/recovery');
         await handleRecoveryComponent(interaction);
       } catch (error) {
-        console.error('Erreur sur le recovery :', error);
-        await interaction
-          .reply({ content: 'Une erreur est survenue, réessaie.', flags: MessageFlags.Ephemeral })
-          .catch(() => {});
+        await reportComponentError('le recovery', interaction, error);
       }
       return;
     }
@@ -137,10 +140,7 @@ module.exports = {
         const { handleScheduleComponent } = require('../core/scheduler');
         await handleScheduleComponent(interaction);
       } catch (error) {
-        console.error('Erreur sur les messages programmés :', error);
-        await interaction
-          .reply({ content: 'Une erreur est survenue, réessaie.', flags: MessageFlags.Ephemeral })
-          .catch(() => {});
+        await reportComponentError('les messages programmés', interaction, error);
       }
       return;
     }
@@ -152,10 +152,7 @@ module.exports = {
         const { handleEmbedComponent } = require('../core/embedBuilder');
         await handleEmbedComponent(interaction);
       } catch (error) {
-        console.error("Erreur sur le générateur d'embeds :", error);
-        await interaction
-          .reply({ content: 'Une erreur est survenue, réessaie.', flags: MessageFlags.Ephemeral })
-          .catch(() => {});
+        await reportComponentError("le générateur d'embeds", interaction, error);
       }
       return;
     }
@@ -166,10 +163,7 @@ module.exports = {
       try {
         await handleTempvocComponent(interaction);
       } catch (error) {
-        console.error('Erreur sur les vocaux temporaires :', error);
-        await interaction
-          .reply({ content: 'Une erreur est survenue, réessaie.', flags: MessageFlags.Ephemeral })
-          .catch(() => {});
+        await reportComponentError('les vocaux temporaires', interaction, error);
       }
       return;
     }
@@ -189,10 +183,7 @@ module.exports = {
       try {
         await handleSetupComponent(interaction);
       } catch (error) {
-        console.error('Erreur sur le panneau setup :', error);
-        await interaction
-          .followUp({ content: 'Une erreur est survenue.', flags: MessageFlags.Ephemeral })
-          .catch(() => {});
+        await reportComponentError('le panneau setup', interaction, error, { followUp: true });
       }
       return;
     }
