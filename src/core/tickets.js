@@ -279,13 +279,18 @@ async function closeTicketChannel(channel, row, closedBy, reason = 'leave') {
 
   if (tc.transcriptDM) {
     const opener = await guild.client.users.fetch(row.user_id).catch(() => null);
-    if (opener) {
-      await opener
+    const delivered =
+      opener &&
+      (await opener
         .send({
           content: `🔒 Ton ticket n°${row.number} sur **${guild.name}** a été fermé. Voici le transcript :`,
           files: [makeFile()],
         })
-        .catch(() => {});
+        .then(() => true)
+        .catch(() => false));
+    // MP fermés ou bot bloqué : la demande d'avis échouera pareil et prévient le staff
+    if (!delivered) {
+      console.warn(`[tickets] Transcript du ticket n°${row.number} impossible à envoyer en MP à ${row.user_id}.`);
     }
   }
 

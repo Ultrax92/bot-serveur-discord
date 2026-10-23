@@ -48,6 +48,9 @@ module.exports = {
       durationText = ` pour **${formatDuration(duration)}**`;
     }
 
+    // MP + ban + log peuvent dépasser les 3 s accordées par Discord : on acquitte avant
+    await interaction.deferReply();
+
     if (getSettings(interaction.guildId).moderationConfig.dmOnSanction) {
       await user
         .send(
@@ -75,7 +78,7 @@ module.exports = {
       reason,
       duration: expiresAt ? durationText.replaceAll('*', '').replace(' pour ', '') : null,
     });
-    return interaction.reply({
+    return interaction.editReply({
       embeds: [successEmbed(interaction, `🔨 **${user.tag}** a été banni${durationText}.\n**Raison :** ${reason}`)],
     });
   },

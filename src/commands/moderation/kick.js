@@ -27,6 +27,9 @@ module.exports = {
       return interaction.reply({ embeds: [errorEmbed(interaction, hierarchyError)], flags: MessageFlags.Ephemeral });
     }
 
+    // MP + kick + log peuvent dépasser les 3 s accordées par Discord : on acquitte avant
+    await interaction.deferReply();
+
     if (getSettings(interaction.guildId).moderationConfig.dmOnSanction) {
       await member.send(`👢 Tu as été expulsé de **${interaction.guild.name}** : ${reason}`).catch(() => {});
     }
@@ -40,7 +43,7 @@ module.exports = {
     });
 
     await logModAction(interaction, { emoji: '👢', action: 'Kick', target: member.user, reason });
-    return interaction.reply({
+    return interaction.editReply({
       embeds: [successEmbed(interaction, `👢 **${member.user.tag}** a été expulsé.\n**Raison :** ${reason}`)],
     });
   },

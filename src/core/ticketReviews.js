@@ -194,6 +194,38 @@ async function requestReview(guild, ticketRow, closedBy, transcript = null) {
       .catch(() => null));
   // MP fermés : la ligne reste en pending → avis 5⭐ auto à J+7 comme sans réponse
   if (sent) setDmMessageStmt.run(sent.channelId, sent.id, reviewId);
+  // Échec silencieux côté client (MP fermés ou bot bloqué) : le staff doit le
+  // savoir, sinon le client semble ignoré alors qu'il n'a simplement rien reçu
+  else await notifyAskFailed(guild, review).catch(() => {});
+}
+
+// Préviens le staff qu'un client est injoignable en MP : la demande d'avis (et
+// le transcript, envoyé par le même canal) ne lui est pas parvenue
+async function notifyAskFailed(guild, review) {
+  const tc = getSettings(guild.id).ticketsConfig;
+  const user = await guild.client.users.fetch(review.user_id).catch(() => null);
+
+  const embed = new EmbedBuilder()
+    .setColor(0xfaa61a)
+    .setDescription(
+      [
+        `⚠️ **Demande d'avis impossible à envoyer** — ${ticketLabel(review)}`,
+        `${user ? `**${user.tag}**` : `<@${review.user_id}>`} n'a pas reçu la demande d'avis en MP (MP fermés ou bot bloqué) — le transcript non plus, le cas échéant.`,
+        idLine(review.user_id),
+        "*Sans action de sa part, un avis 5⭐ automatique sera publié à J+7. Vous pouvez l'inviter à ouvrir ses MP.*",
+      ].join('\n'),
+    )
+    .setTimestamp();
+  if (user) embed.setAuthor(userAuthor(user));
+
+  const payload = { embeds: [embed], nonce: `rv-nak-${review.id}`, enforceNonce: true };
+  const staffChannel = tc.reviewChannel && guild.channels.cache.get(tc.reviewChannel);
+  let sent = staffChannel ? await staffChannel.send(payload).catch(() => null) : null;
+  if (!sent && process.env.OWNER_ID) {
+    const owner = await guild.client.users.fetch(process.env.OWNER_ID).catch(() => null);
+    sent = owner && (await owner.send({ embeds: [embed] }).catch(() => null));
+  }
+  if (!sent) console.warn(`[reviews] Avis #${review.id} : demande d'avis ET notification staff impossibles.`);
 }
 
 // ── Brouillon d'avis en MP (note + commentaire + image, envoi par 📤) ────────

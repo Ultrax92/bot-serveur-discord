@@ -48,6 +48,9 @@ module.exports = {
       if (duration > MAX_TIMEOUT_MS) duration = MAX_TIMEOUT_MS;
     }
 
+    // Timeout + MP + log peuvent dépasser les 3 s accordées par Discord : on acquitte avant
+    await interaction.deferReply();
+
     await member.timeout(duration, `${reason} (par ${interaction.user.tag})`);
     if (getSettings(interaction.guildId).moderationConfig.dmOnSanction) {
       await member
@@ -70,7 +73,7 @@ module.exports = {
       reason,
       duration: formatDuration(duration),
     });
-    return interaction.reply({
+    return interaction.editReply({
       embeds: [
         successEmbed(
           interaction,

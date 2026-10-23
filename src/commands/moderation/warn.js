@@ -28,6 +28,9 @@ module.exports = {
       return interaction.reply({ embeds: [errorEmbed(interaction, hierarchyError)], flags: MessageFlags.Ephemeral });
     }
 
+    // MP + log + vérification des paliers peuvent dépasser les 3 s : on acquitte avant
+    await interaction.deferReply();
+
     addSanction({
       guildId: interaction.guildId,
       userId: member.id,
@@ -45,7 +48,7 @@ module.exports = {
     const { checkStrikes } = require('../../core/strikes');
     const strikeNote = await checkStrikes(interaction.guild, member).catch(() => null);
 
-    return interaction.reply({
+    return interaction.editReply({
       embeds: [
         successEmbed(
           interaction,
