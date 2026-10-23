@@ -44,6 +44,7 @@ const dueStmt = db.prepare(
   "SELECT * FROM ticket_reviews WHERE status = 'pending' AND deadline IS NOT NULL AND deadline <= ?",
 );
 const setDmMessageStmt = db.prepare('UPDATE ticket_reviews SET dm_channel_id = ?, dm_message_id = ? WHERE id = ?');
+const setDeadlineStmt = db.prepare('UPDATE ticket_reviews SET deadline = ? WHERE id = ?');
 const setStarsStmt = db.prepare('UPDATE ticket_reviews SET stars = ? WHERE id = ?');
 const setCommentStmt = db.prepare('UPDATE ticket_reviews SET comment = ? WHERE id = ?');
 const setImageStmt = db.prepare('UPDATE ticket_reviews SET image = ? WHERE id = ?');
@@ -185,18 +186,24 @@ async function requestReview(guild, ticketRow, closedBy, transcript = null) {
   }
 
   const review = getStmt.get(reviewId);
-  const opener = await guild.client.users.fetch(ticketRow.user_id).catch(() => null);
-  // nonce + enforceNonce : un rejeu réseau ne double pas la demande d'avis en MP
+  const delivered = await sendAskDM(guild, review);
+  // Échec silencieux côté client (MP fermés ou bot bloqué) : le staff doit le
+  // savoir, sinon le client semble ignoré alors qu'il n'a simplement rien reçu
+  if (!delivered) await notifyAskFailed(guild, review).catch(() => {});
+}
+
+// Envoie (ou renvoie) la demande d'avis en MP. nonce + enforceNonce : un rejeu
+// réseau ou un double-clic sur 🔁 Renvoyer retombe sur le MP déjà créé.
+// MP fermés : la ligne reste en pending → avis 5⭐ auto à J+7 comme sans réponse.
+async function sendAskDM(guild, review) {
+  const opener = await guild.client.users.fetch(review.user_id).catch(() => null);
   const sent =
     opener &&
     (await opener
       .send({ ...starsView(review, guild.name), nonce: `rv-ask-${review.id}`, enforceNonce: true })
       .catch(() => null));
-  // MP fermés : la ligne reste en pending → avis 5⭐ auto à J+7 comme sans réponse
-  if (sent) setDmMessageStmt.run(sent.channelId, sent.id, reviewId);
-  // Échec silencieux côté client (MP fermés ou bot bloqué) : le staff doit le
-  // savoir, sinon le client semble ignoré alors qu'il n'a simplement rien reçu
-  else await notifyAskFailed(guild, review).catch(() => {});
+  if (sent) setDmMessageStmt.run(sent.channelId, sent.id, review.id);
+  return Boolean(sent);
 }
 
 // Préviens le staff qu'un client est injoignable en MP : la demande d'avis (et
@@ -218,12 +225,20 @@ async function notifyAskFailed(guild, review) {
     .setTimestamp();
   if (user) embed.setAuthor(userAuthor(user));
 
-  const payload = { embeds: [embed], nonce: `rv-nak-${review.id}`, enforceNonce: true };
+  // Le staff peut retenter l'envoi une fois les MP du client rouverts
+  const buttons = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`rv:resend:${review.id}`)
+      .setLabel('🔁 Renvoyer la demande')
+      .setStyle(ButtonStyle.Primary),
+  );
+
+  const payload = { embeds: [embed], components: [buttons], nonce: `rv-nak-${review.id}`, enforceNonce: true };
   const staffChannel = tc.reviewChannel && guild.channels.cache.get(tc.reviewChannel);
   let sent = staffChannel ? await staffChannel.send(payload).catch(() => null) : null;
   if (!sent && process.env.OWNER_ID) {
     const owner = await guild.client.users.fetch(process.env.OWNER_ID).catch(() => null);
-    sent = owner && (await owner.send({ embeds: [embed] }).catch(() => null));
+    sent = owner && (await owner.send({ embeds: [embed], components: [buttons] }).catch(() => null));
   }
   if (!sent) console.warn(`[reviews] Avis #${review.id} : demande d'avis ET notification staff impossibles.`);
 }
@@ -661,6 +676,45 @@ async function handleReviewComponent(interaction) {
         sentView(review, "Ton avis a été transmis, il sera publié après vérification par l'équipe. Merci ! 🙏"),
       );
     }
+  }
+
+  // ── Côté staff : renvoi de la demande d'avis à un client injoignable en MP ──
+  if (action === 'resend') {
+    const allowed = interaction.inGuild()
+      ? canModerateReview(interaction.member, review)
+      : isOwner(interaction.user.id);
+    if (!allowed) {
+      return interaction.reply({
+        content: 'Seul le staff peut renvoyer une demande d’avis.',
+        flags: MessageFlags.Ephemeral,
+      });
+    }
+    if (review.status !== 'pending') {
+      return interaction.reply({
+        content: '⚠️ Cette demande n’est plus en attente (avis déjà envoyé, publié ou refusé).',
+        flags: MessageFlags.Ephemeral,
+      });
+    }
+    // Acquitté tout de suite : l'envoi du MP peut dépasser les 3 s
+    await ack(interaction);
+
+    const guild = interaction.client.guilds.cache.get(review.guild_id);
+    const delivered = guild && (await sendAskDM(guild, review));
+    if (!delivered) {
+      return respond(interaction, '❌ Toujours impossible : ses MP sont fermés ou le bot est bloqué.');
+    }
+    // Nouveau départ : le client retrouve ses 7 jours complets avant l'avis auto
+    setDeadlineStmt.run(Date.now() + REVIEW_DEADLINE_MS, review.id);
+    const embed = EmbedBuilder.from(interaction.message.embeds[0])
+      .setColor(0x57f287)
+      .setDescription(
+        [
+          `✅ **Demande d'avis renvoyée** par ${interaction.user} — ${ticketLabel(review)}`,
+          idLine(review.user_id),
+          '*Le client a bien reçu le MP cette fois. Le délai de 7 jours avant avis automatique repart de zéro.*',
+        ].join('\n'),
+      );
+    return edit(interaction, { embeds: [embed], components: [] });
   }
 
   // ── Côté staff : validation dans le salon configuré, ou owner dans ses MP ──
